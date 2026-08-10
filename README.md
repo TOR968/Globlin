@@ -225,6 +225,38 @@ To see the working UI on demand, downgrade something disposable and hit *Check n
 npm i -g npm-check-updates@23.0.0
 ```
 
+## CI and releases
+
+Two workflows, both Windows-only, because that is the only platform arm this project implements.
+
+**`.github/workflows/ci.yml`** runs on every push to `master`/`main` and on pull requests:
+`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, then a release build whose
+`.exe` is attached to the run as an artifact and whose size is printed to the log. Superseded runs are
+cancelled. The `#[ignore]`d tests never run here — that is the point of ignoring them.
+
+**`.github/workflows/release.yml`** runs only on a `v*` tag. It first refuses to continue if the tag does
+not match the `version` in `Cargo.toml`, so a `v0.2.0` tag on a `0.1.0` manifest fails instead of
+publishing a mislabelled build. Then it tests, builds, and creates the GitHub Release with two assets: the
+bare `npm-globals-tray.exe` and a `.sha256` next to it.
+
+To cut a version:
+
+```powershell
+# 1. bump the version in Cargo.toml, then refresh Cargo.lock
+cargo build --release
+
+# 2. commit the bump
+git commit -am "Release 0.2.0"
+
+# 3. tag it and push — the tag is what triggers the release
+git tag v0.2.0
+git push && git push --tags
+```
+
+Neither workflow uses a third-party action: `actions/checkout`, `actions/upload-artifact`, and the `gh` CLI
+that GitHub runners already provide are the whole toolchain. Rust comes preinstalled on `windows-latest`,
+so there is no toolchain action and no cache to invalidate — a cold build takes about a minute.
+
 ## Other platforms
 
 `src/platform/` is selected by `cfg`: `windows.rs` is implemented, `unix.rs` returns an error from every

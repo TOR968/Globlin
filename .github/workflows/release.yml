@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish a tagged build
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Confirm the tag matches Cargo.toml
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}' -replace '^v', ''
+          $pattern = '^version = "([^"]+)"'
+          $manifest = (Select-String -Path Cargo.toml -Pattern $pattern).Matches[0].Groups[1].Value
+          if ($tag -ne $manifest) {
+            throw "tag $tag does not match the Cargo.toml version $manifest"
+          }
+          "releasing $manifest"
+
+      - name: Test
+        run: cargo test
+
+      - name: Build the release binary
+        run: cargo build --release
+
+      - name: Package the download
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/npm-globals-tray.exe dist/
+          $hash = (Get-FileHash dist/npm-globals-tray.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  npm-globals-tray.exe" | Set-Content dist/npm-globals-tray.exe.sha256
+          Get-ChildItem dist | Select-Object Name, Length
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create ${{ github.ref_name }}
+          dist/npm-globals-tray.exe
+          dist/npm-globals-tray.exe.sha256
+          --title "npm-globals-tray ${{ github.ref_name }}"
+          --notes-file .github/release-notes.md

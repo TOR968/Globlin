@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test on Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Report the toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Install the lint components
+        run: rustup component add clippy rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
+
+      - name: Build the release binary
+        run: cargo build --release
+
+      - name: Report the binary size
+        shell: pwsh
+        run: |
+          $exe = Get-Item target/release/npm-globals-tray.exe
+          "{0:N0} bytes ({1:N2} MB)" -f $exe.Length, ($exe.Length / 1MB)
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm-globals-tray-${{ github.sha }}
+          path: target/release/npm-globals-tray.exe
+          if-no-files-found: error
