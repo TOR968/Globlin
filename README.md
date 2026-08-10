@@ -27,17 +27,17 @@ config next to itself.
 Right-click the tray icon:
 
 ```
-● npm globals — 3 updates
-─────────────────────────────
+npm globals — 3 updates available
+─────────────────────────────────────
 ↑  @google/gemini-cli   0.53.1 → 0.54.4
 ↑  @salesforce/cli      2.145.6 → 2.146.3
 ↑  vercel               58.4.4 → 58.9.1
-─────────────────────────────
+─────────────────────────────────────
 ✓  prettier             3.9.6
 ✓  typescript           7.0.2
 ·  npm                  12.0.2      (ignored)
 ?  some-package         1.0.0       (not checked)
-─────────────────────────────
+─────────────────────────────────────
 Update all (3)
 Check now
 ☑ Run at startup
@@ -48,11 +48,46 @@ Quit
 Clicking an `↑` row runs `npm install -g <name>@latest` (or `bun add -g …`) with no console window, then
 re-checks. Packages from bun are suffixed ` (bun)` so a name installed in both places stays distinguishable.
 
-The icon colour is the state: grey = up to date, amber with an arrow = updates available, blue = working,
-red = the last check failed.
-
 Markers: `↑` outdated, `✓` current, `·` ignored, `?` the registry did not answer for it. `?` is
 deliberately **not** the same as `✓` — a network failure must never look like "everything is fine".
+
+### While it is working
+
+The first line always says what is happening right now, and the row being worked on is marked too, so
+"something is happening" is never ambiguous:
+
+```
+Updating @salesforce/cli 2.145.6 → 2.146.3  [2/3]..
+─────────────────────────────────────
+↑  @google/gemini-cli   0.53.1 → 0.54.4
+◓  @salesforce/cli      2.145.6 → 2.146.3..
+↑  vercel               58.4.4 → 58.9.1
+```
+
+The trailing dots cycle through `` → `.` → `..` → `...`, the row marker spins through `◐◓◑◒`, and the tray
+icon becomes a ring of orbiting dots — all driven by one frame counter that ticks every 120 ms and only
+while work is in flight. Idle costs nothing: the event loop simply waits until the next scheduled check.
+
+Every clickable row and *Update all* / *Check now* are disabled while an update runs, so a second job
+cannot be started on top of the first.
+
+## Icons
+
+There are no image files in the repository. Every icon is drawn from primitives (discs, thick segments,
+triangles) in `src/icon/render.rs`, supersampled 4× for antialiasing, and rendered at whatever size is
+asked for:
+
+| State | Look |
+|---|---|
+| Idle | slate badge, white check — everything current |
+| Updates | amber badge, white up-arrow |
+| Busy | ring of eight sky-blue dots, one bright head fading to a tail, rotating |
+| Error | red badge, white exclamation mark |
+
+The same drawing code has three consumers. The tray asks for 32 px frames at runtime. `build.rs` renders
+the idle badge at 16/32/48/64/128 px and packs it into a real `.ico` (`src/icon/ico.rs` writes the
+container by hand) which `winresource` embeds as the executable's icon. And the first notification writes
+that same `.ico` next to the config so the toast can show it.
 
 ## Checking
 
@@ -105,8 +140,9 @@ In `%LOCALAPPDATA%\npm-globals-tray\`:
 
 - **`last-check.txt`** — every package from the most recent check, one per line, with its state. This is
   the file to look at when the menu shows something surprising.
-- **`last-run.log`** — stdout and stderr of the most recent *failed* update. Reachable from the menu via
-  *Open last log*.
+- **`last-run.log`** — stdout and stderr of the most recent *failed* update, with the package name and both
+  versions on the first line. Reachable from the menu via *Open last log*.
+- **`app.ico`** — the notification artwork, written once so the toast can point at it.
 
 ## Removing it
 
@@ -133,8 +169,31 @@ Two things about the environment that the code has to work around, both verified
   `~/.bun/install/global/package.json` (honouring `BUN_INSTALL`) and resolves versions from that
   directory's `node_modules`. With an empty global store it reports zero packages, which is not an error.
 
-The tray icon is drawn pixel by pixel at runtime, so there are no image assets and no image-decoding
-dependency. The exe itself has no custom icon yet — Explorer shows the default.
+Drawing the icons rather than shipping them keeps the dependency list at seven crates: no image decoder, no
+asset pipeline, and the executable icon cannot drift out of sync with the tray icon because both come from
+the same function.
+
+## Layout
+
+| Module | Responsibility |
+|---|---|
+| `main.rs` | the `tao` event loop and nothing else |
+| `app.rs` | wiring: dispatches menu actions, spawns workers, owns the frame counter |
+| `check.rs` | the read path — what is installed, what is behind |
+| `update.rs` | the write path — runs updates, announces progress per package |
+| `notice.rs` | decides whether an update set is worth a notification, and what it should say |
+| `registry.rs` | dist-tags over HTTP |
+| `source/` | `PackageSource` trait plus the npm and bun adapters |
+| `tray/` | `mod.rs` owns the tray handle; `menu.rs` builds the menu and every label |
+| `icon/` | `render.rs` draws the states, `ico.rs` writes the container |
+| `platform/` | the OS-specific arm, selected by `cfg` |
+| `diagnostics.rs` | the two files written for troubleshooting |
+| `config.rs`, `model.rs` | settings and the types everything else speaks in |
+
+The split follows one rule: anything with branch-worthy logic lives where it can be tested without a
+running Win32 tray. That is why `notice.rs` exists as its own module rather than as methods on `App` —
+the "only notify when the set changed" rule has real edge cases (first sighting, a newer target version,
+everything becoming current) and `App` cannot be constructed in a test.
 
 ## Tests
 
@@ -142,16 +201,29 @@ dependency. The exe itself has no custom icon yet — Explorer shows the default
 cargo test
 ```
 
-Three tests are `#[ignore]`d because they touch the real system. Run them deliberately:
+93 tests, no network and no side effects. The update orchestration is exercised by pointing `npm_cmd` at a
+file that cannot be executed, which drives the real failure paths without installing anything.
+
+Five tests are `#[ignore]`d because they do touch the real system. Run them deliberately:
 
 ```
 cargo test -- --ignored --exact platform::windows::tests::autostart_round_trips_through_the_run_key
-cargo test -- --ignored --exact check::tests::a_failed_update_is_recorded_in_the_log
-$env:UPDATE_TARGET="npm-check-updates"; cargo test -- --ignored --exact check::tests::updates_a_package_for_real
+cargo test -- --ignored --exact platform::windows::tests::raises_a_real_notification
+cargo test -- --ignored --exact update::tests::a_real_npm_failure_lands_in_the_log
+cargo test -- --ignored --exact icon::tests::dump_every_state_for_visual_review
+$env:UPDATE_TARGET="npm-check-updates"; cargo test -- --ignored --exact update::tests::updates_a_package_for_real
 ```
 
-The autostart test saves and restores whatever the Run key held before it ran. The last one really installs
-`$UPDATE_TARGET@latest` globally — point it at something harmless.
+The autostart test saves and restores whatever the Run key held before it ran. `dump_every_state_for_visual_review`
+writes one `.ico` per state and per spinner frame to `%TEMP%\npm-globals-tray-icons` so the artwork can be
+eyeballed. `updates_a_package_for_real` really installs `$UPDATE_TARGET@latest` globally — point it at
+something harmless.
+
+To see the working UI on demand, downgrade something disposable and hit *Check now*:
+
+```
+npm i -g npm-check-updates@23.0.0
+```
 
 ## Other platforms
 

@@ -31,10 +31,7 @@ impl Default for Config {
         Self {
             check_interval_hours: 6,
             sources: Sources::default(),
-            ignore: vec![
-                "npm".to_string(),
-                "@anthropic-ai/claude-code".to_string(),
-            ],
+            ignore: vec!["npm".to_string(), "@anthropic-ai/claude-code".to_string()],
             last_notified: Vec::new(),
             npm_cmd: None,
         }
@@ -112,10 +109,7 @@ fn candidate_paths() -> Vec<PathBuf> {
 }
 
 fn exe_dir() -> Option<PathBuf> {
-    std::env::current_exe()
-        .ok()?
-        .parent()
-        .map(PathBuf::from)
+    std::env::current_exe().ok()?.parent().map(PathBuf::from)
 }
 
 fn quarantine(path: &PathBuf, error: &str) -> String {
@@ -126,7 +120,10 @@ fn quarantine(path: &PathBuf, error: &str) -> String {
             path.display(),
             backup.display()
         ),
-        Err(_) => format!("{} was not valid JSON ({error}); defaults are in use", path.display()),
+        Err(_) => format!(
+            "{} was not valid JSON ({error}); defaults are in use",
+            path.display()
+        ),
     }
 }
 

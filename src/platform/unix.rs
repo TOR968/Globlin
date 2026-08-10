@@ -3,8 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::Result;
 
-const NOT_IMPLEMENTED: &str =
-    "this build only implements the Windows platform arm; see README.md";
+const NOT_IMPLEMENTED: &str = "this build only implements the Windows platform arm; see README.md";
 
 pub fn claim_single_instance() -> bool {
     true

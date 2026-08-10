@@ -21,6 +21,13 @@ impl SourceKind {
             _ => None,
         }
     }
+
+    pub fn suffix(self) -> &'static str {
+        match self {
+            SourceKind::Npm => "",
+            SourceKind::Bun => " (bun)",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +65,33 @@ impl Package {
         self.latest()
             .map(|latest| format!("{}:{}@{}", self.source.label(), self.name, latest))
     }
+
+    pub fn update_target(&self) -> Option<UpdateTarget> {
+        Some(UpdateTarget {
+            name: self.name.clone(),
+            source: self.source,
+            from: self.current.clone(),
+            to: self.latest()?.clone(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateTarget {
+    pub name: String,
+    pub source: SourceKind,
+    pub from: Version,
+    pub to: Version,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Activity {
+    Checking,
+    Updating {
+        target: UpdateTarget,
+        index: usize,
+        total: usize,
+    },
 }
 
 pub fn outdated(packages: &[Package]) -> Vec<&Package> {
@@ -107,6 +141,32 @@ mod tests {
             .collect();
 
         assert_eq!(names, vec!["b"]);
+    }
+
+    #[test]
+    fn only_an_outdated_package_yields_an_update_target() {
+        let current = package("a", "1.0.0", Status::Current);
+        assert_eq!(current.update_target(), None);
+
+        let behind = package(
+            "b",
+            "1.0.0",
+            Status::Outdated {
+                latest: Version::parse("2.0.0").unwrap(),
+            },
+        );
+        let target = behind.update_target().unwrap();
+
+        assert_eq!(target.name, "b");
+        assert_eq!(target.from, Version::parse("1.0.0").unwrap());
+        assert_eq!(target.to, Version::parse("2.0.0").unwrap());
+        assert_eq!(target.source, SourceKind::Npm);
+    }
+
+    #[test]
+    fn an_ignored_or_unknown_package_is_never_an_update_target() {
+        assert_eq!(package("a", "1.0.0", Status::Ignored).update_target(), None);
+        assert_eq!(package("b", "1.0.0", Status::Unknown).update_target(), None);
     }
 
     #[test]

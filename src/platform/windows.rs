@@ -6,6 +6,7 @@ use tauri_winrt_notification::{Duration as ToastDuration, Toast};
 use winreg::enums::HKEY_CURRENT_USER;
 use winreg::RegKey;
 
+use crate::icon;
 use crate::Result;
 
 const APP_USER_MODEL_ID: &str = "NpmGlobals.Tray";
@@ -74,9 +75,16 @@ pub fn open_in_shell(path: &Path) -> Result<()> {
 }
 
 fn register_app_user_model_id() -> Result<()> {
-    let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
-        .create_subkey(format!(r"Software\Classes\AppUserModelId\{APP_USER_MODEL_ID}"))?;
+    let (key, _) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(format!(
+        r"Software\Classes\AppUserModelId\{APP_USER_MODEL_ID}"
+    ))?;
     key.set_value("DisplayName", &DISPLAY_NAME.to_string())?;
+
+    let artwork = data_dir().join("app.ico");
+    if !artwork.is_file() {
+        icon::write_app_icon(&artwork)?;
+    }
+    key.set_value("IconUri", &artwork.display().to_string())?;
     Ok(())
 }
 
@@ -107,13 +115,46 @@ mod tests {
             .unwrap()
             .get_value(RUN_VALUE)
             .unwrap();
-        assert!(value.contains("npm-globals-tray"), "unexpected value: {value}");
+        assert!(
+            value.contains("npm-globals-tray"),
+            "unexpected value: {value}"
+        );
 
         set_autostart(false).unwrap();
         assert!(!autostart_enabled());
 
         set_autostart(was_enabled).unwrap();
         assert_eq!(autostart_enabled(), was_enabled);
+    }
+
+    #[test]
+    #[ignore = "shows a real toast: cargo test -- --ignored --exact platform::windows::tests::raises_a_real_notification"]
+    fn raises_a_real_notification() {
+        notify(
+            "npm globals — test notification",
+            "prettier  3.9.6 → 3.10.0\nvercel  58.9.1 → 59.0.0",
+        )
+        .unwrap();
+
+        let artwork = data_dir().join("app.ico");
+        assert!(
+            artwork.is_file(),
+            "the toast artwork should have been written"
+        );
+
+        let key = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(format!(
+                r"Software\Classes\AppUserModelId\{APP_USER_MODEL_ID}"
+            ))
+            .unwrap();
+        assert_eq!(
+            key.get_value::<String, _>("DisplayName").unwrap(),
+            DISPLAY_NAME
+        );
+        assert_eq!(
+            key.get_value::<String, _>("IconUri").unwrap(),
+            artwork.display().to_string()
+        );
     }
 
     #[test]

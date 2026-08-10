@@ -3,19 +3,23 @@
 mod app;
 mod check;
 mod config;
+mod diagnostics;
+mod icon;
 mod model;
+mod notice;
 mod platform;
 mod registry;
 mod source;
 mod tray;
+mod update;
 
 use tao::event::{Event, StartCause};
-use tao::event_loop::{ControlFlow, EventLoopBuilder};
+use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tray_icon::menu::MenuEvent;
 
 use app::{App, Control};
-use check::Outcome;
 use model::Package;
+use update::{Outcome, Progress};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -23,6 +27,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Message {
     Menu(MenuEvent),
     Checked(Result<Vec<Package>>),
+    Progress(Progress),
     Updated(Outcome),
 }
 
@@ -44,19 +49,19 @@ fn run() -> Result<()> {
         *control_flow = match event {
             Event::NewEvents(StartCause::Init)
             | Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
-                app.start_check();
-                ControlFlow::WaitUntil(app.next_check())
+                app.on_wake();
+                ControlFlow::WaitUntil(app.next_wake())
             }
             Event::UserEvent(message) => match app.handle(message) {
                 Control::Exit => ControlFlow::Exit,
-                Control::Continue => ControlFlow::WaitUntil(app.next_check()),
+                Control::Continue => ControlFlow::WaitUntil(app.next_wake()),
             },
-            _ => ControlFlow::WaitUntil(app.next_check()),
+            _ => ControlFlow::WaitUntil(app.next_wake()),
         };
     })
 }
 
-fn forward_menu_events(proxy: tao::event_loop::EventLoopProxy<Message>) {
+fn forward_menu_events(proxy: EventLoopProxy<Message>) {
     MenuEvent::set_event_handler(Some(move |event| {
         proxy.send_event(Message::Menu(event)).ok();
     }));
