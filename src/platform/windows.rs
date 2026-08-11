@@ -35,9 +35,7 @@ pub fn home_dir() -> Option<PathBuf> {
 }
 
 pub fn data_dir() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
+    let base = std::env::var_os("LOCALAPPDATA").map_or_else(std::env::temp_dir, PathBuf::from);
     let dir = base.join("npm-globals-tray");
     fs::create_dir_all(&dir).ok();
     dir

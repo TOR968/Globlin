@@ -7,25 +7,25 @@ pub enum SourceKind {
 }
 
 impl SourceKind {
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
-            SourceKind::Npm => "npm",
-            SourceKind::Bun => "bun",
+            Self::Npm => "npm",
+            Self::Bun => "bun",
         }
     }
 
     pub fn from_label(label: &str) -> Option<Self> {
         match label {
-            "npm" => Some(SourceKind::Npm),
-            "bun" => Some(SourceKind::Bun),
+            "npm" => Some(Self::Npm),
+            "bun" => Some(Self::Bun),
             _ => None,
         }
     }
 
-    pub fn suffix(self) -> &'static str {
+    pub const fn suffix(self) -> &'static str {
         match self {
-            SourceKind::Npm => "",
-            SourceKind::Bun => " (bun)",
+            Self::Npm => "",
+            Self::Bun => " (bun)",
         }
     }
 }
@@ -54,7 +54,7 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn latest(&self) -> Option<&Version> {
+    pub const fn latest(&self) -> Option<&Version> {
         match &self.status {
             Status::Outdated { latest } => Some(latest),
             _ => None,

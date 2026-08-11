@@ -180,6 +180,6 @@ mod tests {
             check_interval_hours: 0,
             ..Default::default()
         };
-        assert_eq!(config.interval(), Duration::from_secs(3600));
+        assert_eq!(config.interval(), Duration::from_hours(1));
     }
 }

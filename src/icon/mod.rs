@@ -12,7 +12,7 @@ pub use render::{IconState, BUSY_FRAMES};
 
 const TRAY_SIZE: u32 = 32;
 
-pub fn state_for(busy: bool, failed: bool, outdated: usize) -> IconState {
+pub const fn state_for(busy: bool, failed: bool, outdated: usize) -> IconState {
     if busy {
         IconState::Busy
     } else if failed {

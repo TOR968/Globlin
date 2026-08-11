@@ -42,18 +42,18 @@ impl Action {
 
     fn from_key(key: &str) -> Option<Self> {
         match key {
-            ID_UPDATE_ALL => Some(Action::UpdateAll),
-            ID_CHECK_NOW => Some(Action::CheckNow),
-            ID_AUTOSTART => Some(Action::ToggleAutostart),
-            ID_OPEN_LOG => Some(Action::OpenLog),
-            ID_QUIT => Some(Action::Quit),
+            ID_UPDATE_ALL => Some(Self::UpdateAll),
+            ID_CHECK_NOW => Some(Self::CheckNow),
+            ID_AUTOSTART => Some(Self::ToggleAutostart),
+            ID_OPEN_LOG => Some(Self::OpenLog),
+            ID_QUIT => Some(Self::Quit),
             other => Self::parse_update(other),
         }
     }
 
     fn parse_update(key: &str) -> Option<Self> {
         let (label, name) = key.strip_prefix(UPDATE_PREFIX)?.split_once(':')?;
-        Some(Action::Update {
+        Some(Self::Update {
             name: name.to_string(),
             source: SourceKind::from_label(label)?,
         })
@@ -213,9 +213,9 @@ fn is_in_progress(package: &Package, activity: Option<&Activity>) -> bool {
     )
 }
 
-fn spinner_tick(frame: u32) -> char {
+const fn spinner_tick(frame: u32) -> char {
     const TICKS: [char; 4] = ['◐', '◓', '◑', '◒'];
-    TICKS[(frame % TICKS.len() as u32) as usize]
+    TICKS[frame as usize % TICKS.len()]
 }
 
 #[cfg(test)]

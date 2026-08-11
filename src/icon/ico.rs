@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+
 pub const SIZES: [u32; 5] = [16, 32, 48, 64, 128];
 
 const DIRECTORY_HEADER: usize = 6;
@@ -34,7 +36,7 @@ pub fn encode(images: &[(u32, Vec<u8>)]) -> Vec<u8> {
     file
 }
 
-fn stored_dimension(size: u32) -> u8 {
+const fn stored_dimension(size: u32) -> u8 {
     if size >= 256 {
         0
     } else {

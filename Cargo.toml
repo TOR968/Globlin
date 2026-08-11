@@ -3,6 +3,9 @@ name = "npm-globals-tray"
 version = "0.1.0"
 edition = "2021"
 
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
 [dependencies]
 tao = "0.36"
 tray-icon = "0.24"

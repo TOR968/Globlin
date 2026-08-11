@@ -149,7 +149,7 @@ mod tests {
     fn an_empty_target_list_does_nothing_and_announces_nothing() {
         let seen = Mutex::new(Vec::new());
         let outcome = run(&Config::default(), &[], |progress| {
-            seen.lock().unwrap().push(progress)
+            seen.lock().unwrap().push(progress);
         });
 
         assert_eq!(outcome, Outcome::default());
@@ -163,7 +163,7 @@ mod tests {
         let seen = Mutex::new(Vec::new());
 
         run(&fake.config, &targets, |progress| {
-            seen.lock().unwrap().push(progress)
+            seen.lock().unwrap().push(progress);
         });
 
         let seen = seen.lock().unwrap();
@@ -180,7 +180,7 @@ mod tests {
         let seen = Mutex::new(Vec::new());
 
         run(&fake.config, &[target("alpha")], |progress| {
-            seen.lock().unwrap().push(progress)
+            seen.lock().unwrap().push(progress);
         });
 
         let seen = seen.lock().unwrap();

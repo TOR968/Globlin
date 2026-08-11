@@ -1,3 +1,11 @@
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::many_single_char_names
+)]
+
 pub const DESIGN: f32 = 32.0;
 pub const BUSY_FRAMES: u32 = 8;
 
@@ -142,11 +150,9 @@ enum Shape {
 impl Shape {
     fn contains(&self, x: f32, y: f32) -> bool {
         match *self {
-            Shape::Disc { cx, cy, r } => (x - cx).powi(2) + (y - cy).powi(2) <= r * r,
-            Shape::Segment { from, to, width } => {
-                distance_to_segment(x, y, from, to) <= width / 2.0
-            }
-            Shape::Triangle { a, b, c } => inside_triangle(x, y, a, b, c),
+            Self::Disc { cx, cy, r } => (x - cx).powi(2) + (y - cy).powi(2) <= r * r,
+            Self::Segment { from, to, width } => distance_to_segment(x, y, from, to) <= width / 2.0,
+            Self::Triangle { a, b, c } => inside_triangle(x, y, a, b, c),
         }
     }
 }

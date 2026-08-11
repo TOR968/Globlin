@@ -64,15 +64,15 @@ impl App {
 
     pub fn handle(&mut self, message: Message) -> Control {
         match message {
-            Message::Menu(event) => return self.on_menu(event),
+            Message::Menu(event) => return self.on_menu(&event),
             Message::Checked(result) => self.on_checked(result),
             Message::Progress(progress) => self.on_progress(progress),
-            Message::Updated(outcome) => self.on_updated(outcome),
+            Message::Updated(outcome) => self.on_updated(&outcome),
         }
         Control::Continue
     }
 
-    fn on_menu(&mut self, event: MenuEvent) -> Control {
+    fn on_menu(&mut self, event: &MenuEvent) -> Control {
         let Some(action) = Action::from_id(&event.id) else {
             return Control::Continue;
         };
@@ -93,7 +93,7 @@ impl App {
                 }
             }
             Action::ToggleAutostart => self.toggle_autostart(),
-            Action::OpenLog => self.open_log(),
+            Action::OpenLog => open_log(),
         }
         Control::Continue
     }
@@ -197,7 +197,7 @@ impl App {
         self.config.save().ok();
     }
 
-    fn on_updated(&mut self, outcome: Outcome) {
+    fn on_updated(&mut self, outcome: &Outcome) {
         self.activity = None;
         if !outcome.failed.is_empty() {
             platform::notify(
@@ -223,15 +223,6 @@ impl App {
         self.render();
     }
 
-    fn open_log(&self) {
-        let path = diagnostics::log_path();
-        if path.is_file() {
-            platform::open_in_shell(&path).ok();
-        } else {
-            platform::notify("npm globals", "No failures have been logged yet.").ok();
-        }
-    }
-
     fn render(&mut self) {
         let state = self.icon_state();
         let view = view_of(&self.packages, self.activity.as_ref(), self.frame);
@@ -244,6 +235,15 @@ impl App {
             self.failed,
             model::outdated(&self.packages).len(),
         )
+    }
+}
+
+fn open_log() {
+    let path = diagnostics::log_path();
+    if path.is_file() {
+        platform::open_in_shell(&path).ok();
+    } else {
+        platform::notify("npm globals", "No failures have been logged yet.").ok();
     }
 }
 

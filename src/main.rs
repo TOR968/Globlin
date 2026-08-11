@@ -47,8 +47,7 @@ fn run() -> Result<()> {
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = match event {
-            Event::NewEvents(StartCause::Init)
-            | Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
+            Event::NewEvents(StartCause::Init | StartCause::ResumeTimeReached { .. }) => {
                 app.on_wake();
                 ControlFlow::WaitUntil(app.next_wake())
             }

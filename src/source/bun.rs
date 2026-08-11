@@ -80,9 +80,7 @@ fn install_root() -> PathBuf {
     if let Some(root) = std::env::var_os("BUN_INSTALL") {
         return PathBuf::from(root);
     }
-    platform::home_dir()
-        .map(|home| home.join(".bun"))
-        .unwrap_or_else(|| PathBuf::from(".bun"))
+    platform::home_dir().map_or_else(|| PathBuf::from(".bun"), |home| home.join(".bun"))
 }
 
 fn default_location() -> Option<PathBuf> {
