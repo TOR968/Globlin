@@ -7,6 +7,20 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-08-11
+
+Housekeeping only — the binary behaves exactly as 0.1.0 does.
+
+### Other
+
+- Enable `clippy::pedantic` in `Cargo.toml` so the existing `-D warnings` CI gate covers it, and clear
+  every finding. Only the rasteriser and the `.ico` writer keep a module-level allow, for cast lints on
+  small bounded integers.
+- Trim the README from 308 lines to 215 and add `CLAUDE.md` describing the architecture that takes several
+  files to see.
+- Widen `.gitignore` to cover the diagnostics files, editor and OS leftovers, and machine-local Claude
+  settings.
+
 ## [0.1.0] - 2026-08-11
 
 First release.
