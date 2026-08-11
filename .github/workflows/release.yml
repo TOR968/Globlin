@@ -41,6 +41,20 @@ jobs:
           "$hash  npm-globals-tray.exe" | Set-Content dist/npm-globals-tray.exe.sha256
           Get-ChildItem dist | Select-Object Name, Length
 
+      - name: Assemble the release notes
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}' -replace '^v', ''
+          $parts = @()
+          $section = & ./.github/changelog-section.ps1 -Version $version
+          if ($section) {
+            $parts += $section
+          } else {
+            "no CHANGELOG.md section found for $version; using the static notes only"
+          }
+          $parts += (Get-Content .github/release-notes.md -Raw).Trim()
+          ($parts -join "`n`n") | Set-Content dist/notes.md -Encoding utf8
+
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -49,4 +63,4 @@ jobs:
           dist/npm-globals-tray.exe
           dist/npm-globals-tray.exe.sha256
           --title "npm-globals-tray ${{ github.ref_name }}"
-          --notes-file .github/release-notes.md
+          --notes-file dist/notes.md

@@ -239,23 +239,56 @@ not match the `version` in `Cargo.toml`, so a `v0.2.0` tag on a `0.1.0` manifest
 publishing a mislabelled build. Then it tests, builds, and creates the GitHub Release with two assets: the
 bare `npm-globals-tray.exe` and a `.sha256` next to it.
 
-To cut a version:
+**`.github/workflows/release-plz.yml`** removes the manual version bookkeeping. On every push to `master`,
+[release-plz](https://release-plz.dev) reads the commits since the last tag and keeps a **release pull
+request** open containing the version bump in `Cargo.toml`/`Cargo.lock` and the new `CHANGELOG.md` entries.
+Nothing is published while that PR sits there. Merging it is the decision to release: release-plz then
+creates the `v*` tag, which triggers `release.yml`, which builds and publishes the release.
 
-```powershell
-# 1. bump the version in Cargo.toml, then refresh Cargo.lock
-cargo build --release
+### Cutting a version
 
-# 2. commit the bump
-git commit -am "Release 0.2.0"
+1. Write [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) — `feat:` for a minor bump,
+   `fix:` for a patch, `feat!:` or a `BREAKING CHANGE:` footer for a major. The commit subject becomes the
+   changelog line, so write it for a reader.
+2. Push to `master`. Check the release PR release-plz opens or updates.
+3. Merge that PR when the version is worth shipping. The tag, the build and the release follow on their own.
 
-# 3. tag it and push — the tag is what triggers the release
-git tag v0.2.0
-git push && git push --tags
+Nothing stops you from tagging by hand instead — `release.yml` only cares that a `v*` tag appeared and that
+it agrees with `Cargo.toml`.
+
+### Division of labour
+
+`release-plz.toml` keeps the two halves from fighting over the same job:
+
+```toml
+[workspace]
+publish = false            # not a crates.io crate, so never run cargo publish
+git_tag_enable = true      # release-plz owns the tag
+git_release_enable = false # release.yml owns the GitHub release and its assets
+changelog_update = true
 ```
 
-Neither workflow uses a third-party action: `actions/checkout`, `actions/upload-artifact`, and the `gh` CLI
-that GitHub runners already provide are the whole toolchain. Rust comes preinstalled on `windows-latest`,
-so there is no toolchain action and no cache to invalidate — a cold build takes about a minute.
+Without `git_release_enable = false` both release-plz and `release.yml` would race to create the same
+release. As configured, release-plz stops at the tag and hands over.
+
+`release.yml` builds its notes by pulling the matching section out of `CHANGELOG.md`
+(`.github/changelog-section.ps1`) and appending the download and checksum instructions from
+`.github/release-notes.md`. If no section matches the tag, the static notes are used alone rather than
+failing the release.
+
+### Required repository setting
+
+release-plz opens pull requests, so **Settings → Actions → General → Workflow permissions → "Allow GitHub
+Actions to create and approve pull requests"** must be enabled. Without it the `release-pr` job fails with a
+permissions error; everything else keeps working.
+
+Release PRs opened with the default `GITHUB_TOKEN` do not trigger other workflows, so CI will not run on the
+release PR itself. That is a deliberate GitHub restriction; supply a PAT or a GitHub App token instead if
+you want CI on those PRs.
+
+`release-plz/action` is the only third-party action here — `actions/checkout`, `actions/upload-artifact` and
+the `gh` CLI already on the runner cover the rest. Rust comes preinstalled on both runner images, so there
+is no toolchain step and no cache to invalidate; a cold build takes about a minute.
 
 ## Other platforms
 
