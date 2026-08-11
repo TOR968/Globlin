@@ -1,0 +1,86 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```sh
+cargo build --release          # target/release/npm-globals-tray.exe
+cargo test                     # 93 tests, no network, no side effects
+cargo fmt --check              # CI gate
+cargo clippy --all-targets -- -D warnings   # CI gate
+```
+
+`[lints.clippy] pedantic` is on in `Cargo.toml`, so `-D warnings` denies the pedantic set too. The only
+blanket exemptions are module-level `#![allow(...)]` at the top of `src/icon/render.rs` and
+`src/icon/ico.rs` — cast and single-char-name lints on the rasteriser and the `.ico` byte layout, where
+the values are small, bounded, and the casts are the point. Do not widen those allows to other modules;
+fix the code instead.
+
+Run one test: `cargo test -- --exact check::tests::versions_compare_numerically_not_as_strings`
+
+Five tests are `#[ignore]`d because they touch the real system (registry Run key, real toast, real
+`npm install -g`, icon dump). They never run in CI. Each carries its exact invocation in its
+`#[ignore = "…"]` message — `grep -rn "#\[ignore" src/` — read it before running one;
+`updates_a_package_for_real` installs globally for real and is driven by `$env:UPDATE_TARGET`.
+
+Windows-only in practice: `src/platform/unix.rs` is a stub that errors, and both CI workflows are
+`windows-latest`.
+
+## Architecture
+
+**One thread owns all state.** `main.rs` runs a `tao` event loop; `App` (`app.rs`) is the only mutable
+state and lives inside the closure. Work that can block — a check, an update run — is spawned on a plain
+`std::thread` with a *clone* of `Config`, and reports back by sending a `Message` through
+`EventLoopProxy`. There are no locks and no shared state; anything a worker learns must travel as a
+`Message` variant (`main.rs:27`). Menu clicks arrive the same way: `tray_icon`'s global handler is
+forwarded into the same queue.
+
+**`Activity` is the concurrency guard.** `App.activity: Option<Activity>` doubles as (a) the "a job is in
+flight" lock — `start_check`/`start_update` return early when it is `Some` — and (b) what the menu and
+icon render as busy. It is set on the main thread before the worker spawns and cleared only by the
+worker's terminal message.
+
+**`next_wake` drives everything time-based.** Busy: `now + 120 ms` so the spinner advances. Idle: the next
+scheduled check. There is no timer thread and idle costs nothing.
+
+**Two render paths, deliberately.** `Tray::render` rebuilds the whole menu (rows, enabled/disabled
+states, icon, tooltip); `Tray::animate` only re-texts the header item and swaps the icon, because
+rebuilding a 20-row menu 8×/second is visible. Animation frames must go through `animate`.
+
+**Menu identity is a string round-trip.** Rows carry ids like `update:npm:@salesforce/cli`, parsed back
+by `Action::from_id` (`src/tray/menu.rs:39`). Adding a menu action means adding the id constant, the
+build site, and the parse arm. `App` then resolves `Action::Update { name, source }` against
+`self.packages` — the id is a key, not a payload.
+
+**Read path vs write path.** `check.rs` = sources → installed list → registry `dist-tags` →
+`Status` per package. `update.rs` = run the update command per target, announcing `Progress` between
+each. `model.rs` holds the vocabulary both speak (`Package`, `Status`, `UpdateTarget`, `Activity`).
+`Status::Unknown` (registry did not answer) is distinct from `Status::Current` everywhere and must stay
+that way — a network failure must never render as "everything is fine".
+
+**Sources are a trait.** `PackageSource` (`src/source/mod.rs:14`) = kind + installed list + update
+`Command`. `source::enabled` fails only when *no* source could be built; one broken source does not sink
+a working one.
+
+**The testability rule that shaped the module split:** anything with branch-worthy logic lives outside
+`App`, because `App` needs a running Win32 tray and cannot be constructed in a test. That is why
+`notice.rs` (should this update set raise a notification?) is a module and not a method. Keep new logic
+on that side of the line.
+
+**Icons are code, not assets.** `icon/render.rs` draws every state from primitives; `build.rs`, the tray,
+and the notification toast all consume the same function, so the exe icon cannot drift from the tray
+icon. Do not add image files.
+
+## Conventions
+
+- **No comments anywhere in `src/`** — currently zero `//` and zero `///`. Rationale goes in
+  [README.md](README.md), which is unusually complete: it documents the verified environment
+  workarounds (`npm ls -g --json` exits non-zero on a healthy-enough tree; `bun pm ls -g` ignores `-g`),
+  the config file, and the release machinery. Read it before changing behaviour it describes.
+- Test names are full sentences describing the rule being pinned
+  (`a_package_missing_from_the_registry_reply_is_unknown_not_current`).
+- `#![windows_subsystem = "windows"]` means there is no console: `println!` debugging is invisible. Use
+  the diagnostics files (`diagnostics.rs`) or a notification.
+- Conventional Commits are load-bearing — release-plz derives the version bump and CHANGELOG from them,
+  and the subject line ships to users.
