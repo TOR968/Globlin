@@ -14,7 +14,7 @@ pub fn level(done: usize, total: usize, elapsed: Duration) -> f32 {
     if total == 0 {
         return creep(elapsed);
     }
-    (count(done) + creep(elapsed)) / count(total)
+    ((count(done) + creep(elapsed)) / count(total)).min(1.0)
 }
 
 fn count(value: usize) -> f32 {
@@ -86,5 +86,16 @@ mod tests {
         let value = level(0, 0, Duration::from_secs(2));
         assert!(value.is_finite(), "{value}");
         assert!((0.0..=1.0).contains(&value), "{value}");
+    }
+
+    #[test]
+    fn a_finished_batch_stops_at_a_full_level() {
+        for seconds in [0, 3, 600] {
+            let value = level(3, 3, Duration::from_secs(seconds));
+            assert!(
+                (value - 1.0).abs() < f32::EPSILON,
+                "{seconds}s produced {value}"
+            );
+        }
     }
 }
