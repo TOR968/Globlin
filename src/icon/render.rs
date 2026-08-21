@@ -147,7 +147,7 @@ impl Shape {
                     return false;
                 }
                 let angle = dy.atan2(dx).rem_euclid(std::f32::consts::TAU);
-                angle >= start && angle <= end
+                (angle - start).rem_euclid(std::f32::consts::TAU) <= end - start
             }
         }
     }
@@ -355,6 +355,11 @@ mod tests {
         assert!(!arc.contains(16.0, 22.0), "the bottom should be a gap");
         assert!(!arc.contains(16.0, 16.0), "the centre should be hollow");
         assert!(!arc.contains(30.0, 10.0), "outside the radius");
+        assert!(arc.contains(22.0, 16.0), "the span should close at its end");
+        assert!(
+            arc.contains(10.0, 16.0),
+            "the span should close at its start"
+        );
     }
 
     #[test]
