@@ -16,6 +16,12 @@ const AMBER: [u8; 3] = [0xf5, 0x9e, 0x0b];
 const SKY: [u8; 3] = [0x38, 0xbd, 0xf8];
 const RED: [u8; 3] = [0xef, 0x44, 0x44];
 const WHITE: [u8; 3] = [0xff, 0xff, 0xff];
+const DEEP: [u8; 3] = [0x33, 0x41, 0x55];
+
+const WAVE_CYCLES: f32 = 1.6;
+const WAVE_AMPLITUDE: f32 = 0.9;
+const GLYPH_TOP: f32 = 7.0;
+const GLYPH_BOTTOM: f32 = 25.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconState {
@@ -25,20 +31,20 @@ pub enum IconState {
     Error,
 }
 
-pub fn rgba(state: IconState, frame: u32, size: u32) -> Vec<u8> {
-    composite(&layers(state, frame), size)
+pub fn rgba(state: IconState, frame: u32, level: f32, size: u32) -> Vec<u8> {
+    composite(&layers(state, frame, level), size)
 }
 
-fn layers(state: IconState, frame: u32) -> Vec<Layer> {
+fn layers(state: IconState, frame: u32, level: f32) -> Vec<Layer> {
     match state {
         IconState::Idle => badge(SLATE, glyph()),
         IconState::Updates => badge(AMBER, glyph()),
         IconState::Error => badge(RED, glyph()),
-        IconState::Busy => spinner(frame),
+        IconState::Busy => filling(frame, level),
     }
 }
 
-fn badge(color: [u8; 3], glyph: Vec<Shape>) -> Vec<Layer> {
+fn badge(color: [u8; 3], shapes: Vec<Shape>) -> Vec<Layer> {
     let mut layers = vec![Layer {
         shape: Shape::Disc {
             cx: 16.0,
@@ -47,11 +53,13 @@ fn badge(color: [u8; 3], glyph: Vec<Shape>) -> Vec<Layer> {
         },
         color,
         alpha: 1.0,
+        clip: None,
     }];
-    layers.extend(glyph.into_iter().map(|shape| Layer {
+    layers.extend(shapes.into_iter().map(|shape| Layer {
         shape,
         color: WHITE,
         alpha: 1.0,
+        clip: None,
     }));
     layers
 }
@@ -79,32 +87,60 @@ fn glyph() -> Vec<Shape> {
     ]
 }
 
-fn spinner(frame: u32) -> Vec<Layer> {
-    const ORBIT: f32 = 10.6;
-    const DOT: f32 = 3.4;
+fn filling(frame: u32, level: f32) -> Vec<Layer> {
+    let phase = std::f32::consts::TAU * (frame % BUSY_FRAMES) as f32 / BUSY_FRAMES as f32;
+    let mut layers = vec![Layer {
+        shape: Shape::Disc {
+            cx: 16.0,
+            cy: 16.0,
+            r: 15.0,
+        },
+        color: DEEP,
+        alpha: 1.0,
+        clip: None,
+    }];
+    for shape in glyph() {
+        layers.push(Layer {
+            shape,
+            color: WHITE,
+            alpha: 0.28,
+            clip: None,
+        });
+    }
+    for shape in glyph() {
+        layers.push(Layer {
+            shape,
+            color: SKY,
+            alpha: 1.0,
+            clip: Some(Wave { level, phase }),
+        });
+    }
+    layers
+}
 
-    (0..BUSY_FRAMES)
-        .map(|dot| {
-            let behind = (dot + BUSY_FRAMES - frame % BUSY_FRAMES) % BUSY_FRAMES;
-            let angle = std::f32::consts::TAU * dot as f32 / BUSY_FRAMES as f32
-                - std::f32::consts::FRAC_PI_2;
-            Layer {
-                shape: Shape::Disc {
-                    cx: 16.0 + ORBIT * angle.cos(),
-                    cy: 16.0 + ORBIT * angle.sin(),
-                    r: DOT,
-                },
-                color: SKY,
-                alpha: 1.0 - 0.8 * (behind as f32 / (BUSY_FRAMES - 1) as f32),
-            }
-        })
-        .collect()
+struct Wave {
+    level: f32,
+    phase: f32,
+}
+
+impl Wave {
+    fn covers(&self, x: f32, y: f32) -> bool {
+        y >= self.surface_y(x)
+    }
+
+    fn surface_y(&self, x: f32) -> f32 {
+        let span = GLYPH_BOTTOM - GLYPH_TOP;
+        let level_y = GLYPH_BOTTOM - self.level.clamp(0.0, 1.0) * span;
+        let angle = std::f32::consts::TAU * x / DESIGN * WAVE_CYCLES + self.phase;
+        level_y + WAVE_AMPLITUDE * angle.sin()
+    }
 }
 
 struct Layer {
     shape: Shape,
     color: [u8; 3],
     alpha: f32,
+    clip: Option<Wave>,
 }
 
 enum Shape {
@@ -161,7 +197,7 @@ fn composite(layers: &[Layer], size: u32) -> Vec<u8> {
         for x in 0..size {
             let mut accumulated = [0.0f32; 4];
             for layer in layers {
-                let alpha = coverage(&layer.shape, x, y, scale) * layer.alpha;
+                let alpha = coverage(layer, x, y, scale) * layer.alpha;
                 if alpha > 0.0 {
                     accumulated = source_over(layer.color, alpha, accumulated);
                 }
@@ -175,7 +211,7 @@ fn composite(layers: &[Layer], size: u32) -> Vec<u8> {
     pixels
 }
 
-fn coverage(shape: &Shape, x: u32, y: u32, scale: f32) -> f32 {
+fn coverage(layer: &Layer, x: u32, y: u32, scale: f32) -> f32 {
     let step = 1.0 / SUPERSAMPLE as f32;
     let mut hits = 0;
 
@@ -183,7 +219,12 @@ fn coverage(shape: &Shape, x: u32, y: u32, scale: f32) -> f32 {
         for column in 0..SUPERSAMPLE {
             let sample_x = (x as f32 + (column as f32 + 0.5) * step) / scale;
             let sample_y = (y as f32 + (row as f32 + 0.5) * step) / scale;
-            if shape.contains(sample_x, sample_y) {
+            let inside = layer.shape.contains(sample_x, sample_y)
+                && layer
+                    .clip
+                    .as_ref()
+                    .is_none_or(|wave| wave.covers(sample_x, sample_y));
+            if inside {
                 hits += 1;
             }
         }
@@ -241,7 +282,7 @@ mod tests {
     fn every_state_fills_a_complete_rgba_buffer_at_every_size() {
         for state in STATES {
             for size in [16, 32, 48, 128] {
-                assert_eq!(rgba(state, 0, size).len() as u32, size * size * 4);
+                assert_eq!(rgba(state, 0, 0.0, size).len() as u32, size * size * 4);
             }
         }
     }
@@ -249,7 +290,7 @@ mod tests {
     #[test]
     fn corners_stay_transparent_and_the_centre_is_opaque() {
         let size = 32;
-        let pixels = rgba(IconState::Idle, 0, size);
+        let pixels = rgba(IconState::Idle, 0, 0.0, size);
 
         assert_eq!(alpha_at(&pixels, size, 0, 0), 0);
         assert_eq!(alpha_at(&pixels, size, size - 1, size - 1), 0);
@@ -259,7 +300,7 @@ mod tests {
     #[test]
     fn edges_are_antialiased_rather_than_hard() {
         let size = 32;
-        let pixels = rgba(IconState::Idle, 0, size);
+        let pixels = rgba(IconState::Idle, 0, 0.0, size);
         let partial = (0..size * size)
             .map(|index| pixels[(index * 4 + 3) as usize])
             .filter(|alpha| *alpha > 0 && *alpha < 255)
@@ -273,7 +314,10 @@ mod tests {
 
     #[test]
     fn each_state_renders_a_distinct_image() {
-        let rendered: Vec<Vec<u8>> = STATES.iter().map(|state| rgba(*state, 0, 32)).collect();
+        let rendered: Vec<Vec<u8>> = STATES
+            .iter()
+            .map(|state| rgba(*state, 0, 0.0, 32))
+            .collect();
 
         for left in 0..rendered.len() {
             for right in left + 1..rendered.len() {
@@ -285,35 +329,47 @@ mod tests {
         }
     }
 
-    #[test]
-    fn the_spinner_changes_on_every_frame_and_repeats_after_a_full_turn() {
-        let frames: Vec<Vec<u8>> = (0..BUSY_FRAMES)
-            .map(|frame| rgba(IconState::Busy, frame, 32))
-            .collect();
-
-        for frame in 1..frames.len() {
-            assert_ne!(
-                frames[frame - 1],
-                frames[frame],
-                "frame {frame} did not move"
-            );
-        }
-        assert_eq!(rgba(IconState::Busy, BUSY_FRAMES, 32), frames[0]);
+    fn sky_pixels(level: f32) -> usize {
+        let pixels = rgba(IconState::Busy, 0, level, 32);
+        pixels
+            .chunks_exact(4)
+            .filter(|pixel| pixel[3] > 128 && pixel[2] > pixel[0] + 40)
+            .count()
     }
 
     #[test]
-    fn the_spinner_has_one_fully_bright_leading_dot() {
-        let brightest = spinner(0)
-            .iter()
-            .filter(|layer| layer.alpha >= 0.999)
-            .count();
-        assert_eq!(brightest, 1);
+    fn the_water_covers_more_of_the_glyph_as_the_level_rises() {
+        let empty = sky_pixels(0.0);
+        let half = sky_pixels(0.5);
+        let full = sky_pixels(1.0);
+
+        assert!(half > empty, "half {half} !> empty {empty}");
+        assert!(full > half, "full {full} !> half {half}");
+    }
+
+    #[test]
+    fn the_surface_keeps_moving_while_the_level_stands_still() {
+        let first = rgba(IconState::Busy, 0, 0.5, 32);
+        let second = rgba(IconState::Busy, 1, 0.5, 32);
+
+        assert_ne!(first, second, "the wave did not advance");
+    }
+
+    #[test]
+    fn every_state_frame_and_level_yields_a_filled_buffer() {
+        for state in STATES {
+            for frame in 0..BUSY_FRAMES {
+                for level in [0.0, 0.5, 1.0] {
+                    assert_eq!(rgba(state, frame, level, 32).len(), 32 * 32 * 4);
+                }
+            }
+        }
     }
 
     #[test]
     fn still_states_ignore_the_frame_counter() {
         for state in [IconState::Idle, IconState::Updates, IconState::Error] {
-            assert_eq!(rgba(state, 0, 32), rgba(state, 5, 32));
+            assert_eq!(rgba(state, 0, 0.0, 32), rgba(state, 5, 0.0, 32));
         }
     }
 

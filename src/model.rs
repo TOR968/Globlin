@@ -117,6 +117,13 @@ impl Batch {
         self.targets.len()
     }
 
+    pub fn done(&self) -> usize {
+        self.results
+            .iter()
+            .filter(|result| result.is_some())
+            .count()
+    }
+
     pub fn state_of(&self, position: usize) -> RowState {
         match self.results.get(position) {
             Some(Some(true)) => RowState::Done,
@@ -310,5 +317,16 @@ mod tests {
 
         assert_eq!(batch.state_of(0), RowState::Failed);
         assert_eq!(batch.state_of(1), RowState::Done);
+    }
+
+    #[test]
+    fn the_batch_counts_only_the_targets_it_has_finished() {
+        let mut batch = batch_of(&["a", "b", "c"]);
+        assert_eq!(batch.done(), 0);
+
+        batch.finish(0, true);
+        batch.finish(1, false);
+
+        assert_eq!(batch.done(), 2);
     }
 }

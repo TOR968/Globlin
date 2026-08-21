@@ -26,7 +26,7 @@ impl Tray {
         let built = menu::build(&view)?;
         let icon = TrayIconBuilder::new()
             .with_tooltip(menu::headline(&view))
-            .with_icon(icon::tray(IconState::Busy, 0)?)
+            .with_icon(icon::tray(IconState::Busy, 0, 0.0)?)
             .with_menu(Box::new(built.menu))
             .build()?;
         Ok(Self {
@@ -36,17 +36,18 @@ impl Tray {
         })
     }
 
-    pub fn render(&mut self, view: &View, state: IconState) -> Result<()> {
+    pub fn render(&mut self, view: &View, state: IconState, level: f32) -> Result<()> {
         let built = menu::build(view)?;
         self.icon.set_menu(Some(Box::new(built.menu)));
         self.header = built.header;
         self.rows = built.rows;
         self.icon.set_tooltip(Some(menu::headline(view)))?;
-        self.icon.set_icon(Some(icon::tray(state, view.frame)?))?;
+        self.icon
+            .set_icon(Some(icon::tray(state, view.frame, level)?))?;
         Ok(())
     }
 
-    pub fn animate(&mut self, view: &View) -> Result<()> {
+    pub fn animate(&mut self, view: &View, level: f32) -> Result<()> {
         self.header.set_text(menu::headline(view));
         for (position, row) in self.rows.iter().enumerate() {
             if let Some(text) = menu::batch_row_text(view, position) {
@@ -54,7 +55,7 @@ impl Tray {
             }
         }
         self.icon
-            .set_icon(Some(icon::tray(IconState::Busy, view.frame)?))?;
+            .set_icon(Some(icon::tray(IconState::Busy, view.frame, level)?))?;
         Ok(())
     }
 }

@@ -19,7 +19,7 @@ fn main() {
 
     let images: Vec<(u32, Vec<u8>)> = ico::SIZES
         .iter()
-        .map(|size| (*size, render::rgba(render::IconState::Idle, 0, *size)))
+        .map(|size| (*size, render::rgba(render::IconState::Idle, 0, 0.0, *size)))
         .collect();
 
     let path =

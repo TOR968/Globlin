@@ -10,6 +10,17 @@ pub fn creep(elapsed: Duration) -> f32 {
     (1.0 - (-elapsed.as_secs_f32() / TAU_SECONDS).exp()).min(NEVER_QUITE_LANDED)
 }
 
+pub fn level(done: usize, total: usize, elapsed: Duration) -> f32 {
+    if total == 0 {
+        return creep(elapsed);
+    }
+    (count(done) + creep(elapsed)) / count(total)
+}
+
+fn count(value: usize) -> f32 {
+    f32::from(u16::try_from(value).unwrap_or(u16::MAX))
+}
+
 pub fn bar(fraction: f32) -> String {
     let filled = CELL_THRESHOLDS
         .iter()
@@ -58,5 +69,22 @@ mod tests {
         assert_eq!(bar(0.0), "░░░░░░░░");
         assert_eq!(bar(1.0), "████████");
         assert_eq!(bar(0.5), "████░░░░");
+    }
+
+    #[test]
+    fn a_landed_package_moves_the_level_to_its_full_share() {
+        let fresh = level(1, 3, Duration::ZERO);
+        assert!((fresh - 1.0 / 3.0).abs() < 0.001, "{fresh}");
+
+        let later = level(1, 3, Duration::from_secs(30));
+        assert!(later > fresh, "{later} !> {fresh}");
+        assert!(later < 2.0 / 3.0 + 0.001, "{later} crossed the next mark");
+    }
+
+    #[test]
+    fn an_empty_batch_never_divides_by_zero() {
+        let value = level(0, 0, Duration::from_secs(2));
+        assert!(value.is_finite(), "{value}");
+        assert!((0.0..=1.0).contains(&value), "{value}");
     }
 }

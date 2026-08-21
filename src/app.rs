@@ -8,7 +8,7 @@ use crate::icon::{self, IconState, BUSY_FRAMES};
 use crate::model::{self, Activity, Batch, Package, Status, UpdateTarget};
 use crate::tray::{Action, Tray, View};
 use crate::update::{self, Outcome, Step};
-use crate::{check, diagnostics, notice, platform, Message, Result};
+use crate::{check, diagnostics, notice, platform, progress, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
 
@@ -175,13 +175,14 @@ impl App {
 
     fn advance_animation(&mut self) {
         self.frame = (self.frame + 1) % (BUSY_FRAMES * 4);
+        let level = self.water_level();
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
             self.frame,
             self.elapsed(),
         );
-        self.tray.animate(&view).ok();
+        self.tray.animate(&view, level).ok();
     }
 
     fn on_step(&mut self, step: &Step) {
@@ -258,13 +259,14 @@ impl App {
 
     fn render(&mut self) {
         let state = self.icon_state();
+        let level = self.water_level();
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
             self.frame,
             self.elapsed(),
         );
-        self.tray.render(&view, state).ok();
+        self.tray.render(&view, state, level).ok();
     }
 
     fn icon_state(&self) -> IconState {
@@ -273,6 +275,16 @@ impl App {
             self.failed,
             model::outdated(&self.packages).len(),
         )
+    }
+
+    fn water_level(&self) -> f32 {
+        match &self.activity {
+            Some(Activity::Updating { batch }) => {
+                progress::level(batch.done(), batch.total(), self.elapsed())
+            }
+            Some(Activity::Checking) => progress::creep(self.elapsed()),
+            None => 0.0,
+        }
     }
 
     fn elapsed(&self) -> Duration {
