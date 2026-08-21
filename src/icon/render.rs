@@ -31,9 +31,9 @@ pub fn rgba(state: IconState, frame: u32, size: u32) -> Vec<u8> {
 
 fn layers(state: IconState, frame: u32) -> Vec<Layer> {
     match state {
-        IconState::Idle => badge(SLATE, check_glyph()),
-        IconState::Updates => badge(AMBER, arrow_glyph()),
-        IconState::Error => badge(RED, bang_glyph()),
+        IconState::Idle => badge(SLATE, glyph()),
+        IconState::Updates => badge(AMBER, glyph()),
+        IconState::Error => badge(RED, glyph()),
         IconState::Busy => spinner(frame),
     }
 }
@@ -56,47 +56,25 @@ fn badge(color: [u8; 3], glyph: Vec<Shape>) -> Vec<Layer> {
     layers
 }
 
-fn check_glyph() -> Vec<Shape> {
+fn glyph() -> Vec<Shape> {
     vec![
         Shape::Segment {
-            from: (10.0, 16.8),
-            to: (14.2, 21.0),
-            width: 3.4,
-        },
-        Shape::Segment {
-            from: (14.2, 21.0),
-            to: (22.4, 11.8),
-            width: 3.4,
-        },
-    ]
-}
-
-fn arrow_glyph() -> Vec<Shape> {
-    vec![
-        Shape::Segment {
-            from: (16.0, 14.0),
-            to: (16.0, 23.2),
+            from: (10.0, 9.5),
+            to: (10.0, 23.0),
             width: 4.4,
         },
-        Shape::Triangle {
-            a: (16.0, 8.2),
-            b: (23.2, 16.6),
-            c: (8.8, 16.6),
-        },
-    ]
-}
-
-fn bang_glyph() -> Vec<Shape> {
-    vec![
-        Shape::Segment {
-            from: (16.0, 9.0),
-            to: (16.0, 18.4),
-            width: 3.8,
-        },
-        Shape::Disc {
+        Shape::Arc {
             cx: 16.0,
-            cy: 23.0,
-            r: 2.2,
+            cy: 15.5,
+            r: 6.0,
+            width: 4.4,
+            start: std::f32::consts::PI,
+            end: std::f32::consts::TAU,
+        },
+        Shape::Segment {
+            from: (22.0, 15.5),
+            to: (22.0, 23.0),
+            width: 4.4,
         },
     ]
 }
@@ -140,10 +118,13 @@ enum Shape {
         to: (f32, f32),
         width: f32,
     },
-    Triangle {
-        a: (f32, f32),
-        b: (f32, f32),
-        c: (f32, f32),
+    Arc {
+        cx: f32,
+        cy: f32,
+        r: f32,
+        width: f32,
+        start: f32,
+        end: f32,
     },
 }
 
@@ -152,7 +133,22 @@ impl Shape {
         match *self {
             Self::Disc { cx, cy, r } => (x - cx).powi(2) + (y - cy).powi(2) <= r * r,
             Self::Segment { from, to, width } => distance_to_segment(x, y, from, to) <= width / 2.0,
-            Self::Triangle { a, b, c } => inside_triangle(x, y, a, b, c),
+            Self::Arc {
+                cx,
+                cy,
+                r,
+                width,
+                start,
+                end,
+            } => {
+                let (dx, dy) = (x - cx, y - cy);
+                let distance = (dx * dx + dy * dy).sqrt();
+                if (distance - r).abs() > width / 2.0 {
+                    return false;
+                }
+                let angle = dy.atan2(dx).rem_euclid(std::f32::consts::TAU);
+                angle >= start && angle <= end
+            }
         }
     }
 }
@@ -224,12 +220,6 @@ fn distance_to_segment(x: f32, y: f32, from: (f32, f32), to: (f32, f32)) -> f32 
     };
     let nearest = (from.0 + position * dx, from.1 + position * dy);
     ((x - nearest.0).powi(2) + (y - nearest.1).powi(2)).sqrt()
-}
-
-fn inside_triangle(x: f32, y: f32, a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> bool {
-    let side = |p: (f32, f32), q: (f32, f32)| (q.0 - p.0) * (y - p.1) - (q.1 - p.1) * (x - p.0);
-    let (ab, bc, ca) = (side(a, b), side(b, c), side(c, a));
-    (ab >= 0.0 && bc >= 0.0 && ca >= 0.0) || (ab <= 0.0 && bc <= 0.0 && ca <= 0.0)
 }
 
 #[cfg(test)]
@@ -351,14 +341,33 @@ mod tests {
     }
 
     #[test]
-    fn a_triangle_contains_its_middle_and_excludes_its_outside() {
-        let triangle = Shape::Triangle {
-            a: (16.0, 8.0),
-            b: (24.0, 20.0),
-            c: (8.0, 20.0),
+    fn an_arc_contains_its_span_and_not_the_gap() {
+        let arc = Shape::Arc {
+            cx: 16.0,
+            cy: 16.0,
+            r: 6.0,
+            width: 4.0,
+            start: std::f32::consts::PI,
+            end: std::f32::consts::TAU,
         };
-        assert!(triangle.contains(16.0, 16.0));
-        assert!(!triangle.contains(16.0, 25.0));
-        assert!(!triangle.contains(8.0, 8.0));
+
+        assert!(arc.contains(16.0, 10.0), "the top of the arc is missing");
+        assert!(!arc.contains(16.0, 22.0), "the bottom should be a gap");
+        assert!(!arc.contains(16.0, 16.0), "the centre should be hollow");
+        assert!(!arc.contains(30.0, 10.0), "outside the radius");
+    }
+
+    #[test]
+    fn the_glyph_covers_both_stems_and_the_shoulder() {
+        let shapes = glyph();
+        let hits = |x: f32, y: f32| shapes.iter().any(|shape| shape.contains(x, y));
+
+        assert!(hits(10.0, 21.0), "the left stem is missing");
+        assert!(hits(22.0, 21.0), "the right stem is missing");
+        assert!(hits(16.0, 9.5), "the shoulder is missing");
+        assert!(
+            !hits(16.0, 21.0),
+            "the gap under the shoulder should be open"
+        );
     }
 }
