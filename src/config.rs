@@ -89,6 +89,16 @@ impl Config {
     pub fn is_ignored(&self, name: &str) -> bool {
         self.ignore.iter().any(|ignored| ignored == name)
     }
+
+    pub fn set_ignored(&mut self, name: &str, ignored: bool) {
+        if ignored {
+            if !self.is_ignored(name) {
+                self.ignore.push(name.to_string());
+            }
+        } else {
+            self.ignore.retain(|entry| entry != name);
+        }
+    }
 }
 
 fn read_path() -> Option<PathBuf> {
@@ -181,5 +191,40 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(config.interval(), Duration::from_hours(1));
+    }
+
+    #[test]
+    fn ignoring_the_same_package_twice_does_not_duplicate_the_entry() {
+        let mut config = Config::default();
+        config.set_ignored("prettier", true);
+        config.set_ignored("prettier", true);
+
+        assert_eq!(
+            config
+                .ignore
+                .iter()
+                .filter(|name| *name == "prettier")
+                .count(),
+            1
+        );
+        assert!(config.is_ignored("prettier"));
+    }
+
+    #[test]
+    fn un_ignoring_a_package_that_was_never_ignored_changes_nothing() {
+        let mut config = Config::default();
+        let before = config.ignore.clone();
+        config.set_ignored("prettier", false);
+
+        assert_eq!(config.ignore, before);
+    }
+
+    #[test]
+    fn un_ignoring_removes_only_the_named_package() {
+        let mut config = Config::default();
+        config.set_ignored("npm", false);
+
+        assert!(!config.is_ignored("npm"));
+        assert!(config.is_ignored("@anthropic-ai/claude-code"));
     }
 }

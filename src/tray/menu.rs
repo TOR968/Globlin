@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tray_icon::menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu};
 
 use crate::model::{self, Activity, Batch, Package, RowState, SourceKind, Status, UpdateTarget};
 use crate::progress;
@@ -12,6 +12,7 @@ const ID_AUTOSTART: &str = "autostart";
 const ID_OPEN_LOG: &str = "open-log";
 const ID_QUIT: &str = "quit";
 const UPDATE_PREFIX: &str = "update:";
+const IGNORE_PREFIX: &str = "ignore:";
 
 const DOT_CYCLE: u32 = 4;
 const FRAMES_PER_DOT: u32 = 2;
@@ -19,6 +20,7 @@ const FRAMES_PER_DOT: u32 = 2;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     Update { name: String, source: SourceKind },
+    ToggleIgnore { name: String },
     UpdateAll,
     CheckNow,
     ToggleAutostart,
@@ -52,7 +54,7 @@ impl Action {
             ID_AUTOSTART => Some(Self::ToggleAutostart),
             ID_OPEN_LOG => Some(Self::OpenLog),
             ID_QUIT => Some(Self::Quit),
-            other => Self::parse_update(other),
+            other => Self::parse_update(other).or_else(|| Self::parse_ignore(other)),
         }
     }
 
@@ -61,6 +63,14 @@ impl Action {
         Some(Self::Update {
             name: name.to_string(),
             source: SourceKind::from_label(label)?,
+        })
+    }
+
+    fn parse_ignore(key: &str) -> Option<Self> {
+        let (label, name) = key.strip_prefix(IGNORE_PREFIX)?.split_once(':')?;
+        SourceKind::from_label(label)?;
+        Some(Self::ToggleIgnore {
+            name: name.to_string(),
         })
     }
 }
@@ -92,12 +102,7 @@ pub fn build(view: &View) -> Result<Built> {
         if in_batch(batch, package) {
             continue;
         }
-        menu.append(&MenuItem::with_id(
-            update_id(package),
-            row(package),
-            !busy,
-            None,
-        ))?;
+        menu.append(&package_entry(package, busy)?)?;
     }
 
     let settled: Vec<&Package> = view
@@ -109,7 +114,7 @@ pub fn build(view: &View) -> Result<Built> {
         menu.append(&PredefinedMenuItem::separator())?;
     }
     for package in &settled {
-        menu.append(&MenuItem::new(row(package), false, None))?;
+        menu.append(&package_entry(package, busy)?)?;
     }
 
     menu.append(&PredefinedMenuItem::separator())?;
@@ -218,6 +223,34 @@ fn dots(frame: u32) -> String {
 
 fn update_id(package: &Package) -> String {
     format!("{UPDATE_PREFIX}{}:{}", package.source.label(), package.name)
+}
+
+fn ignore_id(package: &Package) -> String {
+    format!("{IGNORE_PREFIX}{}:{}", package.source.label(), package.name)
+}
+
+fn offers_update(package: &Package) -> bool {
+    package.latest().is_some()
+}
+
+fn package_entry(package: &Package, busy: bool) -> Result<Submenu> {
+    let entry = Submenu::new(row(package), !busy);
+    if offers_update(package) {
+        entry.append(&MenuItem::with_id(
+            update_id(package),
+            "Update",
+            !busy,
+            None,
+        ))?;
+    }
+    entry.append(&CheckMenuItem::with_id(
+        ignore_id(package),
+        "Ignore",
+        !busy,
+        package.status == Status::Ignored,
+        None,
+    ))?;
+    Ok(entry)
 }
 
 fn row(package: &Package) -> String {
@@ -530,5 +563,47 @@ mod tests {
         let view = updating_view(&activity, Duration::ZERO);
 
         assert_eq!(batch_row_text(&view, 7), None);
+    }
+
+    #[test]
+    fn an_ignore_id_round_trips_including_scoped_names() {
+        for name in ["prettier", "@salesforce/cli"] {
+            let package = package(name, SourceKind::Npm, Status::Current);
+            assert_eq!(
+                Action::from_key(&ignore_id(&package)),
+                Some(Action::ToggleIgnore {
+                    name: name.to_string()
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn the_same_name_from_two_sources_gets_two_distinct_ignore_ids() {
+        let from_npm = package("typescript", SourceKind::Npm, Status::Current);
+        let from_bun = package("typescript", SourceKind::Bun, Status::Current);
+
+        assert_ne!(ignore_id(&from_npm), ignore_id(&from_bun));
+    }
+
+    #[test]
+    fn an_ignore_id_with_an_unknown_source_is_rejected() {
+        assert_eq!(Action::from_key("ignore:pnpm:prettier"), None);
+        assert_eq!(Action::from_key("ignore:prettier"), None);
+    }
+
+    #[test]
+    fn only_an_outdated_package_offers_an_update_item() {
+        assert!(offers_update(&behind("prettier", "2.0.0")));
+        assert!(!offers_update(&package(
+            "npm",
+            SourceKind::Npm,
+            Status::Ignored
+        )));
+        assert!(!offers_update(&package(
+            "typescript",
+            SourceKind::Npm,
+            Status::Current
+        )));
     }
 }

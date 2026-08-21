@@ -5,7 +5,7 @@ use tray_icon::menu::MenuEvent;
 
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
-use crate::model::{self, Activity, Batch, Package, UpdateTarget};
+use crate::model::{self, Activity, Batch, Package, Status, UpdateTarget};
 use crate::tray::{Action, Tray, View};
 use crate::update::{self, Outcome, Step};
 use crate::{check, diagnostics, notice, platform, Message, Result};
@@ -94,6 +94,7 @@ impl App {
                     self.start_update(vec![target]);
                 }
             }
+            Action::ToggleIgnore { name } => self.toggle_ignore(&name),
             Action::ToggleAutostart => self.toggle_autostart(),
             Action::OpenLog => open_log(),
         }
@@ -105,6 +106,31 @@ impl App {
             .iter()
             .filter_map(|package| package.update_target())
             .collect()
+    }
+
+    fn toggle_ignore(&mut self, name: &str) {
+        let ignoring = !self.config.is_ignored(name);
+        self.config.set_ignored(name, ignoring);
+        if let Err(error) = self.config.save() {
+            platform::notify(
+                "npm globals",
+                &format!("Could not save the setting: {error}"),
+            )
+            .ok();
+        }
+        for package in &mut self.packages {
+            if package.name == name {
+                package.status = if ignoring {
+                    Status::Ignored
+                } else {
+                    Status::Unknown
+                };
+            }
+        }
+        self.render();
+        if !ignoring {
+            self.start_check();
+        }
     }
 
     fn start_check(&mut self) {
