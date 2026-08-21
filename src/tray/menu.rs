@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use tray_icon::menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem};
 
-use crate::model::{self, Activity, Package, SourceKind, Status};
+use crate::model::{self, Activity, Batch, Package, RowState, SourceKind, Status, UpdateTarget};
+use crate::progress;
 use crate::Result;
 
 const ID_UPDATE_ALL: &str = "update-all";
@@ -26,6 +29,7 @@ pub enum Action {
 pub struct Built {
     pub menu: Menu,
     pub header: MenuItem,
+    pub rows: Vec<MenuItem>,
 }
 
 pub struct View<'a> {
@@ -33,6 +37,7 @@ pub struct View<'a> {
     pub activity: Option<&'a Activity>,
     pub autostart: bool,
     pub frame: u32,
+    pub elapsed: Duration,
 }
 
 impl Action {
@@ -65,11 +70,28 @@ pub fn build(view: &View) -> Result<Built> {
     let header = MenuItem::new(headline(view), false, None);
     let busy = view.activity.is_some();
     let outdated = model::outdated(view.packages);
+    let batch = active_batch(view.activity);
 
     menu.append(&header)?;
     menu.append(&PredefinedMenuItem::separator())?;
 
+    let mut rows = Vec::new();
+    if let Some(batch) = batch {
+        for position in 0..batch.total() {
+            let text = batch_row_text(view, position).unwrap_or_default();
+            let item = MenuItem::new(text, false, None);
+            menu.append(&item)?;
+            rows.push(item);
+        }
+        if !batch.targets.is_empty() {
+            menu.append(&PredefinedMenuItem::separator())?;
+        }
+    }
+
     for package in &outdated {
+        if in_batch(batch, package) {
+            continue;
+        }
         menu.append(&MenuItem::with_id(
             update_id(package),
             row(package, view.activity, view.frame),
@@ -115,7 +137,48 @@ pub fn build(view: &View) -> Result<Built> {
     menu.append(&PredefinedMenuItem::separator())?;
     menu.append(&MenuItem::with_id(ID_QUIT, "Quit", true, None))?;
 
-    Ok(Built { menu, header })
+    Ok(Built { menu, header, rows })
+}
+
+fn in_batch(batch: Option<&Batch>, package: &Package) -> bool {
+    batch.is_some_and(|batch| {
+        batch
+            .targets
+            .iter()
+            .any(|target| target.name == package.name && target.source == package.source)
+    })
+}
+
+pub fn batch_row_text(view: &View, position: usize) -> Option<String> {
+    let batch = active_batch(view.activity)?;
+    let target = batch.targets.get(position)?;
+    Some(match batch.state_of(position) {
+        RowState::Done => format!("{}   done", target_label(target, '✓')),
+        RowState::Failed => format!("{}   failed", target_label(target, '✗')),
+        RowState::Queued => format!("{}   queued", target_label(target, '·')),
+        RowState::Active => format!(
+            "{}   {}",
+            target_label(target, spinner_tick(view.frame)),
+            progress::bar(progress::creep(view.elapsed))
+        ),
+    })
+}
+
+fn active_batch(activity: Option<&Activity>) -> Option<&Batch> {
+    match activity {
+        Some(Activity::Updating { batch }) => Some(batch),
+        _ => None,
+    }
+}
+
+fn target_label(target: &UpdateTarget, marker: char) -> String {
+    format!(
+        "{marker}  {}{}   {} → {}",
+        target.name,
+        target.source.suffix(),
+        target.from,
+        target.to
+    )
 }
 
 pub fn headline(view: &View) -> String {
@@ -249,6 +312,17 @@ mod tests {
             activity,
             autostart: false,
             frame,
+            elapsed: Duration::ZERO,
+        }
+    }
+
+    fn updating_view(activity: &Activity, elapsed: Duration) -> View<'_> {
+        View {
+            packages: &[],
+            activity: Some(activity),
+            autostart: false,
+            frame: 0,
+            elapsed,
         }
     }
 
@@ -451,5 +525,58 @@ mod tests {
 
         assert!(row(&from_bun, None, 0).contains("(bun)"));
         assert!(!row(&from_npm, None, 0).contains("(bun)"));
+    }
+
+    #[test]
+    fn only_the_active_row_carries_a_bar() {
+        let activity = updating("beta", 1, 3);
+        let view = updating_view(&activity, Duration::from_secs(2));
+
+        let first = batch_row_text(&view, 0).unwrap();
+        let active = batch_row_text(&view, 1).unwrap();
+        let queued = batch_row_text(&view, 2).unwrap();
+
+        assert!(active.contains('█') || active.contains('░'), "{active}");
+        assert!(!first.contains('░'), "{first}");
+        assert!(!queued.contains('░'), "{queued}");
+        assert!(queued.contains("queued"), "{queued}");
+    }
+
+    #[test]
+    fn a_failed_row_never_renders_as_done() {
+        let Activity::Updating { mut batch } = updating("alpha", 0, 2) else {
+            panic!("expected an update activity");
+        };
+        batch.finish(0, false);
+        batch.start(1);
+        let activity = Activity::Updating { batch };
+        let view = updating_view(&activity, Duration::ZERO);
+
+        let failed = batch_row_text(&view, 0).unwrap();
+        assert!(failed.contains("failed"), "{failed}");
+        assert!(!failed.contains("done"), "{failed}");
+        assert!(failed.starts_with('✗'), "{failed}");
+    }
+
+    #[test]
+    fn a_landed_row_reports_done_with_a_tick() {
+        let Activity::Updating { mut batch } = updating("alpha", 0, 2) else {
+            panic!("expected an update activity");
+        };
+        batch.finish(0, true);
+        batch.start(1);
+        let activity = Activity::Updating { batch };
+        let view = updating_view(&activity, Duration::ZERO);
+
+        let done = batch_row_text(&view, 0).unwrap();
+        assert!(done.starts_with('✓') && done.contains("done"), "{done}");
+    }
+
+    #[test]
+    fn a_row_beyond_the_batch_has_no_text() {
+        let activity = updating("alpha", 0, 1);
+        let view = updating_view(&activity, Duration::ZERO);
+
+        assert_eq!(batch_row_text(&view, 7), None);
     }
 }

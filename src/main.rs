@@ -8,6 +8,7 @@ mod icon;
 mod model;
 mod notice;
 mod platform;
+mod progress;
 mod registry;
 mod source;
 mod tray;

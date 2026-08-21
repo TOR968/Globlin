@@ -11,6 +11,7 @@ pub use menu::{Action, View};
 pub struct Tray {
     icon: TrayIcon,
     header: MenuItem,
+    rows: Vec<MenuItem>,
 }
 
 impl Tray {
@@ -20,6 +21,7 @@ impl Tray {
             activity: None,
             autostart: false,
             frame: 0,
+            elapsed: std::time::Duration::ZERO,
         };
         let built = menu::build(&view)?;
         let icon = TrayIconBuilder::new()
@@ -30,6 +32,7 @@ impl Tray {
         Ok(Self {
             icon,
             header: built.header,
+            rows: built.rows,
         })
     }
 
@@ -37,6 +40,7 @@ impl Tray {
         let built = menu::build(view)?;
         self.icon.set_menu(Some(Box::new(built.menu)));
         self.header = built.header;
+        self.rows = built.rows;
         self.icon.set_tooltip(Some(menu::headline(view)))?;
         self.icon.set_icon(Some(icon::tray(state, view.frame)?))?;
         Ok(())
@@ -44,6 +48,11 @@ impl Tray {
 
     pub fn animate(&mut self, view: &View) -> Result<()> {
         self.header.set_text(menu::headline(view));
+        for (position, row) in self.rows.iter().enumerate() {
+            if let Some(text) = menu::batch_row_text(view, position) {
+                row.set_text(text);
+            }
+        }
         self.icon
             .set_icon(Some(icon::tray(IconState::Busy, view.frame)?))?;
         Ok(())

@@ -84,6 +84,14 @@ pub struct UpdateTarget {
     pub to: Version,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowState {
+    Done,
+    Failed,
+    Active,
+    Queued,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Batch {
     pub targets: Vec<UpdateTarget>,
@@ -107,6 +115,15 @@ impl Batch {
 
     pub fn total(&self) -> usize {
         self.targets.len()
+    }
+
+    pub fn state_of(&self, position: usize) -> RowState {
+        match self.results.get(position) {
+            Some(Some(true)) => RowState::Done,
+            Some(Some(false)) => RowState::Failed,
+            _ if position == self.index => RowState::Active,
+            _ => RowState::Queued,
+        }
     }
 
     pub fn start(&mut self, position: usize) {
@@ -271,5 +288,27 @@ mod tests {
             batch.current().map(|target| target.name.as_str()),
             Some("b")
         );
+    }
+
+    #[test]
+    fn a_queued_target_is_never_reported_as_done() {
+        let mut batch = batch_of(&["a", "b", "c"]);
+        batch.start(0);
+
+        assert_eq!(batch.state_of(0), RowState::Active);
+        assert_eq!(batch.state_of(1), RowState::Queued);
+        assert_eq!(batch.state_of(2), RowState::Queued);
+    }
+
+    #[test]
+    fn a_finished_target_reports_its_own_outcome() {
+        let mut batch = batch_of(&["a", "b"]);
+        batch.start(0);
+        batch.finish(0, false);
+        batch.start(1);
+        batch.finish(1, true);
+
+        assert_eq!(batch.state_of(0), RowState::Failed);
+        assert_eq!(batch.state_of(1), RowState::Done);
     }
 }

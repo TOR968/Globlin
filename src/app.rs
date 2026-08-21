@@ -25,6 +25,7 @@ pub struct App {
     failed: bool,
     frame: u32,
     next_check: Instant,
+    step_started: Instant,
     proxy: EventLoopProxy<Message>,
 }
 
@@ -40,6 +41,7 @@ impl App {
             failed: false,
             frame: 0,
             next_check,
+            step_started: Instant::now(),
             proxy,
         };
         if let Some(warning) = warning {
@@ -141,12 +143,18 @@ impl App {
     fn begin(&mut self, activity: Activity) {
         self.activity = Some(activity);
         self.frame = 0;
+        self.step_started = Instant::now();
         self.render();
     }
 
     fn advance_animation(&mut self) {
         self.frame = (self.frame + 1) % (BUSY_FRAMES * 4);
-        let view = view_of(&self.packages, self.activity.as_ref(), self.frame);
+        let view = view_of(
+            &self.packages,
+            self.activity.as_ref(),
+            self.frame,
+            self.elapsed(),
+        );
         self.tray.animate(&view).ok();
     }
 
@@ -156,6 +164,9 @@ impl App {
                 Step::Started { index, .. } => batch.start(*index),
                 Step::Finished { index, ok } => batch.finish(*index, *ok),
             }
+        }
+        if matches!(step, Step::Started { .. }) {
+            self.step_started = Instant::now();
         }
         self.render();
     }
@@ -221,7 +232,12 @@ impl App {
 
     fn render(&mut self) {
         let state = self.icon_state();
-        let view = view_of(&self.packages, self.activity.as_ref(), self.frame);
+        let view = view_of(
+            &self.packages,
+            self.activity.as_ref(),
+            self.frame,
+            self.elapsed(),
+        );
         self.tray.render(&view, state).ok();
     }
 
@@ -231,6 +247,10 @@ impl App {
             self.failed,
             model::outdated(&self.packages).len(),
         )
+    }
+
+    fn elapsed(&self) -> Duration {
+        self.step_started.elapsed()
     }
 }
 
@@ -243,11 +263,17 @@ fn open_log() {
     }
 }
 
-fn view_of<'a>(packages: &'a [Package], activity: Option<&'a Activity>, frame: u32) -> View<'a> {
+fn view_of<'a>(
+    packages: &'a [Package],
+    activity: Option<&'a Activity>,
+    frame: u32,
+    elapsed: Duration,
+) -> View<'a> {
     View {
         packages,
         activity,
         autostart: platform::autostart_enabled(),
         frame,
+        elapsed,
     }
 }
