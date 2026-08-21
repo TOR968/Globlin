@@ -94,7 +94,7 @@ pub fn build(view: &View) -> Result<Built> {
         }
         menu.append(&MenuItem::with_id(
             update_id(package),
-            row(package, view.activity, view.frame),
+            row(package),
             !busy,
             None,
         ))?;
@@ -109,11 +109,7 @@ pub fn build(view: &View) -> Result<Built> {
         menu.append(&PredefinedMenuItem::separator())?;
     }
     for package in &settled {
-        menu.append(&MenuItem::new(
-            row(package, view.activity, view.frame),
-            false,
-            None,
-        ))?;
+        menu.append(&MenuItem::new(row(package), false, None))?;
     }
 
     menu.append(&PredefinedMenuItem::separator())?;
@@ -224,21 +220,7 @@ fn update_id(package: &Package) -> String {
     format!("{UPDATE_PREFIX}{}:{}", package.source.label(), package.name)
 }
 
-fn row(package: &Package, activity: Option<&Activity>, frame: u32) -> String {
-    if is_in_progress(package, activity) {
-        return format!(
-            "{}  {}{}   {} → {}{}",
-            spinner_tick(frame),
-            package.name,
-            package.source.suffix(),
-            package.current,
-            package
-                .latest()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-            dots(frame)
-        );
-    }
+fn row(package: &Package) -> String {
     match &package.status {
         Status::Outdated { latest } => format!(
             "↑  {}{}   {} → {latest}",
@@ -265,15 +247,6 @@ fn row(package: &Package, activity: Option<&Activity>, frame: u32) -> String {
             package.current
         ),
     }
-}
-
-fn is_in_progress(package: &Package, activity: Option<&Activity>) -> bool {
-    let Some(Activity::Updating { batch }) = activity else {
-        return false;
-    };
-    batch
-        .current()
-        .is_some_and(|target| target.name == package.name && target.source == package.source)
 }
 
 const fn spinner_tick(frame: u32) -> char {
@@ -461,10 +434,10 @@ mod tests {
 
     #[test]
     fn each_status_gets_its_own_marker() {
-        let outdated = row(&behind("a", "2.0.0"), None, 0);
-        let current = row(&package("b", SourceKind::Npm, Status::Current), None, 0);
-        let unknown = row(&package("c", SourceKind::Npm, Status::Unknown), None, 0);
-        let ignored = row(&package("d", SourceKind::Npm, Status::Ignored), None, 0);
+        let outdated = row(&behind("a", "2.0.0"));
+        let current = row(&package("b", SourceKind::Npm, Status::Current));
+        let unknown = row(&package("c", SourceKind::Npm, Status::Unknown));
+        let ignored = row(&package("d", SourceKind::Npm, Status::Ignored));
 
         assert!(outdated.starts_with('↑'), "{outdated}");
         assert!(current.starts_with('✓'), "{current}");
@@ -480,28 +453,7 @@ mod tests {
 
     #[test]
     fn an_outdated_row_shows_installed_and_target_versions() {
-        assert!(row(&behind("prettier", "2.0.0"), None, 0).contains("1.2.3 → 2.0.0"));
-    }
-
-    #[test]
-    fn the_row_being_updated_gets_a_spinner_instead_of_the_arrow() {
-        let target = behind("prettier", "2.0.0");
-        let activity = updating("prettier", 0, 1);
-        let text = row(&target, Some(&activity), 0);
-
-        assert!(!text.starts_with('↑'), "{text}");
-        assert!(text.contains("1.2.3 → 2.0.0"), "{text}");
-    }
-
-    #[test]
-    fn only_the_matching_source_row_shows_as_in_progress() {
-        let activity = updating("typescript", 0, 1);
-        let from_npm = package("typescript", SourceKind::Npm, Status::Current);
-        let from_bun = package("typescript", SourceKind::Bun, Status::Current);
-
-        assert!(is_in_progress(&from_npm, Some(&activity)));
-        assert!(!is_in_progress(&from_bun, Some(&activity)));
-        assert!(!is_in_progress(&from_npm, None));
+        assert!(row(&behind("prettier", "2.0.0")).contains("1.2.3 → 2.0.0"));
     }
 
     #[test]
@@ -523,8 +475,8 @@ mod tests {
         let from_bun = package("typescript", SourceKind::Bun, Status::Current);
         let from_npm = package("typescript", SourceKind::Npm, Status::Current);
 
-        assert!(row(&from_bun, None, 0).contains("(bun)"));
-        assert!(!row(&from_npm, None, 0).contains("(bun)"));
+        assert!(row(&from_bun).contains("(bun)"));
+        assert!(!row(&from_npm).contains("(bun)"));
     }
 
     #[test]
