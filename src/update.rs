@@ -10,13 +10,19 @@ pub struct Outcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Progress {
-    pub target: UpdateTarget,
-    pub index: usize,
-    pub total: usize,
+pub enum Step {
+    Started {
+        target: UpdateTarget,
+        index: usize,
+        total: usize,
+    },
+    Finished {
+        index: usize,
+        ok: bool,
+    },
 }
 
-pub fn run(config: &Config, targets: &[UpdateTarget], announce: impl Fn(Progress)) -> Outcome {
+pub fn run(config: &Config, targets: &[UpdateTarget], announce: impl Fn(Step)) -> Outcome {
     let sources = match source::enabled(config) {
         Ok(sources) => sources,
         Err(error) => {
@@ -33,17 +39,21 @@ pub fn run(config: &Config, targets: &[UpdateTarget], announce: impl Fn(Progress
     let mut report = String::new();
 
     for (index, target) in targets.iter().enumerate() {
-        announce(Progress {
+        announce(Step::Started {
             target: target.clone(),
             index,
             total: targets.len(),
         });
 
         match apply(&sources, target) {
-            Ok(()) => outcome.updated.push(target.name.clone()),
+            Ok(()) => {
+                outcome.updated.push(target.name.clone());
+                announce(Step::Finished { index, ok: true });
+            }
             Err(details) => {
                 outcome.failed.push(target.name.clone());
                 report.push_str(&details);
+                announce(Step::Finished { index, ok: false });
             }
         }
     }
@@ -148,44 +158,75 @@ mod tests {
     #[test]
     fn an_empty_target_list_does_nothing_and_announces_nothing() {
         let seen = Mutex::new(Vec::new());
-        let outcome = run(&Config::default(), &[], |progress| {
-            seen.lock().unwrap().push(progress);
+        let outcome = run(&Config::default(), &[], |step| {
+            seen.lock().unwrap().push(step);
         });
 
         assert_eq!(outcome, Outcome::default());
         assert!(seen.lock().unwrap().is_empty());
     }
 
+    fn started(steps: &[Step]) -> Vec<&Step> {
+        steps
+            .iter()
+            .filter(|step| matches!(step, Step::Started { .. }))
+            .collect()
+    }
+
     #[test]
-    fn progress_is_announced_once_per_target_with_a_zero_based_index() {
+    fn every_target_announces_a_start_and_a_finish() {
         let fake = UnrunnableNpm::new("indexes");
         let targets = vec![target("alpha"), target("beta"), target("gamma")];
         let seen = Mutex::new(Vec::new());
 
-        run(&fake.config, &targets, |progress| {
-            seen.lock().unwrap().push(progress);
+        run(&fake.config, &targets, |step| {
+            seen.lock().unwrap().push(step);
         });
 
         let seen = seen.lock().unwrap();
-        assert_eq!(seen.len(), 3);
-        assert_eq!(seen[0].index, 0);
-        assert_eq!(seen[2].index, 2);
-        assert!(seen.iter().all(|progress| progress.total == 3));
-        assert_eq!(seen[1].target.name, "beta");
+        assert_eq!(seen.len(), 6);
+        assert!(matches!(seen[0], Step::Started { index: 0, .. }));
+        assert!(matches!(seen[1], Step::Finished { index: 0, .. }));
+        assert_eq!(started(&seen).len(), 3);
+        assert!(
+            matches!(seen[2], Step::Started { index: 1, ref target, total: 3 } if target.name == "beta")
+        );
     }
 
     #[test]
-    fn progress_carries_both_versions_so_the_menu_can_show_them() {
+    fn a_start_carries_both_versions_so_the_menu_can_show_them() {
         let fake = UnrunnableNpm::new("versions");
         let seen = Mutex::new(Vec::new());
 
-        run(&fake.config, &[target("alpha")], |progress| {
-            seen.lock().unwrap().push(progress);
+        run(&fake.config, &[target("alpha")], |step| {
+            seen.lock().unwrap().push(step);
         });
 
         let seen = seen.lock().unwrap();
-        assert_eq!(seen[0].target.from, Version::parse("1.0.0").unwrap());
-        assert_eq!(seen[0].target.to, Version::parse("2.0.0").unwrap());
+        let Step::Started { target, .. } = &seen[0] else {
+            panic!("the first step should be a start: {:?}", seen[0]);
+        };
+        assert_eq!(target.from, Version::parse("1.0.0").unwrap());
+        assert_eq!(target.to, Version::parse("2.0.0").unwrap());
+    }
+
+    #[test]
+    fn a_target_that_cannot_be_started_finishes_with_ok_false() {
+        let fake = UnrunnableNpm::new("finishes-false");
+        let seen = Mutex::new(Vec::new());
+
+        run(&fake.config, &[target("alpha")], |step| {
+            seen.lock().unwrap().push(step);
+        });
+
+        let seen = seen.lock().unwrap();
+        assert!(matches!(
+            seen[1],
+            Step::Finished {
+                index: 0,
+                ok: false
+            }
+        ));
     }
 
     #[test]

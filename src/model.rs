@@ -85,13 +85,45 @@ pub struct UpdateTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Batch {
+    pub targets: Vec<UpdateTarget>,
+    pub index: usize,
+    pub results: Vec<Option<bool>>,
+}
+
+impl Batch {
+    pub fn new(targets: Vec<UpdateTarget>) -> Self {
+        let results = vec![None; targets.len()];
+        Self {
+            targets,
+            index: 0,
+            results,
+        }
+    }
+
+    pub fn current(&self) -> Option<&UpdateTarget> {
+        self.targets.get(self.index)
+    }
+
+    pub fn total(&self) -> usize {
+        self.targets.len()
+    }
+
+    pub fn start(&mut self, position: usize) {
+        self.index = position;
+    }
+
+    pub fn finish(&mut self, position: usize, ok: bool) {
+        if let Some(slot) = self.results.get_mut(position) {
+            *slot = Some(ok);
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Activity {
     Checking,
-    Updating {
-        target: UpdateTarget,
-        index: usize,
-        total: usize,
-    },
+    Updating { batch: Batch },
 }
 
 pub fn outdated(packages: &[Package]) -> Vec<&Package> {
@@ -192,6 +224,52 @@ mod tests {
         assert_eq!(
             stamps(&packages),
             vec!["npm:aaa@3.0.0".to_string(), "npm:zzz@1.2.0".to_string()]
+        );
+    }
+
+    fn batch_of(names: &[&str]) -> Batch {
+        Batch::new(
+            names
+                .iter()
+                .map(|name| UpdateTarget {
+                    name: (*name).to_string(),
+                    source: SourceKind::Npm,
+                    from: Version::parse("1.0.0").unwrap(),
+                    to: Version::parse("2.0.0").unwrap(),
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_fresh_batch_has_recorded_nothing() {
+        let batch = batch_of(&["a", "b", "c"]);
+
+        assert_eq!(batch.total(), 3);
+        assert_eq!(batch.index, 0);
+        assert_eq!(batch.results, vec![None, None, None]);
+    }
+
+    #[test]
+    fn a_recorded_failure_stays_failed_for_the_rest_of_the_run() {
+        let mut batch = batch_of(&["a", "b"]);
+        batch.start(0);
+        batch.finish(0, false);
+        batch.start(1);
+        batch.finish(1, true);
+
+        assert_eq!(batch.results, vec![Some(false), Some(true)]);
+        assert_eq!(batch.total(), 2);
+    }
+
+    #[test]
+    fn the_batch_points_at_the_target_being_worked_on() {
+        let mut batch = batch_of(&["a", "b"]);
+        batch.start(1);
+
+        assert_eq!(
+            batch.current().map(|target| target.name.as_str()),
+            Some("b")
         );
     }
 }

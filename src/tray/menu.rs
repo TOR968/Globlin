@@ -121,24 +121,23 @@ pub fn build(view: &View) -> Result<Built> {
 pub fn headline(view: &View) -> String {
     match view.activity {
         Some(Activity::Checking) => format!("Checking npm globals{}", dots(view.frame)),
-        Some(Activity::Updating {
-            target,
-            index,
-            total,
-        }) => {
-            let progress = if *total > 1 {
-                format!("  [{}/{}]", index + 1, total)
-            } else {
-                String::new()
-            };
-            format!(
-                "Updating {} {} → {}{progress}{}",
-                target.name,
-                target.from,
-                target.to,
-                dots(view.frame)
-            )
-        }
+        Some(Activity::Updating { batch }) => match batch.current() {
+            Some(target) => {
+                let progress = if batch.total() > 1 {
+                    format!("  [{}/{}]", batch.index + 1, batch.total())
+                } else {
+                    String::new()
+                };
+                format!(
+                    "Updating {} {} → {}{progress}{}",
+                    target.name,
+                    target.from,
+                    target.to,
+                    dots(view.frame)
+                )
+            }
+            None => format!("Updating npm globals{}", dots(view.frame)),
+        },
         None => summary(view.packages),
     }
 }
@@ -206,11 +205,12 @@ fn row(package: &Package, activity: Option<&Activity>, frame: u32) -> String {
 }
 
 fn is_in_progress(package: &Package, activity: Option<&Activity>) -> bool {
-    matches!(
-        activity,
-        Some(Activity::Updating { target, .. })
-            if target.name == package.name && target.source == package.source
-    )
+    let Some(Activity::Updating { batch }) = activity else {
+        return false;
+    };
+    batch
+        .current()
+        .is_some_and(|target| target.name == package.name && target.source == package.source)
 }
 
 const fn spinner_tick(frame: u32) -> char {
@@ -253,16 +253,21 @@ mod tests {
     }
 
     fn updating(name: &str, index: usize, total: usize) -> Activity {
-        Activity::Updating {
-            target: UpdateTarget {
-                name: name.to_string(),
+        let targets = (0..total)
+            .map(|position| UpdateTarget {
+                name: if position == index {
+                    name.to_string()
+                } else {
+                    format!("filler-{position}")
+                },
                 source: SourceKind::Npm,
                 from: Version::parse("1.2.3").unwrap(),
                 to: Version::parse("2.0.0").unwrap(),
-            },
-            index,
-            total,
-        }
+            })
+            .collect();
+        let mut batch = crate::model::Batch::new(targets);
+        batch.start(index);
+        Activity::Updating { batch }
     }
 
     #[test]

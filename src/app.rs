@@ -5,9 +5,9 @@ use tray_icon::menu::MenuEvent;
 
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
-use crate::model::{self, Activity, Package, UpdateTarget};
+use crate::model::{self, Activity, Batch, Package, UpdateTarget};
 use crate::tray::{Action, Tray, View};
-use crate::update::{self, Outcome, Progress};
+use crate::update::{self, Outcome, Step};
 use crate::{check, diagnostics, notice, platform, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
@@ -66,7 +66,7 @@ impl App {
         match message {
             Message::Menu(event) => return self.on_menu(&event),
             Message::Checked(result) => self.on_checked(result),
-            Message::Progress(progress) => self.on_progress(progress),
+            Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome),
         }
         Control::Continue
@@ -120,23 +120,18 @@ impl App {
     }
 
     fn start_update(&mut self, targets: Vec<UpdateTarget>) {
-        let Some(first) = targets.first().cloned() else {
-            return;
-        };
-        if self.activity.is_some() {
+        if targets.is_empty() || self.activity.is_some() {
             return;
         }
         self.begin(Activity::Updating {
-            target: first,
-            index: 0,
-            total: targets.len(),
+            batch: Batch::new(targets.clone()),
         });
 
         let config = self.config.clone();
         let proxy = self.proxy.clone();
         std::thread::spawn(move || {
-            let announce = |progress| {
-                proxy.send_event(Message::Progress(progress)).ok();
+            let announce = |step| {
+                proxy.send_event(Message::Step(step)).ok();
             };
             let outcome = update::run(&config, &targets, announce);
             proxy.send_event(Message::Updated(outcome)).ok();
@@ -155,12 +150,13 @@ impl App {
         self.tray.animate(&view).ok();
     }
 
-    fn on_progress(&mut self, progress: Progress) {
-        self.activity = Some(Activity::Updating {
-            target: progress.target,
-            index: progress.index,
-            total: progress.total,
-        });
+    fn on_step(&mut self, step: &Step) {
+        if let Some(Activity::Updating { batch }) = self.activity.as_mut() {
+            match step {
+                Step::Started { index, .. } => batch.start(*index),
+                Step::Finished { index, ok } => batch.finish(*index, *ok),
+            }
+        }
         self.render();
     }
 

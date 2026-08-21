@@ -19,7 +19,7 @@ use tray_icon::menu::MenuEvent;
 
 use app::{App, Control};
 use model::Package;
-use update::{Outcome, Progress};
+use update::{Outcome, Step};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -27,7 +27,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Message {
     Menu(MenuEvent),
     Checked(Result<Vec<Package>>),
-    Progress(Progress),
+    Step(Step),
     Updated(Outcome),
 }
 
