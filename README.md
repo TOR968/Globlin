@@ -26,14 +26,14 @@ Right-click the tray icon:
 ```
 npm globals — 3 updates available
 ─────────────────────────────────────
-↑  @google/gemini-cli   0.53.1 → 0.54.4
-↑  @salesforce/cli      2.145.6 → 2.146.3
-↑  vercel               58.4.4 → 58.9.1
+↑  @google/gemini-cli   0.53.1 → 0.54.4      ▸  Update · ☐ Ignore
+↑  @salesforce/cli      2.145.6 → 2.146.3    ▸  Update · ☐ Ignore
+↑  vercel               58.4.4 → 58.9.1      ▸  Update · ☐ Ignore
 ─────────────────────────────────────
-✓  prettier             3.9.6
-✓  typescript           7.0.2
-·  npm                  12.0.2      (ignored)
-?  some-package         1.0.0       (not checked)
+✓  prettier             3.9.6                ▸  ☐ Ignore
+✓  typescript           7.0.2                ▸  ☐ Ignore
+·  npm                  12.0.2      (ignored) ▸ ☑ Ignore
+?  some-package         1.0.0   (not checked) ▸ ☐ Ignore
 ─────────────────────────────────────
 Update all (3)
 Check now
@@ -42,16 +42,30 @@ Open last log
 Quit
 ```
 
-Clicking an `↑` row runs `npm install -g <name>@latest` (or `bun add -g …`) with no console window, then
-re-checks. Packages from bun are suffixed ` (bun)` so a name installed in both places stays
-distinguishable.
+Opening a row's submenu and picking `Update` runs `npm install -g <name>@latest` (or `bun add -g …`) with
+no console window, then re-checks. Packages from bun are suffixed ` (bun)` so a name installed in both
+places stays distinguishable.
 
 Markers: `↑` outdated, `✓` current, `·` ignored, `?` the registry did not answer for it. `?` is
 deliberately **not** the same as `✓` — a network failure must never look like "everything is fine".
 
-While an update runs, the header line, the row being worked on and the tray icon all animate off one frame
-counter that ticks every 120 ms, and every clickable row is disabled so a second job cannot start on top of
-the first. Idle costs nothing: the event loop waits until the next scheduled check.
+Every package row is a submenu. Outdated packages offer `Update`; every package offers `Ignore`.
+Ticking `Ignore` writes the name into the `ignore` list in `npm-globals-tray.json` and drops the
+package out of `Update all` immediately, without touching the network. Unticking it starts a check
+right away, because the registry was never asked about an ignored package — until that check lands the
+row shows `?`, not `✓`. The list is keyed by name alone, so ignoring `typescript` silences it under
+both npm and bun.
+
+While an update runs, the batch is shown as a queue: finished packages carry `✓ done` (or `✗ failed`),
+the package being worked on carries a spinner and a progress bar, and the rest carry `· queued`.
+`npm install -g` reports progress only to a terminal, and the app runs it without a console, so the
+bar is not a byte count: it rises asymptotically towards the share of the batch that the current
+package represents, and only completes when the package actually lands. A failure is therefore never
+shown as a success.
+
+The header line and the tray icon animate off the same frame counter, ticking every 120 ms, and every
+clickable row is disabled while a job runs so a second job cannot start on top of the first. Idle costs
+nothing: the event loop waits until the next scheduled check.
 
 ## Checking
 
@@ -124,6 +138,7 @@ Nothing else is written. No installer, no service, no scheduled task.
 | `check.rs` | the read path — what is installed, what is behind |
 | `update.rs` | the write path — runs updates, announces progress per package |
 | `notice.rs` | decides whether an update set is worth a notification, and what it should say |
+| `progress.rs` | the asymptotic creep, the batch's overall level and the 8-cell bar |
 | `registry.rs` | dist-tags over HTTP |
 | `source/` | `PackageSource` trait plus the npm and bun adapters |
 | `tray/` | `mod.rs` owns the tray handle; `menu.rs` builds the menu and every label |
@@ -136,11 +151,16 @@ The split follows one rule: anything with branch-worthy logic lives where it can
 running Win32 tray. That is why `notice.rs` exists as its own module rather than as methods on `App` — the
 "only notify when the set changed" rule has real edge cases and `App` cannot be constructed in a test.
 
-There are no image files in the repository. Every icon is drawn from primitives in `src/icon/render.rs`,
-supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px frames at runtime;
-`build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the container by hand)
-for `winresource` to embed as the executable icon; the first notification writes that same file next to the
-config. The exe icon therefore cannot drift out of sync with the tray icon.
+The icon is a lowercase `n`, drawn from primitives in `src/icon/render.rs` — there are no image files,
+and `build.rs` renders the same glyph into the `.exe` icon, so the two cannot drift apart. The state
+is carried by colour: slate when everything is current, amber when updates are waiting, red when the
+last check failed. While a job runs the letter becomes a vessel: a dim outline fills with water whose
+surface ripples every 120 ms, at the level described above.
+
+Every icon is supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px
+frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the
+container by hand) for `winresource` to embed as the executable icon; the first notification writes that
+same file next to the config.
 
 Two things about the environment that the code has to work around, both verified rather than assumed:
 
@@ -158,7 +178,7 @@ Two things about the environment that the code has to work around, both verified
 cargo test
 ```
 
-93 tests, no network and no side effects. The update orchestration is exercised by pointing `npm_cmd` at a
+118 tests, no network and no side effects. The update orchestration is exercised by pointing `npm_cmd` at a
 file that cannot be executed, which drives the real failure paths without installing anything.
 
 Five tests are `#[ignore]`d because they do touch the real system — the HKCU Run key, a real toast, a real
