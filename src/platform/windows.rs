@@ -79,10 +79,10 @@ fn register_app_user_model_id() -> Result<()> {
     key.set_value("DisplayName", &DISPLAY_NAME.to_string())?;
 
     let artwork = data_dir().join("app.ico");
-    if !artwork.is_file() {
-        icon::write_app_icon(&artwork)?;
+    icon::write_app_icon(&artwork).ok();
+    if artwork.is_file() {
+        key.set_value("IconUri", &artwork.display().to_string())?;
     }
-    key.set_value("IconUri", &artwork.display().to_string())?;
     Ok(())
 }
 

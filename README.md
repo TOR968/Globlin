@@ -161,8 +161,9 @@ surface ripples every 120 ms, at the level described above.
 
 Every icon is supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px
 frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the
-container by hand) for `winresource` to embed as the executable icon; the first notification writes that
-same file next to the config.
+container by hand) for `winresource` to embed as the executable icon; every notification rewrites that
+same file next to the config, so a build whose glyph changed cannot leave a stale toast artwork behind —
+Windows reads the toast icon from the `IconUri` on disk, not from the running process.
 
 Two things about the environment that the code has to work around, both verified rather than assumed:
 

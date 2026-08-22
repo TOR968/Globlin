@@ -129,4 +129,21 @@ mod tests {
 
         fs::remove_file(&path).ok();
     }
+
+    #[test]
+    fn a_stale_app_icon_is_overwritten_rather_than_kept() {
+        let path = std::env::temp_dir().join("npm-globals-tray-stale-icon-test.ico");
+        fs::write(&path, b"an icon from an older build").unwrap();
+
+        write_app_icon(&path).unwrap();
+
+        let written = fs::read(&path).unwrap();
+        assert_eq!(&written[..2], &[0x00, 0x00]);
+        assert_eq!(
+            u16::from_le_bytes([written[4], written[5]]) as usize,
+            ico::SIZES.len()
+        );
+
+        fs::remove_file(&path).ok();
+    }
 }
