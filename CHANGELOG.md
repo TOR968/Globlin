@@ -7,6 +7,33 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-23
+
+### Added
+
+- Self-update from GitHub Releases: the tray menu offers the app's own newer build, verifies it against
+  its published checksum, swaps it in by rename with a rollback on failure, and restarts it — opt-in
+  via `auto_update`, with repeated failure notices throttled and failed lookups logged to their own
+  diagnostics file (`self-update.log`).
+- The update batch shows as a queue with per-package progress bars, per-target finish announcements,
+  and packages can be toggled ignored straight from the tray menu.
+- New tray glyph — an uppercase G for the rename to Globlin — with an emerald glow when everything is
+  current and a rising-water fill while a job runs.
+
+### Fixed
+
+- The single-instance mutex handle is closed after a failed claim, and a replaced launch that never
+  claims it still raises its toast; a double rename failure keeps the verified new build instead of
+  emptying the live path.
+- The toast artwork is rewritten so a changed glyph actually reaches notifications, and the row bar
+  and water level no longer overshoot or misreport what has landed.
+
+### Changed
+
+- The app is renamed from `npm-globals-tray` to Globlin end to end: binary slug, AppUserModelId, config
+  file, data directory, autostart value, single-instance mutex, self-update endpoint and release assets.
+  See the README for the leftover files an old install can delete by hand.
+
 ## [0.1.1] - 2026-08-11
 
 Housekeeping only — the binary behaves exactly as 0.1.0 does.
