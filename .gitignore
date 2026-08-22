@@ -8,6 +8,7 @@ last-run.log
 app.ico
 
 .claude/settings.local.json
+/docs/superpowers/
 
 *.rs.bk
 
