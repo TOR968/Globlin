@@ -238,7 +238,7 @@ fn target_label(target: &UpdateTarget, marker: char) -> String {
 
 fn self_update_text(release: &Release) -> String {
     format!(
-        "Update npm-globals-tray {} → {}",
+        "Update Globlin {} → {}",
         env!("CARGO_PKG_VERSION"),
         release.version
     )
@@ -246,7 +246,7 @@ fn self_update_text(release: &Release) -> String {
 
 pub fn headline(view: &View) -> String {
     match view.activity {
-        Some(Activity::Checking) => format!("Checking npm globals{}", dots(view.frame)),
+        Some(Activity::Checking) => format!("Checking Globlin{}", dots(view.frame)),
         Some(Activity::Updating { batch }) => match batch.current() {
             Some(target) => {
                 let progress = if batch.total() > 1 {
@@ -262,10 +262,10 @@ pub fn headline(view: &View) -> String {
                     dots(view.frame)
                 )
             }
-            None => format!("Updating npm globals{}", dots(view.frame)),
+            None => format!("Updating Globlin{}", dots(view.frame)),
         },
         Some(Activity::SelfUpdate) => {
-            format!("Updating npm-globals-tray{}", dots(view.frame))
+            format!("Updating Globlin{}", dots(view.frame))
         }
         None => summary(view.packages),
     }
@@ -273,12 +273,12 @@ pub fn headline(view: &View) -> String {
 
 fn summary(packages: &[Package]) -> String {
     if packages.is_empty() {
-        return "npm globals — nothing found".to_string();
+        return "Globlin — nothing found".to_string();
     }
     match model::outdated(packages).len() {
-        0 => format!("npm globals — {} packages, up to date", packages.len()),
-        1 => "npm globals — 1 update available".to_string(),
-        count => format!("npm globals — {count} updates available"),
+        0 => format!("Globlin — {} packages, up to date", packages.len()),
+        1 => "Globlin — 1 update available".to_string(),
+        count => format!("Globlin — {count} updates available"),
     }
 }
 
@@ -474,7 +474,7 @@ mod tests {
 
         assert_eq!(
             headline(&view(&packages, None, 0)),
-            "npm globals — 1 update available"
+            "Globlin — 1 update available"
         );
     }
 
@@ -487,7 +487,7 @@ mod tests {
 
         assert_eq!(
             headline(&view(&packages, None, 0)),
-            "npm globals — 2 packages, up to date"
+            "Globlin — 2 packages, up to date"
         );
     }
 
@@ -522,10 +522,10 @@ mod tests {
             .map(|frame| headline(&view(&[], Some(&activity), frame)))
             .collect();
 
-        assert_eq!(rendered[0], "Checking npm globals");
-        assert_eq!(rendered[2], "Checking npm globals.");
-        assert_eq!(rendered[4], "Checking npm globals..");
-        assert_eq!(rendered[6], "Checking npm globals...");
+        assert_eq!(rendered[0], "Checking Globlin");
+        assert_eq!(rendered[2], "Checking Globlin.");
+        assert_eq!(rendered[4], "Checking Globlin..");
+        assert_eq!(rendered[6], "Checking Globlin...");
     }
 
     #[test]
@@ -698,10 +698,7 @@ mod tests {
         };
         assert_eq!(
             self_update_text(&release),
-            format!(
-                "Update npm-globals-tray {} → 0.2.0",
-                env!("CARGO_PKG_VERSION")
-            )
+            format!("Update Globlin {} → 0.2.0", env!("CARGO_PKG_VERSION"))
         );
     }
 }

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```sh
-cargo build --release          # target/release/npm-globals-tray.exe
+cargo build --release          # target/release/globlin.exe
 cargo test                     # 93 tests, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate

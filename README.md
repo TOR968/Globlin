@@ -1,4 +1,4 @@
-# npm-globals-tray
+# Globlin
 
 A tray-resident utility that watches your **global** npm (and bun) packages, notifies you when one falls
 behind, and updates it on a click. Single portable `.exe`, no installer, no runtime dependencies.
@@ -16,7 +16,7 @@ Requires a Rust toolchain (MSVC on Windows) plus Microsoft C++ Build Tools and t
 cargo build --release
 ```
 
-`target/release/npm-globals-tray.exe` (~1.5 MB) is portable — copy it anywhere and run it; it keeps its
+`target/release/globlin.exe` (~1.5 MB) is portable — copy it anywhere and run it; it keeps its
 config next to itself.
 
 ## The menu
@@ -24,7 +24,7 @@ config next to itself.
 Right-click the tray icon:
 
 ```
-npm globals — 3 updates available
+Globlin — 3 updates available
 ─────────────────────────────────────
 ↑  @google/gemini-cli   0.53.1 → 0.54.4      ▸  Update · ☐ Ignore
 ↑  @salesforce/cli      2.145.6 → 2.146.3    ▸  Update · ☐ Ignore
@@ -50,7 +50,7 @@ Markers: `↑` outdated, `✓` current, `·` ignored, `?` the registry did not a
 deliberately **not** the same as `✓` — a network failure must never look like "everything is fine".
 
 Every package row is a submenu. Outdated packages offer `Update`; every package offers `Ignore`.
-Ticking `Ignore` writes the name into the `ignore` list in `npm-globals-tray.json` and drops the
+Ticking `Ignore` writes the name into the `ignore` list in `globlin.json` and drops the
 package out of `Update all` immediately, without touching the network. Unticking it starts a check
 right away, because the registry was never asked about an ignored package — until that check lands the
 row shows `?`, not `✓`. The list is keyed by name alone, so ignoring `typescript` silences it under
@@ -90,8 +90,8 @@ nag about the same three packages forever.
 
 ## Config
 
-`npm-globals-tray.json`, read from next to the exe first, otherwise from
-`%LOCALAPPDATA%\npm-globals-tray\`. Written back to the first of those that accepts a write. Missing keys
+`globlin.json`, read from next to the exe first, otherwise from
+`%LOCALAPPDATA%\globlin\`. Written back to the first of those that accepts a write. Missing keys
 take their defaults, so a partial file is fine.
 
 ```json
@@ -119,20 +119,20 @@ take their defaults, so a partial file is fine.
   for, so retrying the same failing version does not notify twice; a differently-versioned release still
   toasts on its own first failure.
 
-If the file is not valid JSON it is moved to `npm-globals-tray.json.invalid`, defaults are used, and a
+If the file is not valid JSON it is moved to `globlin.json.invalid`, defaults are used, and a
 notification says so — your edits are never silently overwritten.
 
 ## Updating itself
 
 On the same schedule as the package check — startup, then every `check_interval_hours` — the app makes one
-extra request per cycle to `https://api.github.com/repos/TOR968/npm-globals-tray/releases/latest`. That
+extra request per cycle to `https://api.github.com/repos/TOR968/globlin/releases/latest`. That
 endpoint always resolves to the newest *published* release; GitHub excludes pre-releases and drafts from
 it, so neither one can reach a user by accident.
 
 A release is offered only when its tag parses as semver strictly newer than the running build, and both
-`npm-globals-tray.exe` and `npm-globals-tray.exe.sha256` are attached to it — a release missing either
+`globlin.exe` and `globlin.exe.sha256` are attached to it — a release missing either
 asset is skipped rather than half-offered. When one is found, the menu grows an
-`Update npm-globals-tray <current> → <new>` row next to `Update all`; the row disappears once the running
+`Update Globlin <current> → <new>` row next to `Update all`; the row disappears once the running
 build catches up. Ticking `Auto-update this app` (config key `auto_update`, default `false`, right below
 *Run at startup*) does the same job unattended: the next check that finds a newer release installs it
 without a click. The job runs under its own `Activity`, so it cannot start while a package update, or
@@ -141,16 +141,16 @@ another self-update, is already in flight, and vice versa.
 Applying an update downloads both assets, hashes the `.exe` with SHA-256, and compares that against the
 published `.sha256`; a mismatch discards the download and reports a failure, and the running binary is
 never touched. Windows will not let a running `.exe` be overwritten, but it will let it be *renamed*, so
-the swap is: write the new build as `npm-globals-tray.exe.new` next to the running one, rename the running
-exe to `npm-globals-tray.exe.old`, then rename `.new` into the live name. If that last rename fails, the
+the swap is: write the new build as `globlin.exe.new` next to the running one, rename the running
+exe to `globlin.exe.old`, then rename `.new` into the live name. If that last rename fails, the
 `.old` build is renamed straight back and the installation is left exactly as it was. In the rare case
 where that rollback also fails, the live path is left empty — but nothing is lost: the previous build is
-still intact at `npm-globals-tray.exe.old`, and the freshly verified new build is still intact at
-`npm-globals-tray.exe.new`, because the staged file is only deleted after a failed swap when the live
-executable is still there to replace it. Renaming either file back to `npm-globals-tray.exe` recovers the
-app. On the next clean start, `npm-globals-tray.exe.old` is deleted, so a successful update leaves nothing
-extra behind. If a swap completes but the new build fails to start, `npm-globals-tray.exe.old` — the
-previous working build — is still sitting next to it and can be renamed back to `npm-globals-tray.exe`;
+still intact at `globlin.exe.old`, and the freshly verified new build is still intact at
+`globlin.exe.new`, because the staged file is only deleted after a failed swap when the live
+executable is still there to replace it. Renaming either file back to `globlin.exe` recovers the
+app. On the next clean start, `globlin.exe.old` is deleted, so a successful update leaves nothing
+extra behind. If a swap completes but the new build fails to start, `globlin.exe.old` — the
+previous working build — is still sitting next to it and can be renamed back to `globlin.exe`;
 that is the only recovery path in that case.
 
 None of this works if the process cannot write next to itself — an install under `Program Files` without
@@ -161,11 +161,11 @@ same still-failing version does not toast again — rather than on every check.
 
 A successful swap restarts the app itself: it spawns the new `.exe` with `--replaced` and exits. The new
 process waits up to 10 seconds (50 attempts, 200 ms apart) for the single-instance mutex the old process is
-still holding while it shuts down, then raises a `npm globals — updated / now running <version>` toast.
+still holding while it shuts down, then raises a `Globlin — updated / now running <version>` toast.
 
 ## Diagnostics
 
-In `%LOCALAPPDATA%\npm-globals-tray\`: **`last-check.txt`** (every package from the most recent check with
+In `%LOCALAPPDATA%\globlin\`: **`last-check.txt`** (every package from the most recent check with
 its state — the file to look at when the menu shows something surprising), **`last-run.log`** (stdout and
 stderr of the most recent *failed* update, reachable from *Open last log*), **`self-update.log`** (the
 error from the most recent *failed* self-update release lookup — a separate file so a GitHub outage or an
@@ -174,17 +174,28 @@ notification artwork).
 
 ## Removing it
 
-Quit from the tray menu, delete the `.exe` and its `.json`, then delete `%LOCALAPPDATA%\npm-globals-tray\`.
-If a self-update was interrupted before its next clean start, `npm-globals-tray.exe.old` may still be
+Quit from the tray menu, delete the `.exe` and its `.json`, then delete `%LOCALAPPDATA%\globlin\`.
+If a self-update was interrupted before its next clean start, `globlin.exe.old` may still be
 sitting next to the `.exe` — see [Updating itself](#updating-itself) — and is safe to delete too.
 Two `HKEY_CURRENT_USER` values are optional to clean:
 
-- `Software\Microsoft\Windows\CurrentVersion\Run` → `npm-globals-tray` — only if *Run at startup* was ever
+- `Software\Microsoft\Windows\CurrentVersion\Run` → `globlin` — only if *Run at startup* was ever
   enabled; toggling it off removes it.
-- `Software\Classes\AppUserModelId\NpmGlobals.Tray` — created so notifications are attributed to
-  "npm globals" rather than to PowerShell.
+- `Software\Classes\AppUserModelId\Globlin.Tray` — created so notifications are attributed to
+  "Globlin" rather than to PowerShell.
 
 Nothing else is written. No installer, no service, no scheduled task.
+
+### Upgrading from npm-globals-tray
+
+This app was renamed from `npm-globals-tray` to Globlin. The new build does not migrate anything — it
+starts fresh with default settings — so an existing install leaves three harmless leftovers behind that
+can be deleted by hand once you have switched to `globlin.exe`:
+
+- the old config file, `npm-globals-tray.json`
+- the old data directory, `%LOCALAPPDATA%\npm-globals-tray\`
+- the old `Software\Microsoft\Windows\CurrentVersion\Run` value named `npm-globals-tray`, if *Run at
+  startup* was ever enabled
 
 ## Development
 
@@ -251,7 +262,7 @@ cargo test
 file that cannot be executed, which drives the real failure paths without installing anything.
 
 Seven tests are `#[ignore]`d because they do touch the real system — the HKCU Run key, a real toast, a real
-`npm install -g`, an icon dump, and two that hit `TOR968/npm-globals-tray`'s real GitHub releases. Each
+`npm install -g`, an icon dump, and two that hit `TOR968/globlin`'s real GitHub releases. Each
 carries its own exact invocation in its `#[ignore = "…"]` message; `grep -rn "#\[ignore" src/` lists them.
 `updates_a_package_for_real` really installs `$env:UPDATE_TARGET`
 globally, so point it at something harmless. To see the working UI on demand, downgrade something

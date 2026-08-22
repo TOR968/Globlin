@@ -1,8 +1,8 @@
 /target
 /dist
 
-npm-globals-tray.json
-npm-globals-tray.json.invalid
+globlin.json
+globlin.json.invalid
 last-check.txt
 last-run.log
 app.ico

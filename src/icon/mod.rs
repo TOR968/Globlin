@@ -80,7 +80,7 @@ mod tests {
     #[test]
     #[ignore = "writes .ico files for visual review: cargo test -- --ignored --exact icon::tests::dump_every_state_for_visual_review"]
     fn dump_every_state_for_visual_review() {
-        let directory = std::env::temp_dir().join("npm-globals-tray-icons");
+        let directory = std::env::temp_dir().join("globlin-icons");
         fs::create_dir_all(&directory).unwrap();
 
         let mut sheet = vec![
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn the_app_icon_is_written_with_every_declared_size() {
-        let path = std::env::temp_dir().join("npm-globals-tray-icon-test.ico");
+        let path = std::env::temp_dir().join("globlin-icon-test.ico");
         write_app_icon(&path).unwrap();
 
         let written = fs::read(&path).unwrap();
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn a_stale_app_icon_is_overwritten_rather_than_kept() {
-        let path = std::env::temp_dir().join("npm-globals-tray-stale-icon-test.ico");
+        let path = std::env::temp_dir().join("globlin-stale-icon-test.ico");
         fs::write(&path, b"an icon from an older build").unwrap();
 
         write_app_icon(&path).unwrap();

@@ -641,6 +641,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "globlin"
+version = "0.1.1"
+dependencies = [
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tao",
+ "tauri-winrt-notification",
+ "tray-icon",
+ "ureq",
+ "windows-sys 0.61.2",
+ "winreg",
+ "winresource",
+]
+
+[[package]]
 name = "gobject-sys"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1093,23 +1110,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee6cda3051665f1fb8d9e08fc35c96d5a244fb1be711a03b71118828afc9a873"
 dependencies = [
  "jni-sys 0.3.1",
-]
-
-[[package]]
-name = "npm-globals-tray"
-version = "0.1.1"
-dependencies = [
- "semver",
- "serde",
- "serde_json",
- "sha2",
- "tao",
- "tauri-winrt-notification",
- "tray-icon",
- "ureq",
- "windows-sys 0.61.2",
- "winreg",
- "winresource",
 ]
 
 [[package]]

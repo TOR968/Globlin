@@ -18,7 +18,7 @@ pub fn data_dir() -> PathBuf {
         .map(PathBuf::from)
         .or_else(|| home_dir().map(|home| home.join(".local/share")))
         .unwrap_or_else(std::env::temp_dir);
-    let dir = base.join("npm-globals-tray");
+    let dir = base.join("globlin");
     fs::create_dir_all(&dir).ok();
     dir
 }

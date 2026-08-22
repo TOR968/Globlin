@@ -50,7 +50,7 @@ impl App {
             proxy,
         };
         if let Some(warning) = warning {
-            platform::notify("npm globals", &warning).ok();
+            platform::notify("Globlin", &warning).ok();
         }
         Ok(app)
     }
@@ -120,11 +120,7 @@ impl App {
         let ignoring = !self.config.is_ignored(name);
         self.config.set_ignored(name, ignoring);
         if let Err(error) = self.config.save() {
-            platform::notify(
-                "npm globals",
-                &format!("Could not save the setting: {error}"),
-            )
-            .ok();
+            platform::notify("Globlin", &format!("Could not save the setting: {error}")).ok();
         }
         for package in &mut self.packages {
             if package.name == name {
@@ -194,11 +190,7 @@ impl App {
     fn toggle_auto_update(&mut self) {
         self.config.auto_update = !self.config.auto_update;
         if let Err(error) = self.config.save() {
-            platform::notify(
-                "npm globals",
-                &format!("Could not save the setting: {error}"),
-            )
-            .ok();
+            platform::notify("Globlin", &format!("Could not save the setting: {error}")).ok();
         }
         self.render();
     }
@@ -212,7 +204,7 @@ impl App {
                     return Control::Exit;
                 }
                 platform::notify(
-                    "npm globals",
+                    "Globlin",
                     "The new build is installed; restart the app to run it.",
                 )
                 .ok();
@@ -232,7 +224,7 @@ impl App {
             return;
         }
         platform::notify(
-            "npm globals — self-update failed",
+            "Globlin — self-update failed",
             &format!("{version}: {error}"),
         )
         .ok();
@@ -286,7 +278,7 @@ impl App {
             }
             Err(error) => {
                 self.failed = true;
-                platform::notify("npm globals — check failed", &error.to_string()).ok();
+                platform::notify("Globlin — check failed", &error.to_string()).ok();
             }
         }
         self.render();
@@ -313,12 +305,12 @@ impl App {
         self.activity = None;
         if !outcome.failed.is_empty() {
             platform::notify(
-                "npm globals — update failed",
+                "Globlin — update failed",
                 &format!("{} (see Open last log)", outcome.failed.join(", ")),
             )
             .ok();
         } else if !outcome.updated.is_empty() {
-            platform::notify("npm globals — updated", &outcome.updated.join("\n")).ok();
+            platform::notify("Globlin — updated", &outcome.updated.join("\n")).ok();
         }
         self.start_check();
     }
@@ -327,7 +319,7 @@ impl App {
         let desired = !platform::autostart_enabled();
         if let Err(error) = platform::set_autostart(desired) {
             platform::notify(
-                "npm globals",
+                "Globlin",
                 &format!("Could not change the startup setting: {error}"),
             )
             .ok();
@@ -377,7 +369,7 @@ fn open_log() {
     if path.is_file() {
         platform::open_in_shell(&path).ok();
     } else {
-        platform::notify("npm globals", "No failures have been logged yet.").ok();
+        platform::notify("Globlin", "No failures have been logged yet.").ok();
     }
 }
 

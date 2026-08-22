@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::platform;
 use crate::Result;
 
-const FILE_NAME: &str = "npm-globals-tray.json";
+const FILE_NAME: &str = "globlin.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]

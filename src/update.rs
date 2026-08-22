@@ -132,7 +132,7 @@ mod tests {
 
     impl UnrunnableNpm {
         fn new(label: &str) -> Self {
-            let path = std::env::temp_dir().join(format!("npm-globals-tray-fake-npm-{label}"));
+            let path = std::env::temp_dir().join(format!("globlin-fake-npm-{label}"));
             std::fs::write(&path, b"not an executable").unwrap();
             Self {
                 config: Config {
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     #[ignore = "spawns npm for real: cargo test -- --ignored --exact update::tests::a_real_npm_failure_lands_in_the_log"]
     fn a_real_npm_failure_lands_in_the_log() {
-        let name = "npm-globals-tray-no-such-package-9d3f".to_string();
+        let name = "globlin-no-such-package-9d3f".to_string();
 
         let outcome = run(&Config::default(), &[target(&name)], |_| {});
 

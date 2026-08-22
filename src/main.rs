@@ -47,13 +47,13 @@ fn main() {
     selfupdate::clean_stale();
     if replaced {
         platform::notify(
-            "npm globals — updated",
+            "Globlin — updated",
             &format!("now running {}", env!("CARGO_PKG_VERSION")),
         )
         .ok();
     }
     if let Err(error) = run() {
-        platform::notify("npm globals could not start", &error.to_string()).ok();
+        platform::notify("Globlin could not start", &error.to_string()).ok();
     }
 }
 
@@ -75,7 +75,7 @@ fn claim(replaced: bool) -> bool {
         }
     }
     platform::notify(
-        "npm globals — update installed",
+        "Globlin — update installed",
         "the update is installed but the previous instance is still running; start the app manually",
     )
     .ok();
@@ -115,9 +115,9 @@ mod tests {
     #[test]
     fn only_the_restart_flag_marks_a_replaced_launch() {
         assert!(was_replaced(
-            ["npm-globals-tray.exe", selfupdate::RESTART_FLAG].iter()
+            ["globlin.exe", selfupdate::RESTART_FLAG].iter()
         ));
-        assert!(!was_replaced(["npm-globals-tray.exe"].iter()));
-        assert!(!was_replaced(["npm-globals-tray.exe", "--other"].iter()));
+        assert!(!was_replaced(["globlin.exe"].iter()));
+        assert!(!was_replaced(["globlin.exe", "--other"].iter()));
     }
 }

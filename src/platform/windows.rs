@@ -9,16 +9,16 @@ use winreg::RegKey;
 use crate::icon;
 use crate::Result;
 
-const APP_USER_MODEL_ID: &str = "NpmGlobals.Tray";
-const DISPLAY_NAME: &str = "npm globals";
+const APP_USER_MODEL_ID: &str = "Globlin.Tray";
+const DISPLAY_NAME: &str = "Globlin";
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-const RUN_VALUE: &str = "npm-globals-tray";
+const RUN_VALUE: &str = "globlin";
 
 pub fn claim_single_instance() -> bool {
     use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};
     use windows_sys::Win32::System::Threading::CreateMutexW;
 
-    let name: Vec<u16> = r"Local\npm-globals-tray"
+    let name: Vec<u16> = r"Local\globlin"
         .encode_utf16()
         .chain(std::iter::once(0))
         .collect();
@@ -40,7 +40,7 @@ pub fn home_dir() -> Option<PathBuf> {
 
 pub fn data_dir() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA").map_or_else(std::env::temp_dir, PathBuf::from);
-    let dir = base.join("npm-globals-tray");
+    let dir = base.join("globlin");
     fs::create_dir_all(&dir).ok();
     dir
 }
@@ -117,10 +117,7 @@ mod tests {
             .unwrap()
             .get_value(RUN_VALUE)
             .unwrap();
-        assert!(
-            value.contains("npm-globals-tray"),
-            "unexpected value: {value}"
-        );
+        assert!(value.contains("globlin"), "unexpected value: {value}");
 
         set_autostart(false).unwrap();
         assert!(!autostart_enabled());
@@ -133,7 +130,7 @@ mod tests {
     #[ignore = "shows a real toast: cargo test -- --ignored --exact platform::windows::tests::raises_a_real_notification"]
     fn raises_a_real_notification() {
         notify(
-            "npm globals — test notification",
+            "Globlin — test notification",
             "prettier  3.9.6 → 3.10.0\nvercel  58.9.1 → 59.0.0",
         )
         .unwrap();

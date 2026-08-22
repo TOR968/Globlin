@@ -3,17 +3,17 @@ behind, and updates it on a click. It never updates anything on its own.
 
 ## Install
 
-Download `npm-globals-tray.exe` and run it. There is no installer — it keeps its config in a
-`npm-globals-tray.json` next to itself, so it can live on a USB stick or in any folder you like. Enable
+Download `globlin.exe` and run it. There is no installer — it keeps its config in a
+`globlin.json` next to itself, so it can live on a USB stick or in any folder you like. Enable
 *Run at startup* from the tray menu if you want it to come back after a reboot.
 
 ## Verify the download
 
 ```powershell
-(Get-FileHash npm-globals-tray.exe -Algorithm SHA256).Hash.ToLower()
+(Get-FileHash globlin.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-Compare the result with `npm-globals-tray.exe.sha256`.
+Compare the result with `globlin.exe.sha256`.
 
 ## Notes
 

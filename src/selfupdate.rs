@@ -10,8 +10,8 @@ use ureq::Agent;
 
 use crate::Result;
 
-pub const EXE_ASSET: &str = "npm-globals-tray.exe";
-pub const SHA_ASSET: &str = "npm-globals-tray.exe.sha256";
+pub const EXE_ASSET: &str = "globlin.exe";
+pub const SHA_ASSET: &str = "globlin.exe.sha256";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
@@ -124,8 +124,8 @@ pub fn clean_stale() {
     }
 }
 
-const LATEST_URL: &str = "https://api.github.com/repos/TOR968/npm-globals-tray/releases/latest";
-const USER_AGENT: &str = "npm-globals-tray";
+const LATEST_URL: &str = "https://api.github.com/repos/TOR968/globlin/releases/latest";
+const USER_AGENT: &str = "globlin";
 const TIMEOUT: Duration = Duration::from_secs(30);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_mins(2);
 pub const RESTART_FLAG: &str = "--replaced";
@@ -190,7 +190,7 @@ mod tests {
     fn the_release_endpoint_points_at_this_repository() {
         assert_eq!(
             LATEST_URL,
-            "https://api.github.com/repos/TOR968/npm-globals-tray/releases/latest"
+            "https://api.github.com/repos/TOR968/globlin/releases/latest"
         );
     }
 
@@ -336,7 +336,7 @@ mod tests {
     }
 
     fn scratch(label: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("npm-globals-tray-test-{label}"));
+        let dir = std::env::temp_dir().join(format!("globlin-test-{label}"));
         fs::remove_dir_all(&dir).ok();
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -344,21 +344,21 @@ mod tests {
 
     #[test]
     fn the_staged_and_previous_files_sit_next_to_the_executable() {
-        let current = PathBuf::from(r"C:\tools\npm-globals-tray.exe");
+        let current = PathBuf::from(r"C:\tools\globlin.exe");
         assert_eq!(
             staged_path(&current),
-            PathBuf::from(r"C:\tools\npm-globals-tray.exe.new")
+            PathBuf::from(r"C:\tools\globlin.exe.new")
         );
         assert_eq!(
             previous_path(&current),
-            PathBuf::from(r"C:\tools\npm-globals-tray.exe.old")
+            PathBuf::from(r"C:\tools\globlin.exe.old")
         );
     }
 
     #[test]
     fn a_swap_moves_the_staged_file_into_place_and_keeps_the_old_one() {
         let dir = scratch("swap");
-        let current = dir.join("npm-globals-tray.exe");
+        let current = dir.join("globlin.exe");
         let staged = staged_path(&current);
         fs::write(&current, b"old build").unwrap();
         fs::write(&staged, b"new build").unwrap();
@@ -373,7 +373,7 @@ mod tests {
     #[test]
     fn a_swap_that_cannot_finish_puts_the_original_back() {
         let dir = scratch("rollback");
-        let current = dir.join("npm-globals-tray.exe");
+        let current = dir.join("globlin.exe");
         let staged = staged_path(&current);
         fs::write(&current, b"old build").unwrap();
 
@@ -387,7 +387,7 @@ mod tests {
     fn a_swap_that_cannot_activate_the_new_file_returns_the_activation_error_when_rollback_succeeds(
     ) {
         let dir = scratch("activation-error");
-        let current = dir.join("npm-globals-tray.exe");
+        let current = dir.join("globlin.exe");
         let staged = staged_path(&current);
         fs::write(&current, b"old build").unwrap();
 
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn the_staged_file_is_kept_when_the_live_executable_is_missing() {
         let dir = scratch("discard-missing");
-        let current = dir.join("npm-globals-tray.exe");
+        let current = dir.join("globlin.exe");
 
         assert!(!should_discard_staged(&current));
     }
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn the_staged_file_is_discarded_when_the_live_executable_is_present() {
         let dir = scratch("discard-present");
-        let current = dir.join("npm-globals-tray.exe");
+        let current = dir.join("globlin.exe");
         fs::write(&current, b"old build").unwrap();
 
         assert!(should_discard_staged(&current));
@@ -419,7 +419,7 @@ mod tests {
     #[test]
     fn a_swap_replaces_a_leftover_previous_build() {
         let dir = scratch("leftover");
-        let current = dir.join("npm-globals-tray.exe");
+        let current = dir.join("globlin.exe");
         let staged = staged_path(&current);
         fs::write(&current, b"old build").unwrap();
         fs::write(&staged, b"new build").unwrap();
