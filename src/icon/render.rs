@@ -20,8 +20,8 @@ const DEEP: [u8; 3] = [0x33, 0x41, 0x55];
 
 const WAVE_CYCLES: f32 = 1.6;
 const WAVE_AMPLITUDE: f32 = 0.9;
-const GLYPH_TOP: f32 = 7.0;
-const GLYPH_BOTTOM: f32 = 25.5;
+const GLYPH_TOP: f32 = 4.8;
+const GLYPH_BOTTOM: f32 = 26.7;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconState {
@@ -66,23 +66,21 @@ fn badge(color: [u8; 3], shapes: Vec<Shape>) -> Vec<Layer> {
 
 fn glyph() -> Vec<Shape> {
     vec![
-        Shape::Segment {
-            from: (10.0, 9.5),
-            to: (10.0, 23.0),
-            width: 4.4,
-        },
         Shape::Arc {
             cx: 16.0,
-            cy: 15.5,
-            r: 6.0,
-            width: 4.4,
-            start: std::f32::consts::PI,
+            cy: 12.0,
+            r: 5.2,
+            width: 4.0,
+            start: 0.0,
             end: std::f32::consts::TAU,
         },
-        Shape::Segment {
-            from: (22.0, 15.5),
-            to: (22.0, 23.0),
-            width: 4.4,
+        Shape::Arc {
+            cx: 15.5,
+            cy: 18.5,
+            r: 6.2,
+            width: 4.0,
+            start: -0.35,
+            end: 2.75,
         },
     ]
 }
@@ -149,11 +147,6 @@ enum Shape {
         cy: f32,
         r: f32,
     },
-    Segment {
-        from: (f32, f32),
-        to: (f32, f32),
-        width: f32,
-    },
     Arc {
         cx: f32,
         cy: f32,
@@ -168,7 +161,6 @@ impl Shape {
     fn contains(&self, x: f32, y: f32) -> bool {
         match *self {
             Self::Disc { cx, cy, r } => (x - cx).powi(2) + (y - cy).powi(2) <= r * r,
-            Self::Segment { from, to, width } => distance_to_segment(x, y, from, to) <= width / 2.0,
             Self::Arc {
                 cx,
                 cy,
@@ -249,18 +241,6 @@ fn source_over(color: [u8; 3], alpha: f32, destination: [f32; 4]) -> [f32; 4] {
 
 fn to_byte(value: f32) -> u8 {
     (value.clamp(0.0, 1.0) * 255.0).round() as u8
-}
-
-fn distance_to_segment(x: f32, y: f32, from: (f32, f32), to: (f32, f32)) -> f32 {
-    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
-    let length_squared = dx * dx + dy * dy;
-    let position = if length_squared <= f32::EPSILON {
-        0.0
-    } else {
-        (((x - from.0) * dx + (y - from.1) * dy) / length_squared).clamp(0.0, 1.0)
-    };
-    let nearest = (from.0 + position * dx, from.1 + position * dy);
-    ((x - nearest.0).powi(2) + (y - nearest.1).powi(2)).sqrt()
 }
 
 #[cfg(test)]
@@ -385,18 +365,6 @@ mod tests {
     }
 
     #[test]
-    fn a_segment_is_thick_along_its_length_only() {
-        let segment = Shape::Segment {
-            from: (10.0, 16.0),
-            to: (22.0, 16.0),
-            width: 4.0,
-        };
-        assert!(segment.contains(16.0, 17.5));
-        assert!(!segment.contains(16.0, 19.0));
-        assert!(!segment.contains(26.0, 16.0));
-    }
-
-    #[test]
     fn an_arc_contains_its_span_and_not_the_gap() {
         let arc = Shape::Arc {
             cx: 16.0,
@@ -419,16 +387,16 @@ mod tests {
     }
 
     #[test]
-    fn the_glyph_covers_both_stems_and_the_shoulder() {
+    fn the_glyph_covers_the_bowl_and_the_descender_hook() {
         let shapes = glyph();
         let hits = |x: f32, y: f32| shapes.iter().any(|shape| shape.contains(x, y));
 
-        assert!(hits(10.0, 21.0), "the left stem is missing");
-        assert!(hits(22.0, 21.0), "the right stem is missing");
-        assert!(hits(16.0, 9.5), "the shoulder is missing");
+        assert!(hits(16.0, 6.8), "the top of the bowl is missing");
+        assert!(hits(17.7, 24.3), "the descender hook is missing");
+        assert!(!hits(16.0, 12.0), "the bowl's counter should be hollow");
         assert!(
-            !hits(16.0, 21.0),
-            "the gap under the shoulder should be open"
+            !hits(14.2, 12.4),
+            "the gap between the counter and the hook should be open"
         );
     }
 }
