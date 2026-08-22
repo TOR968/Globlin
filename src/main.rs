@@ -10,6 +10,7 @@ mod notice;
 mod platform;
 mod progress;
 mod registry;
+mod selfupdate;
 mod source;
 mod tray;
 mod update;
