@@ -15,7 +15,7 @@ const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "npm-globals-tray";
 
 pub fn claim_single_instance() -> bool {
-    use windows_sys::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
+    use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};
     use windows_sys::Win32::System::Threading::CreateMutexW;
 
     let name: Vec<u16> = r"Local\npm-globals-tray"
@@ -27,7 +27,11 @@ pub fn claim_single_instance() -> bool {
     if handle.is_null() {
         return true;
     }
-    unsafe { GetLastError() != ERROR_ALREADY_EXISTS }
+    if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+        unsafe { CloseHandle(handle) };
+        return false;
+    }
+    true
 }
 
 pub fn home_dir() -> Option<PathBuf> {
