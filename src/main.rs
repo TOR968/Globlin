@@ -15,6 +15,8 @@ mod source;
 mod tray;
 mod update;
 
+use std::time::Duration;
+
 use tao::event::{Event, StartCause};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tray_icon::menu::MenuEvent;
@@ -34,13 +36,45 @@ pub enum Message {
     Replaced(Result<semver::Version>),
 }
 
+const CLAIM_ATTEMPTS: u32 = 50;
+const CLAIM_PAUSE: Duration = Duration::from_millis(200);
+
 fn main() {
-    if !platform::claim_single_instance() {
+    let replaced = was_replaced(std::env::args().collect::<Vec<String>>().iter());
+    if !claim(replaced) {
         return;
+    }
+    selfupdate::clean_stale();
+    if replaced {
+        platform::notify(
+            "npm globals — updated",
+            &format!("now running {}", env!("CARGO_PKG_VERSION")),
+        )
+        .ok();
     }
     if let Err(error) = run() {
         platform::notify("npm globals could not start", &error.to_string()).ok();
     }
+}
+
+fn was_replaced<S: AsRef<str>>(mut args: impl Iterator<Item = S>) -> bool {
+    args.any(|argument| argument.as_ref() == selfupdate::RESTART_FLAG)
+}
+
+fn claim(replaced: bool) -> bool {
+    if platform::claim_single_instance() {
+        return true;
+    }
+    if !replaced {
+        return false;
+    }
+    for _ in 0..CLAIM_ATTEMPTS {
+        std::thread::sleep(CLAIM_PAUSE);
+        if platform::claim_single_instance() {
+            return true;
+        }
+    }
+    false
 }
 
 fn run() -> Result<()> {
@@ -67,4 +101,18 @@ fn forward_menu_events(proxy: EventLoopProxy<Message>) {
     MenuEvent::set_event_handler(Some(move |event| {
         proxy.send_event(Message::Menu(event)).ok();
     }));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_the_restart_flag_marks_a_replaced_launch() {
+        assert!(was_replaced(
+            ["npm-globals-tray.exe", selfupdate::RESTART_FLAG].iter()
+        ));
+        assert!(!was_replaced(["npm-globals-tray.exe"].iter()));
+        assert!(!was_replaced(["npm-globals-tray.exe", "--other"].iter()));
+    }
 }
