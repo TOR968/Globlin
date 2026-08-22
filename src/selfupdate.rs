@@ -1,6 +1,8 @@
 use semver::Version;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::Result;
 
@@ -63,12 +65,11 @@ fn digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     let hash = hasher.finalize();
-    hash.iter()
-        .fold(String::with_capacity(64), |mut s, byte| {
-            use std::fmt::Write;
-            write!(s, "{byte:02x}").unwrap();
-            s
-        })
+    hash.iter().fold(String::with_capacity(64), |mut s, byte| {
+        use std::fmt::Write;
+        write!(s, "{byte:02x}").unwrap();
+        s
+    })
 }
 
 fn verify(bytes: &[u8], sha_body: &str) -> Result<()> {
@@ -80,6 +81,38 @@ fn verify(bytes: &[u8], sha_body: &str) -> Result<()> {
         return Ok(());
     }
     Err(format!("checksum mismatch: expected {published}, got {actual}").into())
+}
+
+fn staged_path(current: &Path) -> PathBuf {
+    sibling(current, "new")
+}
+
+fn previous_path(current: &Path) -> PathBuf {
+    sibling(current, "old")
+}
+
+fn sibling(current: &Path, suffix: &str) -> PathBuf {
+    let mut name = current.as_os_str().to_os_string();
+    name.push(format!(".{suffix}"));
+    PathBuf::from(name)
+}
+
+fn swap(current: &Path, staged: &Path) -> Result<()> {
+    let previous = previous_path(current);
+    fs::rename(current, &previous)?;
+    match fs::rename(staged, current) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            fs::rename(&previous, current)?;
+            Err(error.into())
+        }
+    }
+}
+
+pub fn clean_stale() {
+    if let Ok(current) = std::env::current_exe() {
+        fs::remove_file(previous_path(&current)).ok();
+    }
 }
 
 #[cfg(test)]
@@ -194,5 +227,68 @@ mod tests {
     #[test]
     fn a_missing_published_hash_is_refused() {
         assert!(verify(b"abc", "404: Not Found").is_err());
+    }
+
+    fn scratch(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("npm-globals-tray-test-{label}"));
+        fs::remove_dir_all(&dir).ok();
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn the_staged_and_previous_files_sit_next_to_the_executable() {
+        let current = PathBuf::from(r"C:\tools\npm-globals-tray.exe");
+        assert_eq!(
+            staged_path(&current),
+            PathBuf::from(r"C:\tools\npm-globals-tray.exe.new")
+        );
+        assert_eq!(
+            previous_path(&current),
+            PathBuf::from(r"C:\tools\npm-globals-tray.exe.old")
+        );
+    }
+
+    #[test]
+    fn a_swap_moves_the_staged_file_into_place_and_keeps_the_old_one() {
+        let dir = scratch("swap");
+        let current = dir.join("npm-globals-tray.exe");
+        let staged = staged_path(&current);
+        fs::write(&current, b"old build").unwrap();
+        fs::write(&staged, b"new build").unwrap();
+
+        swap(&current, &staged).unwrap();
+
+        assert_eq!(fs::read(&current).unwrap(), b"new build");
+        assert_eq!(fs::read(previous_path(&current)).unwrap(), b"old build");
+        assert!(!staged.exists());
+    }
+
+    #[test]
+    fn a_swap_that_cannot_finish_puts_the_original_back() {
+        let dir = scratch("rollback");
+        let current = dir.join("npm-globals-tray.exe");
+        let staged = staged_path(&current);
+        fs::write(&current, b"old build").unwrap();
+
+        assert!(swap(&current, &staged).is_err());
+
+        assert_eq!(fs::read(&current).unwrap(), b"old build");
+        assert!(!previous_path(&current).exists());
+    }
+
+    #[test]
+    fn a_swap_replaces_a_leftover_previous_build() {
+        let dir = scratch("leftover");
+        let current = dir.join("npm-globals-tray.exe");
+        let staged = staged_path(&current);
+        fs::write(&current, b"old build").unwrap();
+        fs::write(&staged, b"new build").unwrap();
+        fs::write(previous_path(&current), b"ancient build").unwrap();
+
+        swap(&current, &staged).unwrap();
+
+        assert_eq!(fs::read(&current).unwrap(), b"new build");
+        assert_eq!(fs::read(previous_path(&current)).unwrap(), b"old build");
     }
 }
