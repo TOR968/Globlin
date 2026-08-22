@@ -209,10 +209,18 @@ running Win32 tray. That is why `notice.rs` exists as its own module rather than
 "only notify when the set changed" rule has real edge cases and `App` cannot be constructed in a test.
 
 The icon is a lowercase `n`, drawn from primitives in `src/icon/render.rs` — there are no image files,
-and `build.rs` renders the same glyph into the `.exe` icon, so the two cannot drift apart. The state
-is carried by colour: slate when everything is current, amber when updates are waiting, red when the
-last check failed. While a job runs the letter becomes a vessel: a dim outline fills with water whose
-surface ripples every 120 ms, at the level described above.
+and `build.rs` renders the same glyph into the `.exe` icon, so the two cannot drift apart. The state is
+carried by colour:
+
+| State | Colour | Meaning |
+| --- | --- | --- |
+| `Idle` | emerald `#10b981` | everything installed is current — nothing to do |
+| `Updates` | amber `#f59e0b` | one or more packages are behind |
+| `Error` | red `#ef4444` | the last registry check failed |
+| `Busy` | sky `#38bdf8` | a check or an update is running |
+
+While a job runs the letter becomes a vessel: a dim outline fills with water whose surface ripples every
+120 ms, at the level described above.
 
 Every icon is supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px
 frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the

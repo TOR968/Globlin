@@ -11,7 +11,7 @@ pub const BUSY_FRAMES: u32 = 8;
 
 const SUPERSAMPLE: u32 = 4;
 
-const SLATE: [u8; 3] = [0x64, 0x74, 0x8b];
+const EMERALD: [u8; 3] = [0x10, 0xb9, 0x81];
 const AMBER: [u8; 3] = [0xf5, 0x9e, 0x0b];
 const SKY: [u8; 3] = [0x38, 0xbd, 0xf8];
 const RED: [u8; 3] = [0xef, 0x44, 0x44];
@@ -37,7 +37,7 @@ pub fn rgba(state: IconState, frame: u32, level: f32, size: u32) -> Vec<u8> {
 
 fn layers(state: IconState, frame: u32, level: f32) -> Vec<Layer> {
     match state {
-        IconState::Idle => badge(SLATE, glyph()),
+        IconState::Idle => badge(EMERALD, glyph()),
         IconState::Updates => badge(AMBER, glyph()),
         IconState::Error => badge(RED, glyph()),
         IconState::Busy => filling(frame, level),
