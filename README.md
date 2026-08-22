@@ -100,7 +100,9 @@ take their defaults, so a partial file is fine.
   "sources": { "npm": true, "bun": true },
   "ignore": ["npm", "@anthropic-ai/claude-code"],
   "last_notified": [],
-  "npm_cmd": null
+  "npm_cmd": null,
+  "auto_update": false,
+  "last_self_notice": null
 }
 ```
 
@@ -111,9 +113,49 @@ take their defaults, so a partial file is fine.
   to notify again.
 - **`npm_cmd`** — an override, only needed if `npm.cmd` is somewhere unusual. Left `null`, `PATH` is
   searched, then `%APPDATA%\npm\npm.cmd`.
+- **`auto_update`** — when `true`, a newer published build of the app itself is installed and the app
+  restarts on the next check that finds one, with no click needed. See [Updating itself](#updating-itself).
+- **`last_self_notice`** — the version string of the last self-update failure a toast was already raised
+  for, so retrying the same failing version does not notify twice; a differently-versioned release still
+  toasts on its own first failure.
 
 If the file is not valid JSON it is moved to `npm-globals-tray.json.invalid`, defaults are used, and a
 notification says so — your edits are never silently overwritten.
+
+## Updating itself
+
+On the same schedule as the package check — startup, then every `check_interval_hours` — the app makes one
+extra request per cycle to `https://api.github.com/repos/TOR968/npm-globals-tray/releases/latest`. That
+endpoint always resolves to the newest *published* release; GitHub excludes pre-releases and drafts from
+it, so neither one can reach a user by accident.
+
+A release is offered only when its tag parses as semver strictly newer than the running build, and both
+`npm-globals-tray.exe` and `npm-globals-tray.exe.sha256` are attached to it — a release missing either
+asset is skipped rather than half-offered. When one is found, the menu grows an
+`Update npm-globals-tray <current> → <new>` row next to `Update all`; the row disappears once the running
+build catches up. Ticking `Auto-update this app` (config key `auto_update`, default `false`, right below
+*Run at startup*) does the same job unattended: the next check that finds a newer release installs it
+without a click. The job runs under its own `Activity`, so it cannot start while a package update, or
+another self-update, is already in flight, and vice versa.
+
+Applying an update downloads both assets, hashes the `.exe` with SHA-256, and compares that against the
+published `.sha256`; a mismatch discards the download and reports a failure, and the running binary is
+never touched. Windows will not let a running `.exe` be overwritten, but it will let it be *renamed*, so
+the swap is: write the new build as `npm-globals-tray.exe.new` next to the running one, rename the running
+exe to `npm-globals-tray.exe.old`, then rename `.new` into the live name. If that last rename fails, the
+`.old` build is renamed straight back and the installation is left exactly as it was — a failed swap never
+leaves the app without an executable. On the next clean start, `npm-globals-tray.exe.old` is deleted, so a
+successful update leaves nothing extra behind.
+
+None of this works if the process cannot write next to itself — an install under `Program Files` without
+elevation, or a directory an antivirus is holding a handle into, are the two cases seen in practice. Both
+fail the same way: the check keeps finding the release, the rename keeps failing, and the app keeps running
+the old build. The failure is toasted once per version — tracked in `last_self_notice`, so a restart on the
+same still-failing version does not toast again — rather than on every check.
+
+A successful swap restarts the app itself: it spawns the new `.exe` with `--replaced` and exits. The new
+process waits up to 10 seconds (50 attempts, 200 ms apart) for the single-instance mutex the old process is
+still holding while it shuts down, then raises a `npm globals — updated / now running <version>` toast.
 
 ## Diagnostics
 
@@ -125,6 +167,8 @@ notification artwork).
 ## Removing it
 
 Quit from the tray menu, delete the `.exe` and its `.json`, then delete `%LOCALAPPDATA%\npm-globals-tray\`.
+If a self-update was interrupted before its next clean start, `npm-globals-tray.exe.old` may still be
+sitting next to the `.exe` — see [Updating itself](#updating-itself) — and is safe to delete too.
 Two `HKEY_CURRENT_USER` values are optional to clean:
 
 - `Software\Microsoft\Windows\CurrentVersion\Run` → `npm-globals-tray` — only if *Run at startup* was ever
@@ -187,12 +231,13 @@ Two things about the environment that the code has to work around, both verified
 cargo test
 ```
 
-118 tests, no network and no side effects. The update orchestration is exercised by pointing `npm_cmd` at a
+156 tests, no network and no side effects. The update orchestration is exercised by pointing `npm_cmd` at a
 file that cannot be executed, which drives the real failure paths without installing anything.
 
-Five tests are `#[ignore]`d because they do touch the real system — the HKCU Run key, a real toast, a real
-`npm install -g`, an icon dump. Each carries its own exact invocation in its `#[ignore = "…"]` message;
-`grep -rn "#\[ignore" src/` lists them. `updates_a_package_for_real` really installs `$env:UPDATE_TARGET`
+Seven tests are `#[ignore]`d because they do touch the real system — the HKCU Run key, a real toast, a real
+`npm install -g`, an icon dump, and two that hit `TOR968/npm-globals-tray`'s real GitHub releases. Each
+carries its own exact invocation in its `#[ignore = "…"]` message; `grep -rn "#\[ignore" src/` lists them.
+`updates_a_package_for_real` really installs `$env:UPDATE_TARGET`
 globally, so point it at something harmless. To see the working UI on demand, downgrade something
 disposable (`npm i -g npm-check-updates@23.0.0`) and hit *Check now*.
 

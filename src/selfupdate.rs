@@ -200,6 +200,14 @@ mod tests {
         println!("latest(): {outcome:?}");
     }
 
+    #[test]
+    #[ignore = "downloads and installs over the running exe: cargo test -- --ignored --exact selfupdate::tests::installs_the_published_build_for_real"]
+    fn installs_the_published_build_for_real() {
+        let release = latest().unwrap().expect("no newer release is published");
+        let version = apply(&release).unwrap();
+        println!("installed {version}");
+    }
+
     fn body(tag: &str, assets: &[&str]) -> String {
         let assets: Vec<String> = assets
             .iter()
