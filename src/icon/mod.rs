@@ -6,6 +6,8 @@ use tray_icon::Icon;
 use crate::Result;
 
 mod ico;
+#[cfg(test)]
+mod png;
 mod render;
 
 pub use render::{IconState, BUSY_FRAMES};
@@ -114,6 +116,36 @@ mod tests {
         }
 
         println!("icons written to {}", directory.display());
+    }
+
+    #[test]
+    #[ignore = "writes PNGs for the README into docs/img: cargo test -- --ignored --exact icon::tests::dump_readme_images"]
+    fn dump_readme_images() {
+        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/img");
+        fs::create_dir_all(&directory).unwrap();
+
+        let logo_size = 128;
+        let logo = render::rgba(IconState::Idle, 0, 0.0, logo_size);
+        fs::write(
+            directory.join("logo.png"),
+            png::encode(logo_size, logo_size, &logo),
+        )
+        .unwrap();
+
+        let icon_size = 32;
+        let states = [
+            ("icon-idle", IconState::Idle, 0, 0.0),
+            ("icon-updates", IconState::Updates, 0, 0.0),
+            ("icon-error", IconState::Error, 0, 0.0),
+            ("icon-busy", IconState::Busy, BUSY_FRAMES / 2, 0.6),
+        ];
+        for (name, state, frame, level) in states {
+            let pixels = render::rgba(state, frame, level, icon_size);
+            let png = png::encode(icon_size, icon_size, &pixels);
+            fs::write(directory.join(format!("{name}.png")), png).unwrap();
+        }
+
+        println!("README images written to {}", directory.display());
     }
 
     #[test]
