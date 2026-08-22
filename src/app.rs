@@ -3,12 +3,14 @@ use std::time::{Duration, Instant};
 use tao::event_loop::EventLoopProxy;
 use tray_icon::menu::MenuEvent;
 
+use crate::check::{self, Report};
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
 use crate::model::{self, Activity, Batch, Package, Status, UpdateTarget};
+use crate::selfupdate::Release;
 use crate::tray::{Action, Tray, View};
 use crate::update::{self, Outcome, Step};
-use crate::{check, diagnostics, notice, platform, progress, Message, Result};
+use crate::{diagnostics, notice, platform, progress, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
 
@@ -21,6 +23,7 @@ pub struct App {
     config: Config,
     tray: Tray,
     packages: Vec<Package>,
+    available_release: Option<Release>,
     activity: Option<Activity>,
     failed: bool,
     frame: u32,
@@ -37,6 +40,7 @@ impl App {
             config,
             tray: Tray::new()?,
             packages: Vec::new(),
+            available_release: None,
             activity: None,
             failed: false,
             frame: 0,
@@ -196,11 +200,12 @@ impl App {
         self.render();
     }
 
-    fn on_checked(&mut self, result: Result<Vec<Package>>) {
+    fn on_checked(&mut self, result: Result<Report>) {
         self.activity = None;
         match result {
-            Ok(packages) => {
-                self.packages = packages;
+            Ok(report) => {
+                self.packages = report.packages;
+                self.available_release = report.release;
                 self.failed = false;
                 self.announce_new_updates();
             }

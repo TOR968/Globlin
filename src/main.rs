@@ -20,7 +20,7 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tray_icon::menu::MenuEvent;
 
 use app::{App, Control};
-use model::Package;
+use check::Report;
 use update::{Outcome, Step};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -28,7 +28,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub enum Message {
     Menu(MenuEvent),
-    Checked(Result<Vec<Package>>),
+    Checked(Result<Report>),
     Step(Step),
     Updated(Outcome),
 }
