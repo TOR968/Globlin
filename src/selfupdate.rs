@@ -3,6 +3,10 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::Duration;
+
+use ureq::Agent;
 
 use crate::Result;
 
@@ -120,9 +124,81 @@ pub fn clean_stale() {
     }
 }
 
+const LATEST_URL: &str = "https://api.github.com/repos/TOR968/npm-globals-tray/releases/latest";
+const USER_AGENT: &str = "npm-globals-tray";
+const TIMEOUT: Duration = Duration::from_secs(30);
+pub const RESTART_FLAG: &str = "--replaced";
+
+pub fn latest() -> Result<Option<Release>> {
+    let current = Version::parse(env!("CARGO_PKG_VERSION"))?;
+    let body = get(&agent(), LATEST_URL)?.read_to_string()?;
+    Ok(offer(&body, &current))
+}
+
+pub fn apply(release: &Release) -> Result<Version> {
+    clean_stale();
+    let agent = agent();
+    let binary = get(&agent, &release.exe_url)?.read_to_vec()?;
+    let checksum = get(&agent, &release.sha_url)?.read_to_string()?;
+    verify(&binary, &checksum)?;
+
+    let current = std::env::current_exe()?;
+    let staged = staged_path(&current);
+    fs::write(&staged, &binary)?;
+    match swap(&current, &staged) {
+        Ok(()) => Ok(release.version.clone()),
+        Err(error) => {
+            fs::remove_file(&staged).ok();
+            Err(error)
+        }
+    }
+}
+
+pub fn relaunch() -> Result<()> {
+    Command::new(std::env::current_exe()?)
+        .arg(RESTART_FLAG)
+        .spawn()?;
+    Ok(())
+}
+
+fn agent() -> Agent {
+    Agent::config_builder()
+        .timeout_global(Some(TIMEOUT))
+        .build()
+        .into()
+}
+
+fn get(agent: &Agent, url: &str) -> Result<ureq::Body> {
+    Ok(agent
+        .get(url)
+        .header("User-Agent", USER_AGENT)
+        .call()?
+        .into_body())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_release_endpoint_points_at_this_repository() {
+        assert_eq!(
+            LATEST_URL,
+            "https://api.github.com/repos/TOR968/npm-globals-tray/releases/latest"
+        );
+    }
+
+    #[test]
+    fn the_running_version_parses_as_semver() {
+        assert!(Version::parse(env!("CARGO_PKG_VERSION")).is_ok());
+    }
+
+    #[test]
+    #[ignore = "hits the network: cargo test -- --ignored --exact selfupdate::tests::the_real_repository_answers_the_release_lookup"]
+    fn the_real_repository_answers_the_release_lookup() {
+        let outcome = latest().unwrap();
+        println!("latest(): {outcome:?}");
+    }
 
     fn body(tag: &str, assets: &[&str]) -> String {
         let assets: Vec<String> = assets
