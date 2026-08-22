@@ -103,8 +103,13 @@ fn swap(current: &Path, staged: &Path) -> Result<()> {
     match fs::rename(staged, current) {
         Ok(()) => Ok(()),
         Err(error) => {
-            fs::rename(&previous, current)?;
-            Err(error.into())
+            match fs::rename(&previous, current) {
+                Ok(()) => Err(error.into()),
+                Err(rollback_error) => Err(format!(
+                    "failed to activate new executable: {}; rollback also failed: {}; old build remains at {}",
+                    error, rollback_error, previous.display()
+                ).into())
+            }
         }
     }
 }
@@ -273,6 +278,22 @@ mod tests {
 
         assert!(swap(&current, &staged).is_err());
 
+        assert_eq!(fs::read(&current).unwrap(), b"old build");
+        assert!(!previous_path(&current).exists());
+    }
+
+    #[test]
+    fn a_swap_that_cannot_activate_the_new_file_returns_the_activation_error_when_rollback_succeeds(
+    ) {
+        let dir = scratch("activation-error");
+        let current = dir.join("npm-globals-tray.exe");
+        let staged = staged_path(&current);
+        fs::write(&current, b"old build").unwrap();
+
+        let err = swap(&current, &staged).unwrap_err();
+        let msg = err.to_string().to_lowercase();
+
+        assert!(!msg.contains("rollback"));
         assert_eq!(fs::read(&current).unwrap(), b"old build");
         assert!(!previous_path(&current).exists());
     }
