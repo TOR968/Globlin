@@ -167,7 +167,9 @@ still holding while it shuts down, then raises a `npm globals — updated / now 
 
 In `%LOCALAPPDATA%\npm-globals-tray\`: **`last-check.txt`** (every package from the most recent check with
 its state — the file to look at when the menu shows something surprising), **`last-run.log`** (stdout and
-stderr of the most recent *failed* update, reachable from *Open last log*), and **`app.ico`** (the
+stderr of the most recent *failed* update, reachable from *Open last log*), **`self-update.log`** (the
+error from the most recent *failed* self-update release lookup — a separate file so a GitHub outage or an
+offline run cannot overwrite the package update log that *Open last log* reads), and **`app.ico`** (the
 notification artwork).
 
 ## Removing it

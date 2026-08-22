@@ -35,7 +35,9 @@ fn look_up_release(outcome: Result<Option<Release>>) -> Option<Release> {
     match outcome {
         Ok(release) => release,
         Err(error) => {
-            diagnostics::record_failures(&format!("self-update lookup failed: {error}\n"));
+            diagnostics::record_self_update_failure(&format!(
+                "self-update lookup failed: {error}\n"
+            ));
             None
         }
     }

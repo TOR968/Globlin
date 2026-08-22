@@ -6,13 +6,22 @@ use crate::platform;
 
 const SNAPSHOT: &str = "last-check.txt";
 const FAILURES: &str = "last-run.log";
+const SELF_UPDATE_FAILURES: &str = "self-update.log";
 
 pub fn log_path() -> PathBuf {
     platform::data_dir().join(FAILURES)
 }
 
+pub fn self_update_log_path() -> PathBuf {
+    platform::data_dir().join(SELF_UPDATE_FAILURES)
+}
+
 pub fn record_failures(report: &str) {
     fs::write(log_path(), report).ok();
+}
+
+pub fn record_self_update_failure(report: &str) {
+    fs::write(self_update_log_path(), report).ok();
 }
 
 pub fn record_snapshot(packages: &[Package]) {
@@ -87,8 +96,12 @@ mod tests {
     }
 
     #[test]
-    fn the_two_diagnostic_files_do_not_collide() {
+    fn the_diagnostic_files_do_not_collide() {
         assert_ne!(SNAPSHOT, FAILURES);
+        assert_ne!(SNAPSHOT, SELF_UPDATE_FAILURES);
+        assert_ne!(FAILURES, SELF_UPDATE_FAILURES);
         assert!(log_path().ends_with(FAILURES));
+        assert!(self_update_log_path().ends_with(SELF_UPDATE_FAILURES));
+        assert_ne!(log_path(), self_update_log_path());
     }
 }
