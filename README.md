@@ -59,9 +59,11 @@ both npm and bun.
 While an update runs, the batch is shown as a queue: finished packages carry `✓ done` (or `✗ failed`),
 the package being worked on carries a spinner and a progress bar, and the rest carry `· queued`.
 `npm install -g` reports progress only to a terminal, and the app runs it without a console, so the
-bar is not a byte count: it rises asymptotically towards the share of the batch that the current
-package represents, and only completes when the package actually lands. A failure is therefore never
-shown as a success.
+bar is not a byte count: it rises asymptotically with how long the current package has been running,
+and deliberately stops short of its last cell while the work is still in flight — the batch-share
+arithmetic that combines elapsed time with `done`/`total` instead drives the tray icon's water level, not
+this bar. A package is only ever reported as landed by its marker changing to `✓ done` (or `✗ failed`),
+never by the bar filling.
 
 The header line and the tray icon animate off the same frame counter, ticking every 120 ms, and every
 clickable row is disabled while a job runs so a second job cannot start on top of the first. Idle costs

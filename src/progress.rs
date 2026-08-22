@@ -10,6 +10,12 @@ pub fn creep(elapsed: Duration) -> f32 {
     (1.0 - (-elapsed.as_secs_f32() / TAU_SECONDS).exp()).min(NEVER_QUITE_LANDED)
 }
 
+const WORKING_CEILING: f32 = 0.9;
+
+pub fn working(elapsed: Duration) -> f32 {
+    creep(elapsed).min(WORKING_CEILING)
+}
+
 pub fn level(done: usize, total: usize, elapsed: Duration) -> f32 {
     if total == 0 {
         return creep(elapsed);
@@ -86,6 +92,14 @@ mod tests {
         let value = level(0, 0, Duration::from_secs(2));
         assert!(value.is_finite(), "{value}");
         assert!((0.0..=1.0).contains(&value), "{value}");
+    }
+
+    #[test]
+    fn the_working_bar_never_fills_its_last_cell() {
+        for seconds in [0, 3, 9, 60, 600] {
+            let cells = bar(working(Duration::from_secs(seconds)));
+            assert!(cells.ends_with('░'), "{seconds}s produced {cells}");
+        }
     }
 
     #[test]

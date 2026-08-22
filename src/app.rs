@@ -192,9 +192,7 @@ impl App {
                 Step::Finished { index, ok } => batch.finish(*index, *ok),
             }
         }
-        if matches!(step, Step::Started { .. }) {
-            self.step_started = Instant::now();
-        }
+        self.step_started = Instant::now();
         self.render();
     }
 

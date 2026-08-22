@@ -110,7 +110,7 @@ pub fn build(view: &View) -> Result<Built> {
         .iter()
         .filter(|package| package.latest().is_none())
         .collect();
-    if !outdated.is_empty() && !settled.is_empty() {
+    if separates_settled(&outdated, batch, &settled) {
         menu.append(&PredefinedMenuItem::separator())?;
     }
     for package in &settled {
@@ -150,6 +150,10 @@ fn in_batch(batch: Option<&Batch>, package: &Package) -> bool {
     })
 }
 
+fn separates_settled(outdated: &[&Package], batch: Option<&Batch>, settled: &[&Package]) -> bool {
+    !settled.is_empty() && outdated.iter().any(|package| !in_batch(batch, package))
+}
+
 pub fn batch_row_text(view: &View, position: usize) -> Option<String> {
     let batch = active_batch(view.activity)?;
     let target = batch.targets.get(position)?;
@@ -160,7 +164,7 @@ pub fn batch_row_text(view: &View, position: usize) -> Option<String> {
         RowState::Active => format!(
             "{}   {}",
             target_label(target, spinner_tick(view.frame)),
-            progress::bar(progress::creep(view.elapsed))
+            progress::bar(progress::working(view.elapsed))
         ),
     })
 }
@@ -563,6 +567,39 @@ mod tests {
         let view = updating_view(&activity, Duration::ZERO);
 
         assert_eq!(batch_row_text(&view, 7), None);
+    }
+
+    #[test]
+    fn a_batch_covering_every_outdated_package_needs_no_second_separator() {
+        let targets = [behind("alpha", "2.0.0"), behind("beta", "2.0.0")];
+        let outdated: Vec<&Package> = targets.iter().collect();
+        let settled = [package("prettier", SourceKind::Npm, Status::Current)];
+        let settled_refs: Vec<&Package> = settled.iter().collect();
+        let batch = Batch::new(targets.iter().filter_map(Package::update_target).collect());
+
+        assert!(!separates_settled(&outdated, Some(&batch), &settled_refs));
+    }
+
+    #[test]
+    fn an_outdated_package_outside_the_batch_still_gets_its_separator() {
+        let targets = [behind("alpha", "2.0.0"), behind("beta", "2.0.0")];
+        let outdated: Vec<&Package> = targets.iter().collect();
+        let settled = [package("prettier", SourceKind::Npm, Status::Current)];
+        let settled_refs: Vec<&Package> = settled.iter().collect();
+        let batch = Batch::new(vec![targets[0].update_target().unwrap()]);
+
+        assert!(separates_settled(&outdated, Some(&batch), &settled_refs));
+    }
+
+    #[test]
+    fn an_idle_menu_separates_outdated_from_settled() {
+        let targets = [behind("alpha", "2.0.0")];
+        let outdated: Vec<&Package> = targets.iter().collect();
+        let settled = [package("prettier", SourceKind::Npm, Status::Current)];
+        let settled_refs: Vec<&Package> = settled.iter().collect();
+
+        assert!(separates_settled(&outdated, None, &settled_refs));
+        assert!(!separates_settled(&outdated, None, &[]));
     }
 
     #[test]
