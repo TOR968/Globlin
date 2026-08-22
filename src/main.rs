@@ -31,6 +31,7 @@ pub enum Message {
     Checked(Result<Report>),
     Step(Step),
     Updated(Outcome),
+    Replaced(Result<semver::Version>),
 }
 
 fn main() {

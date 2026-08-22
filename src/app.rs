@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+use semver::Version;
 use tao::event_loop::EventLoopProxy;
 use tray_icon::menu::MenuEvent;
 
@@ -7,7 +8,7 @@ use crate::check::{self, Report};
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
 use crate::model::{self, Activity, Batch, Package, Status, UpdateTarget};
-use crate::selfupdate::Release;
+use crate::selfupdate::{self, Release};
 use crate::tray::{Action, Tray, View};
 use crate::update::{self, Outcome, Step};
 use crate::{diagnostics, notice, platform, progress, Message, Result};
@@ -74,6 +75,7 @@ impl App {
             Message::Checked(result) => self.on_checked(result),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome),
+            Message::Replaced(result) => return self.on_replaced(result),
         }
         Control::Continue
     }
@@ -100,6 +102,8 @@ impl App {
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
             Action::ToggleAutostart => self.toggle_autostart(),
+            Action::UpdateSelf => self.start_self_update(),
+            Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::OpenLog => open_log(),
         }
         Control::Continue
@@ -170,6 +174,72 @@ impl App {
         });
     }
 
+    fn start_self_update(&mut self) {
+        if self.activity.is_some() {
+            return;
+        }
+        let Some(release) = self.available_release.clone() else {
+            return;
+        };
+        self.begin(Activity::SelfUpdate);
+
+        let proxy = self.proxy.clone();
+        std::thread::spawn(move || {
+            proxy
+                .send_event(Message::Replaced(selfupdate::apply(&release)))
+                .ok();
+        });
+    }
+
+    fn toggle_auto_update(&mut self) {
+        self.config.auto_update = !self.config.auto_update;
+        if let Err(error) = self.config.save() {
+            platform::notify(
+                "npm globals",
+                &format!("Could not save the setting: {error}"),
+            )
+            .ok();
+        }
+        self.render();
+    }
+
+    fn on_replaced(&mut self, result: Result<Version>) -> Control {
+        self.activity = None;
+        match result {
+            Ok(_) => {
+                self.available_release = None;
+                if selfupdate::relaunch().is_ok() {
+                    return Control::Exit;
+                }
+                platform::notify(
+                    "npm globals",
+                    "The new build is installed; restart the app to run it.",
+                )
+                .ok();
+            }
+            Err(error) => self.report_self_failure(&error.to_string()),
+        }
+        self.render();
+        Control::Continue
+    }
+
+    fn report_self_failure(&mut self, error: &str) {
+        let Some(release) = self.available_release.as_ref() else {
+            return;
+        };
+        let version = release.version.to_string();
+        if !notice::self_failure(&version, self.config.last_self_notice.as_deref()) {
+            return;
+        }
+        platform::notify(
+            "npm globals — self-update failed",
+            &format!("{version}: {error}"),
+        )
+        .ok();
+        self.config.last_self_notice = Some(version);
+        self.config.save().ok();
+    }
+
     fn begin(&mut self, activity: Activity) {
         self.activity = Some(activity);
         self.frame = 0;
@@ -183,6 +253,8 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            self.available_release.as_ref(),
+            self.config.auto_update,
             self.frame,
             self.elapsed(),
         );
@@ -208,6 +280,9 @@ impl App {
                 self.available_release = report.release;
                 self.failed = false;
                 self.announce_new_updates();
+                if self.config.auto_update && self.available_release.is_some() {
+                    self.start_self_update();
+                }
             }
             Err(error) => {
                 self.failed = true;
@@ -266,6 +341,8 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            self.available_release.as_ref(),
+            self.config.auto_update,
             self.frame,
             self.elapsed(),
         );
@@ -285,7 +362,7 @@ impl App {
             Some(Activity::Updating { batch }) => {
                 progress::level(batch.done(), batch.total(), self.elapsed())
             }
-            Some(Activity::Checking) => progress::creep(self.elapsed()),
+            Some(Activity::Checking | Activity::SelfUpdate) => progress::creep(self.elapsed()),
             None => 0.0,
         }
     }
@@ -307,13 +384,17 @@ fn open_log() {
 fn view_of<'a>(
     packages: &'a [Package],
     activity: Option<&'a Activity>,
+    release: Option<&'a Release>,
+    auto_update: bool,
     frame: u32,
     elapsed: Duration,
 ) -> View<'a> {
     View {
         packages,
         activity,
+        release,
         autostart: platform::autostart_enabled(),
+        auto_update,
         frame,
         elapsed,
     }
