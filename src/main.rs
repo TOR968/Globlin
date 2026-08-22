@@ -74,6 +74,11 @@ fn claim(replaced: bool) -> bool {
             return true;
         }
     }
+    platform::notify(
+        "npm globals — update installed",
+        "the update is installed but the previous instance is still running; start the app manually",
+    )
+    .ok();
     false
 }
 
