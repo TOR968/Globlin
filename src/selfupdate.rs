@@ -110,8 +110,8 @@ fn swap(current: &Path, staged: &Path) -> Result<()> {
             match fs::rename(&previous, current) {
                 Ok(()) => Err(error.into()),
                 Err(rollback_error) => Err(format!(
-                    "failed to activate new executable: {}; rollback also failed: {}; old build remains at {}",
-                    error, rollback_error, previous.display()
+                    "failed to activate new executable: {}; rollback also failed: {}; {} is now missing, but the previous build is intact at {} and renaming it back to {} restores it",
+                    error, rollback_error, current.display(), previous.display(), current.display()
                 ).into())
             }
         }
@@ -127,19 +127,19 @@ pub fn clean_stale() {
 const LATEST_URL: &str = "https://api.github.com/repos/TOR968/npm-globals-tray/releases/latest";
 const USER_AGENT: &str = "npm-globals-tray";
 const TIMEOUT: Duration = Duration::from_secs(30);
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_mins(2);
 pub const RESTART_FLAG: &str = "--replaced";
 
 pub fn latest() -> Result<Option<Release>> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))?;
-    let body = get(&agent(), LATEST_URL)?.read_to_string()?;
+    let body = get(&agent(TIMEOUT), LATEST_URL)?.read_to_string()?;
     Ok(offer(&body, &current))
 }
 
 pub fn apply(release: &Release) -> Result<Version> {
     clean_stale();
-    let agent = agent();
-    let binary = get(&agent, &release.exe_url)?.read_to_vec()?;
-    let checksum = get(&agent, &release.sha_url)?.read_to_string()?;
+    let binary = get(&agent(DOWNLOAD_TIMEOUT), &release.exe_url)?.read_to_vec()?;
+    let checksum = get(&agent(TIMEOUT), &release.sha_url)?.read_to_string()?;
     verify(&binary, &checksum)?;
 
     let current = std::env::current_exe()?;
@@ -148,10 +148,16 @@ pub fn apply(release: &Release) -> Result<Version> {
     match swap(&current, &staged) {
         Ok(()) => Ok(release.version.clone()),
         Err(error) => {
-            fs::remove_file(&staged).ok();
+            if should_discard_staged(&current) {
+                fs::remove_file(&staged).ok();
+            }
             Err(error)
         }
     }
+}
+
+fn should_discard_staged(current: &Path) -> bool {
+    current.exists()
 }
 
 pub fn relaunch() -> Result<()> {
@@ -161,9 +167,9 @@ pub fn relaunch() -> Result<()> {
     Ok(())
 }
 
-fn agent() -> Agent {
+fn agent(timeout: Duration) -> Agent {
     Agent::config_builder()
-        .timeout_global(Some(TIMEOUT))
+        .timeout_global(Some(timeout))
         .build()
         .into()
 }
@@ -287,6 +293,17 @@ mod tests {
     }
 
     #[test]
+    fn the_published_hash_is_picked_out_of_a_multi_line_checksum_body() {
+        let body = format!(
+            "{}  other-asset.zip\n{}  {EXE_ASSET}\n{}  another-asset.tar.gz\n",
+            "c".repeat(64),
+            "d".repeat(64),
+            "e".repeat(64),
+        );
+        assert_eq!(published_hash(&body).unwrap(), "d".repeat(64));
+    }
+
+    #[test]
     fn a_checksum_body_that_is_not_a_hash_is_rejected() {
         assert!(published_hash("not found\n").is_none());
         assert!(published_hash("").is_none());
@@ -380,6 +397,23 @@ mod tests {
         assert!(!msg.contains("rollback"));
         assert_eq!(fs::read(&current).unwrap(), b"old build");
         assert!(!previous_path(&current).exists());
+    }
+
+    #[test]
+    fn the_staged_file_is_kept_when_the_live_executable_is_missing() {
+        let dir = scratch("discard-missing");
+        let current = dir.join("npm-globals-tray.exe");
+
+        assert!(!should_discard_staged(&current));
+    }
+
+    #[test]
+    fn the_staged_file_is_discarded_when_the_live_executable_is_present() {
+        let dir = scratch("discard-present");
+        let current = dir.join("npm-globals-tray.exe");
+        fs::write(&current, b"old build").unwrap();
+
+        assert!(should_discard_staged(&current));
     }
 
     #[test]

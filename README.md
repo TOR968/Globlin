@@ -143,9 +143,15 @@ published `.sha256`; a mismatch discards the download and reports a failure, and
 never touched. Windows will not let a running `.exe` be overwritten, but it will let it be *renamed*, so
 the swap is: write the new build as `npm-globals-tray.exe.new` next to the running one, rename the running
 exe to `npm-globals-tray.exe.old`, then rename `.new` into the live name. If that last rename fails, the
-`.old` build is renamed straight back and the installation is left exactly as it was — a failed swap never
-leaves the app without an executable. On the next clean start, `npm-globals-tray.exe.old` is deleted, so a
-successful update leaves nothing extra behind.
+`.old` build is renamed straight back and the installation is left exactly as it was. In the rare case
+where that rollback also fails, the live path is left empty — but nothing is lost: the previous build is
+still intact at `npm-globals-tray.exe.old`, and the freshly verified new build is still intact at
+`npm-globals-tray.exe.new`, because the staged file is only deleted after a failed swap when the live
+executable is still there to replace it. Renaming either file back to `npm-globals-tray.exe` recovers the
+app. On the next clean start, `npm-globals-tray.exe.old` is deleted, so a successful update leaves nothing
+extra behind. If a swap completes but the new build fails to start, `npm-globals-tray.exe.old` — the
+previous working build — is still sitting next to it and can be renamed back to `npm-globals-tray.exe`;
+that is the only recovery path in that case.
 
 None of this works if the process cannot write next to itself — an install under `Program Files` without
 elevation, or a directory an antivirus is holding a handle into, are the two cases seen in practice. Both
