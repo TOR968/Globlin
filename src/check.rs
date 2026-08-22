@@ -6,10 +6,17 @@ use crate::config::Config;
 use crate::diagnostics;
 use crate::model::{Installed, Package, Status};
 use crate::registry;
+use crate::selfupdate::{self, Release};
 use crate::source::{self, PackageSource};
 use crate::Result;
 
-pub fn run(config: &Config) -> Result<Vec<Package>> {
+#[derive(Debug)]
+pub struct Report {
+    pub packages: Vec<Package>,
+    pub release: Option<Release>,
+}
+
+pub fn run(config: &Config) -> Result<Report> {
     let sources = source::enabled(config)?;
     let installed = collect(&sources)?;
     let latest = registry::latest_versions(&lookup_names(&installed, config))?;
@@ -18,7 +25,22 @@ pub fn run(config: &Config) -> Result<Vec<Package>> {
         .map(|item| classify(item, config, &latest))
         .collect();
     diagnostics::record_snapshot(&packages);
-    Ok(packages)
+    Ok(Report {
+        packages,
+        release: look_up_release(selfupdate::latest()),
+    })
+}
+
+fn look_up_release(outcome: Result<Option<Release>>) -> Option<Release> {
+    match outcome {
+        Ok(release) => release,
+        Err(error) => {
+            diagnostics::record_self_update_failure(&format!(
+                "self-update lookup failed: {error}\n"
+            ));
+            None
+        }
+    }
 }
 
 fn collect(sources: &[Box<dyn PackageSource>]) -> Result<Vec<Installed>> {
@@ -173,5 +195,20 @@ mod tests {
             lookup_names(&items, &Config::default()),
             vec!["typescript".to_string()]
         );
+    }
+
+    #[test]
+    fn a_failed_release_lookup_leaves_the_report_without_one() {
+        assert_eq!(look_up_release(Err("no network".into())), None);
+    }
+
+    #[test]
+    fn a_successful_release_lookup_is_carried_in_the_report() {
+        let release = crate::selfupdate::Release {
+            version: Version::parse("0.2.0").unwrap(),
+            exe_url: "https://example.test/exe".to_string(),
+            sha_url: "https://example.test/sha".to_string(),
+        };
+        assert_eq!(look_up_release(Ok(Some(release.clone()))), Some(release));
     }
 }

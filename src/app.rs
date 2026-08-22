@@ -1,14 +1,17 @@
 use std::time::{Duration, Instant};
 
+use semver::Version;
 use tao::event_loop::EventLoopProxy;
 use tray_icon::menu::MenuEvent;
 
+use crate::check::{self, Report};
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
 use crate::model::{self, Activity, Batch, Package, Status, UpdateTarget};
+use crate::selfupdate::{self, Release};
 use crate::tray::{Action, Tray, View};
 use crate::update::{self, Outcome, Step};
-use crate::{check, diagnostics, notice, platform, progress, Message, Result};
+use crate::{diagnostics, notice, platform, progress, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
 
@@ -21,6 +24,7 @@ pub struct App {
     config: Config,
     tray: Tray,
     packages: Vec<Package>,
+    available_release: Option<Release>,
     activity: Option<Activity>,
     failed: bool,
     frame: u32,
@@ -37,6 +41,7 @@ impl App {
             config,
             tray: Tray::new()?,
             packages: Vec::new(),
+            available_release: None,
             activity: None,
             failed: false,
             frame: 0,
@@ -45,7 +50,7 @@ impl App {
             proxy,
         };
         if let Some(warning) = warning {
-            platform::notify("npm globals", &warning).ok();
+            platform::notify("Globlin", &warning).ok();
         }
         Ok(app)
     }
@@ -70,6 +75,7 @@ impl App {
             Message::Checked(result) => self.on_checked(result),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome),
+            Message::Replaced(result) => return self.on_replaced(result),
         }
         Control::Continue
     }
@@ -96,6 +102,8 @@ impl App {
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
             Action::ToggleAutostart => self.toggle_autostart(),
+            Action::UpdateSelf => self.start_self_update(),
+            Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::OpenLog => open_log(),
         }
         Control::Continue
@@ -112,11 +120,7 @@ impl App {
         let ignoring = !self.config.is_ignored(name);
         self.config.set_ignored(name, ignoring);
         if let Err(error) = self.config.save() {
-            platform::notify(
-                "npm globals",
-                &format!("Could not save the setting: {error}"),
-            )
-            .ok();
+            platform::notify("Globlin", &format!("Could not save the setting: {error}")).ok();
         }
         for package in &mut self.packages {
             if package.name == name {
@@ -166,6 +170,68 @@ impl App {
         });
     }
 
+    fn start_self_update(&mut self) {
+        if self.activity.is_some() {
+            return;
+        }
+        let Some(release) = self.available_release.clone() else {
+            return;
+        };
+        self.begin(Activity::SelfUpdate);
+
+        let proxy = self.proxy.clone();
+        std::thread::spawn(move || {
+            proxy
+                .send_event(Message::Replaced(selfupdate::apply(&release)))
+                .ok();
+        });
+    }
+
+    fn toggle_auto_update(&mut self) {
+        self.config.auto_update = !self.config.auto_update;
+        if let Err(error) = self.config.save() {
+            platform::notify("Globlin", &format!("Could not save the setting: {error}")).ok();
+        }
+        self.render();
+    }
+
+    fn on_replaced(&mut self, result: Result<Version>) -> Control {
+        self.activity = None;
+        match result {
+            Ok(_) => {
+                self.available_release = None;
+                if selfupdate::relaunch().is_ok() {
+                    return Control::Exit;
+                }
+                platform::notify(
+                    "Globlin",
+                    "The new build is installed; restart the app to run it.",
+                )
+                .ok();
+            }
+            Err(error) => self.report_self_failure(&error.to_string()),
+        }
+        self.render();
+        Control::Continue
+    }
+
+    fn report_self_failure(&mut self, error: &str) {
+        let Some(release) = self.available_release.as_ref() else {
+            return;
+        };
+        let version = release.version.to_string();
+        if !notice::self_failure(&version, self.config.last_self_notice.as_deref()) {
+            return;
+        }
+        platform::notify(
+            "Globlin — self-update failed",
+            &format!("{version}: {error}"),
+        )
+        .ok();
+        self.config.last_self_notice = Some(version);
+        self.config.save().ok();
+    }
+
     fn begin(&mut self, activity: Activity) {
         self.activity = Some(activity);
         self.frame = 0;
@@ -179,6 +245,8 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            self.available_release.as_ref(),
+            self.config.auto_update,
             self.frame,
             self.elapsed(),
         );
@@ -196,17 +264,21 @@ impl App {
         self.render();
     }
 
-    fn on_checked(&mut self, result: Result<Vec<Package>>) {
+    fn on_checked(&mut self, result: Result<Report>) {
         self.activity = None;
         match result {
-            Ok(packages) => {
-                self.packages = packages;
+            Ok(report) => {
+                self.packages = report.packages;
+                self.available_release = report.release;
                 self.failed = false;
                 self.announce_new_updates();
+                if self.config.auto_update && self.available_release.is_some() {
+                    self.start_self_update();
+                }
             }
             Err(error) => {
                 self.failed = true;
-                platform::notify("npm globals — check failed", &error.to_string()).ok();
+                platform::notify("Globlin — check failed", &error.to_string()).ok();
             }
         }
         self.render();
@@ -233,12 +305,12 @@ impl App {
         self.activity = None;
         if !outcome.failed.is_empty() {
             platform::notify(
-                "npm globals — update failed",
+                "Globlin — update failed",
                 &format!("{} (see Open last log)", outcome.failed.join(", ")),
             )
             .ok();
         } else if !outcome.updated.is_empty() {
-            platform::notify("npm globals — updated", &outcome.updated.join("\n")).ok();
+            platform::notify("Globlin — updated", &outcome.updated.join("\n")).ok();
         }
         self.start_check();
     }
@@ -247,7 +319,7 @@ impl App {
         let desired = !platform::autostart_enabled();
         if let Err(error) = platform::set_autostart(desired) {
             platform::notify(
-                "npm globals",
+                "Globlin",
                 &format!("Could not change the startup setting: {error}"),
             )
             .ok();
@@ -261,6 +333,8 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            self.available_release.as_ref(),
+            self.config.auto_update,
             self.frame,
             self.elapsed(),
         );
@@ -280,7 +354,7 @@ impl App {
             Some(Activity::Updating { batch }) => {
                 progress::level(batch.done(), batch.total(), self.elapsed())
             }
-            Some(Activity::Checking) => progress::creep(self.elapsed()),
+            Some(Activity::Checking | Activity::SelfUpdate) => progress::creep(self.elapsed()),
             None => 0.0,
         }
     }
@@ -295,20 +369,24 @@ fn open_log() {
     if path.is_file() {
         platform::open_in_shell(&path).ok();
     } else {
-        platform::notify("npm globals", "No failures have been logged yet.").ok();
+        platform::notify("Globlin", "No failures have been logged yet.").ok();
     }
 }
 
 fn view_of<'a>(
     packages: &'a [Package],
     activity: Option<&'a Activity>,
+    release: Option<&'a Release>,
+    auto_update: bool,
     frame: u32,
     elapsed: Duration,
 ) -> View<'a> {
     View {
         packages,
         activity,
+        release,
         autostart: platform::autostart_enabled(),
+        auto_update,
         frame,
         elapsed,
     }

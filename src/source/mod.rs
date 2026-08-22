@@ -113,6 +113,6 @@ mod tests {
 
     #[test]
     fn a_program_that_is_not_on_path_is_not_found() {
-        assert_eq!(find_on_path("npm-globals-tray-absent-4b1e.exe"), None);
+        assert_eq!(find_on_path("globlin-absent-4b1e.exe"), None);
     }
 }

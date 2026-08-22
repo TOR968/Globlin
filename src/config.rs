@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::platform;
 use crate::Result;
 
-const FILE_NAME: &str = "npm-globals-tray.json";
+const FILE_NAME: &str = "globlin.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -17,6 +17,8 @@ pub struct Config {
     pub ignore: Vec<String>,
     pub last_notified: Vec<String>,
     pub npm_cmd: Option<PathBuf>,
+    pub auto_update: bool,
+    pub last_self_notice: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +36,8 @@ impl Default for Config {
             ignore: vec!["npm".to_string(), "@anthropic-ai/claude-code".to_string()],
             last_notified: Vec::new(),
             npm_cmd: None,
+            auto_update: false,
+            last_self_notice: None,
         }
     }
 }
@@ -226,5 +230,20 @@ mod tests {
 
         assert!(!config.is_ignored("npm"));
         assert!(config.is_ignored("@anthropic-ai/claude-code"));
+    }
+
+    #[test]
+    fn self_updating_is_off_until_it_is_asked_for() {
+        let config = Config::default();
+        assert!(!config.auto_update);
+        assert_eq!(config.last_self_notice, None);
+    }
+
+    #[test]
+    fn an_older_config_file_without_the_new_fields_still_loads() {
+        let raw = r#"{"check_interval_hours":3,"ignore":["npm"]}"#;
+        let config: Config = serde_json::from_str(raw).unwrap();
+        assert_eq!(config.check_interval_hours, 3);
+        assert!(!config.auto_update);
     }
 }

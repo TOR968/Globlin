@@ -6,11 +6,14 @@ use tray_icon::menu::{
 
 use crate::model::{self, Activity, Batch, Package, RowState, SourceKind, Status, UpdateTarget};
 use crate::progress;
+use crate::selfupdate::Release;
 use crate::Result;
 
 const ID_UPDATE_ALL: &str = "update-all";
 const ID_CHECK_NOW: &str = "check-now";
 const ID_AUTOSTART: &str = "autostart";
+const ID_UPDATE_SELF: &str = "update-self";
+const ID_AUTO_UPDATE: &str = "auto-update";
 const ID_OPEN_LOG: &str = "open-log";
 const ID_QUIT: &str = "quit";
 const UPDATE_PREFIX: &str = "update:";
@@ -26,6 +29,8 @@ pub enum Action {
     UpdateAll,
     CheckNow,
     ToggleAutostart,
+    UpdateSelf,
+    ToggleAutoUpdate,
     OpenLog,
     Quit,
 }
@@ -40,6 +45,8 @@ pub struct View<'a> {
     pub packages: &'a [Package],
     pub activity: Option<&'a Activity>,
     pub autostart: bool,
+    pub auto_update: bool,
+    pub release: Option<&'a Release>,
     pub frame: u32,
     pub elapsed: Duration,
 }
@@ -54,6 +61,8 @@ impl Action {
             ID_UPDATE_ALL => Some(Self::UpdateAll),
             ID_CHECK_NOW => Some(Self::CheckNow),
             ID_AUTOSTART => Some(Self::ToggleAutostart),
+            ID_UPDATE_SELF => Some(Self::UpdateSelf),
+            ID_AUTO_UPDATE => Some(Self::ToggleAutoUpdate),
             ID_OPEN_LOG => Some(Self::OpenLog),
             ID_QUIT => Some(Self::Quit),
             other => Self::parse_update(other).or_else(|| Self::parse_ignore(other)),
@@ -152,12 +161,27 @@ pub fn build(view: &View) -> Result<Built> {
             None,
         ))?;
     }
+    if let Some(release) = view.release {
+        built.item(&MenuItem::with_id(
+            ID_UPDATE_SELF,
+            self_update_text(release),
+            !busy,
+            None,
+        ))?;
+    }
     built.item(&MenuItem::with_id(ID_CHECK_NOW, "Check now", !busy, None))?;
     built.item(&CheckMenuItem::with_id(
         ID_AUTOSTART,
         "Run at startup",
         true,
         view.autostart,
+        None,
+    ))?;
+    built.item(&CheckMenuItem::with_id(
+        ID_AUTO_UPDATE,
+        "Auto-update this app",
+        true,
+        view.auto_update,
         None,
     ))?;
     built.item(&MenuItem::with_id(ID_OPEN_LOG, "Open last log", true, None))?;
@@ -212,9 +236,17 @@ fn target_label(target: &UpdateTarget, marker: char) -> String {
     )
 }
 
+fn self_update_text(release: &Release) -> String {
+    format!(
+        "Update Globlin {} → {}",
+        env!("CARGO_PKG_VERSION"),
+        release.version
+    )
+}
+
 pub fn headline(view: &View) -> String {
     match view.activity {
-        Some(Activity::Checking) => format!("Checking npm globals{}", dots(view.frame)),
+        Some(Activity::Checking) => format!("Checking Globlin{}", dots(view.frame)),
         Some(Activity::Updating { batch }) => match batch.current() {
             Some(target) => {
                 let progress = if batch.total() > 1 {
@@ -230,20 +262,23 @@ pub fn headline(view: &View) -> String {
                     dots(view.frame)
                 )
             }
-            None => format!("Updating npm globals{}", dots(view.frame)),
+            None => format!("Updating Globlin{}", dots(view.frame)),
         },
+        Some(Activity::SelfUpdate) => {
+            format!("Updating Globlin{}", dots(view.frame))
+        }
         None => summary(view.packages),
     }
 }
 
 fn summary(packages: &[Package]) -> String {
     if packages.is_empty() {
-        return "npm globals — nothing found".to_string();
+        return "Globlin — nothing found".to_string();
     }
     match model::outdated(packages).len() {
-        0 => format!("npm globals — {} packages, up to date", packages.len()),
-        1 => "npm globals — 1 update available".to_string(),
-        count => format!("npm globals — {count} updates available"),
+        0 => format!("Globlin — {} packages, up to date", packages.len()),
+        1 => "Globlin — 1 update available".to_string(),
+        count => format!("Globlin — {count} updates available"),
     }
 }
 
@@ -347,6 +382,8 @@ mod tests {
             packages,
             activity,
             autostart: false,
+            auto_update: false,
+            release: None,
             frame,
             elapsed: Duration::ZERO,
         }
@@ -357,6 +394,8 @@ mod tests {
             packages: &[],
             activity: Some(activity),
             autostart: false,
+            auto_update: false,
+            release: None,
             frame: 0,
             elapsed,
         }
@@ -435,7 +474,7 @@ mod tests {
 
         assert_eq!(
             headline(&view(&packages, None, 0)),
-            "npm globals — 1 update available"
+            "Globlin — 1 update available"
         );
     }
 
@@ -448,7 +487,7 @@ mod tests {
 
         assert_eq!(
             headline(&view(&packages, None, 0)),
-            "npm globals — 2 packages, up to date"
+            "Globlin — 2 packages, up to date"
         );
     }
 
@@ -483,10 +522,10 @@ mod tests {
             .map(|frame| headline(&view(&[], Some(&activity), frame)))
             .collect();
 
-        assert_eq!(rendered[0], "Checking npm globals");
-        assert_eq!(rendered[2], "Checking npm globals.");
-        assert_eq!(rendered[4], "Checking npm globals..");
-        assert_eq!(rendered[6], "Checking npm globals...");
+        assert_eq!(rendered[0], "Checking Globlin");
+        assert_eq!(rendered[2], "Checking Globlin.");
+        assert_eq!(rendered[4], "Checking Globlin..");
+        assert_eq!(rendered[6], "Checking Globlin...");
     }
 
     #[test]
@@ -635,5 +674,31 @@ mod tests {
             SourceKind::Npm,
             Status::Current
         )));
+    }
+
+    #[test]
+    fn the_self_update_id_parses_back_to_its_action() {
+        assert_eq!(Action::from_key(ID_UPDATE_SELF), Some(Action::UpdateSelf));
+    }
+
+    #[test]
+    fn the_auto_update_id_parses_back_to_its_action() {
+        assert_eq!(
+            Action::from_key(ID_AUTO_UPDATE),
+            Some(Action::ToggleAutoUpdate)
+        );
+    }
+
+    #[test]
+    fn the_self_update_row_names_both_versions() {
+        let release = crate::selfupdate::Release {
+            version: semver::Version::parse("0.2.0").unwrap(),
+            exe_url: String::new(),
+            sha_url: String::new(),
+        };
+        assert_eq!(
+            self_update_text(&release),
+            format!("Update Globlin {} → 0.2.0", env!("CARGO_PKG_VERSION"))
+        );
     }
 }

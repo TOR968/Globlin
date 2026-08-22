@@ -54,6 +54,10 @@ fn body(packages: &[Package]) -> String {
         .join("\n")
 }
 
+pub fn self_failure(version: &str, last: Option<&str>) -> bool {
+    last != Some(version)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,5 +184,20 @@ mod tests {
         ];
 
         assert_eq!(body(&packages), "prettier  3.9.6 → 3.10.0");
+    }
+
+    #[test]
+    fn the_first_failure_of_a_version_is_announced() {
+        assert!(self_failure("0.2.0", None));
+    }
+
+    #[test]
+    fn a_repeated_failure_of_the_same_version_is_silent() {
+        assert!(!self_failure("0.2.0", Some("0.2.0")));
+    }
+
+    #[test]
+    fn a_failure_of_a_newer_version_is_announced_again() {
+        assert!(self_failure("0.3.0", Some("0.2.0")));
     }
 }

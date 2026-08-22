@@ -11,7 +11,7 @@ pub const BUSY_FRAMES: u32 = 8;
 
 const SUPERSAMPLE: u32 = 4;
 
-const SLATE: [u8; 3] = [0x64, 0x74, 0x8b];
+const EMERALD: [u8; 3] = [0x10, 0xb9, 0x81];
 const AMBER: [u8; 3] = [0xf5, 0x9e, 0x0b];
 const SKY: [u8; 3] = [0x38, 0xbd, 0xf8];
 const RED: [u8; 3] = [0xef, 0x44, 0x44];
@@ -20,8 +20,8 @@ const DEEP: [u8; 3] = [0x33, 0x41, 0x55];
 
 const WAVE_CYCLES: f32 = 1.6;
 const WAVE_AMPLITUDE: f32 = 0.9;
-const GLYPH_TOP: f32 = 7.0;
-const GLYPH_BOTTOM: f32 = 25.5;
+const GLYPH_TOP: f32 = 4.7;
+const GLYPH_BOTTOM: f32 = 27.3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconState {
@@ -37,7 +37,7 @@ pub fn rgba(state: IconState, frame: u32, level: f32, size: u32) -> Vec<u8> {
 
 fn layers(state: IconState, frame: u32, level: f32) -> Vec<Layer> {
     match state {
-        IconState::Idle => badge(SLATE, glyph()),
+        IconState::Idle => badge(EMERALD, glyph()),
         IconState::Updates => badge(AMBER, glyph()),
         IconState::Error => badge(RED, glyph()),
         IconState::Busy => filling(frame, level),
@@ -66,23 +66,18 @@ fn badge(color: [u8; 3], shapes: Vec<Shape>) -> Vec<Layer> {
 
 fn glyph() -> Vec<Shape> {
     vec![
-        Shape::Segment {
-            from: (10.0, 9.5),
-            to: (10.0, 23.0),
-            width: 4.4,
-        },
         Shape::Arc {
             cx: 16.0,
-            cy: 15.5,
-            r: 6.0,
-            width: 4.4,
-            start: std::f32::consts::PI,
-            end: std::f32::consts::TAU,
+            cy: 16.0,
+            r: 9.0,
+            width: 4.5,
+            start: 0.25,
+            end: std::f32::consts::TAU - 0.55,
         },
         Shape::Segment {
-            from: (22.0, 15.5),
-            to: (22.0, 23.0),
-            width: 4.4,
+            from: (18.0, 17.0),
+            to: (22.0, 17.0),
+            width: 4.0,
         },
     ]
 }
@@ -419,16 +414,16 @@ mod tests {
     }
 
     #[test]
-    fn the_glyph_covers_both_stems_and_the_shoulder() {
+    fn the_glyph_covers_the_ring_and_the_crossbar() {
         let shapes = glyph();
         let hits = |x: f32, y: f32| shapes.iter().any(|shape| shape.contains(x, y));
 
-        assert!(hits(10.0, 21.0), "the left stem is missing");
-        assert!(hits(22.0, 21.0), "the right stem is missing");
-        assert!(hits(16.0, 9.5), "the shoulder is missing");
+        assert!(hits(16.0, 7.0), "the top of the ring is missing");
+        assert!(hits(20.0, 17.0), "the crossbar is missing");
+        assert!(!hits(16.0, 16.0), "the ring's counter should be hollow");
         assert!(
-            !hits(16.0, 21.0),
-            "the gap under the shoulder should be open"
+            !hits(25.0, 16.0),
+            "the gap on the right of the ring should be open"
         );
     }
 }

@@ -20,6 +20,8 @@ impl Tray {
             packages: &[],
             activity: None,
             autostart: false,
+            auto_update: false,
+            release: None,
             frame: 0,
             elapsed: std::time::Duration::ZERO,
         };

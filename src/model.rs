@@ -148,6 +148,7 @@ impl Batch {
 pub enum Activity {
     Checking,
     Updating { batch: Batch },
+    SelfUpdate,
 }
 
 pub fn outdated(packages: &[Package]) -> Vec<&Package> {
@@ -328,5 +329,10 @@ mod tests {
         batch.finish(1, false);
 
         assert_eq!(batch.done(), 2);
+    }
+
+    #[test]
+    fn a_self_update_is_an_activity_like_any_other() {
+        assert_ne!(Activity::SelfUpdate, Activity::Checking);
     }
 }
