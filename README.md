@@ -219,10 +219,13 @@ The split follows one rule: anything with branch-worthy logic lives where it can
 running Win32 tray. That is why `notice.rs` exists as its own module rather than as methods on `App` — the
 "only notify when the set changed" rule has real edge cases and `App` cannot be constructed in a test.
 
-The icon is a lowercase `g` — a round bowl plus a single-storey descender hook, no second storey and no
-ear, since a two-storey `g` turns to mush at 16 px — drawn from primitives in `src/icon/render.rs` — there
-are no image files, and `build.rs` renders the same glyph into the `.exe` icon, so the two cannot drift
-apart. The state is carried by colour:
+The icon is an uppercase `G` — a ring with a gap on the right and a crossbar at shelf height closing that
+gap — drawn from primitives in `src/icon/render.rs` — there are no image files, and `build.rs` renders the
+same glyph into the `.exe` icon, so the two cannot drift apart. A lowercase `g` was tried first and
+rejected: at 16 px it read as the numeral `9` no matter how the descender hook was shaped, because `g`
+and `9` are topologically the same closed-loop-plus-descender shape and only a curvature that tightens
+through the turn — something the constant-radius `Arc` primitive cannot express — tells them apart. The
+state is carried by colour:
 
 | State | Colour | Meaning |
 | --- | --- | --- |
