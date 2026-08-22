@@ -1,19 +1,23 @@
 use std::time::Duration;
 
 const TAU_SECONDS: f32 = 3.0;
+const WORKING_TAU_SECONDS: f32 = 12.0;
+const WORKING_CEILING: f32 = 0.9;
 const NEVER_QUITE_LANDED: f32 = 0.999_999;
 const CELL_THRESHOLDS: [f32; 8] = [
     0.0625, 0.1875, 0.3125, 0.4375, 0.5625, 0.6875, 0.8125, 0.9375,
 ];
 
 pub fn creep(elapsed: Duration) -> f32 {
-    (1.0 - (-elapsed.as_secs_f32() / TAU_SECONDS).exp()).min(NEVER_QUITE_LANDED)
+    ramp(elapsed, TAU_SECONDS)
 }
 
-const WORKING_CEILING: f32 = 0.9;
-
 pub fn working(elapsed: Duration) -> f32 {
-    creep(elapsed).min(WORKING_CEILING)
+    ramp(elapsed, WORKING_TAU_SECONDS).min(WORKING_CEILING)
+}
+
+fn ramp(elapsed: Duration, tau: f32) -> f32 {
+    (1.0 - (-elapsed.as_secs_f32() / tau).exp()).min(NEVER_QUITE_LANDED)
 }
 
 pub fn level(done: usize, total: usize, elapsed: Duration) -> f32 {
@@ -100,6 +104,16 @@ mod tests {
             let cells = bar(working(Duration::from_secs(seconds)));
             assert!(cells.ends_with('░'), "{seconds}s produced {cells}");
         }
+    }
+
+    #[test]
+    fn the_working_bar_keeps_moving_across_a_realistic_install() {
+        let early = bar(working(Duration::from_secs(5)));
+        let middle = bar(working(Duration::from_secs(20)));
+        let late = bar(working(Duration::from_secs(45)));
+
+        assert_ne!(early, middle, "the bar stalled between 5s and 20s");
+        assert_ne!(middle, late, "the bar stalled between 20s and 45s");
     }
 
     #[test]

@@ -62,8 +62,11 @@ the package being worked on carries a spinner and a progress bar, and the rest c
 bar is not a byte count: it rises asymptotically with how long the current package has been running,
 and deliberately stops short of its last cell while the work is still in flight — the batch-share
 arithmetic that combines elapsed time with `done`/`total` instead drives the tray icon's water level, not
-this bar. A package is only ever reported as landed by its marker changing to `✓ done` (or `✗ failed`),
-never by the bar filling.
+this bar. The bar runs on a slower curve than the icon's water: the icon can be snapped forward the moment
+a package lands, but the bar has nothing else to show while a package is running, so it needs to keep
+visibly creeping across installs that take tens of seconds. Its last cell is reserved for the same reason
+across both curves — a running package can never look finished. A package is only ever reported as landed
+by its marker changing to `✓ done` (or `✗ failed`), never by the bar filling.
 
 The header line and the tray icon animate off the same frame counter, ticking every 120 ms, and every
 clickable row is disabled while a job runs so a second job cannot start on top of the first. Idle costs
@@ -163,7 +166,10 @@ Every icon is supersampled 4× for antialiasing, at whatever size is asked for. 
 frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the
 container by hand) for `winresource` to embed as the executable icon; every notification rewrites that
 same file next to the config, so a build whose glyph changed cannot leave a stale toast artwork behind —
-Windows reads the toast icon from the `IconUri` on disk, not from the running process.
+Windows reads the toast icon from the `IconUri` on disk, not from the running process. A rewrite can fail
+— the shell can be holding the file open while a toast from the previous run is still on screen — and
+that failure is deliberately swallowed: whichever artwork is already on disk stays registered, rather than
+dropping the notification to the unbranded PowerShell fallback app id.
 
 Two things about the environment that the code has to work around, both verified rather than assumed:
 

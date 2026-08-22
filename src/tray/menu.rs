@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use tray_icon::menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu};
+use tray_icon::menu::{
+    CheckMenuItem, IsMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu,
+};
 
 use crate::model::{self, Activity, Batch, Package, RowState, SourceKind, Status, UpdateTarget};
 use crate::progress;
@@ -75,70 +77,98 @@ impl Action {
     }
 }
 
+struct Sections {
+    menu: Menu,
+    pending: bool,
+}
+
+impl Sections {
+    fn new() -> Self {
+        Self {
+            menu: Menu::new(),
+            pending: false,
+        }
+    }
+
+    fn item(&mut self, item: &dyn IsMenuItem) -> Result<()> {
+        self.menu.append(item)?;
+        self.pending = true;
+        Ok(())
+    }
+
+    fn split(&mut self) -> Result<()> {
+        if self.pending {
+            self.menu.append(&PredefinedMenuItem::separator())?;
+            self.pending = false;
+        }
+        Ok(())
+    }
+}
+
 pub fn build(view: &View) -> Result<Built> {
-    let menu = Menu::new();
     let header = MenuItem::new(headline(view), false, None);
     let busy = view.activity.is_some();
     let outdated = model::outdated(view.packages);
     let batch = active_batch(view.activity);
 
-    menu.append(&header)?;
-    menu.append(&PredefinedMenuItem::separator())?;
+    let mut built = Sections::new();
+    built.item(&header)?;
+    built.split()?;
 
     let mut rows = Vec::new();
     if let Some(batch) = batch {
         for position in 0..batch.total() {
             let text = batch_row_text(view, position).unwrap_or_default();
             let item = MenuItem::new(text, false, None);
-            menu.append(&item)?;
+            built.item(&item)?;
             rows.push(item);
         }
-        if !batch.targets.is_empty() {
-            menu.append(&PredefinedMenuItem::separator())?;
-        }
     }
+    built.split()?;
 
     for package in &outdated {
         if in_batch(batch, package) {
             continue;
         }
-        menu.append(&package_entry(package, busy)?)?;
+        built.item(&package_entry(package, busy)?)?;
     }
+    built.split()?;
 
     let settled: Vec<&Package> = view
         .packages
         .iter()
         .filter(|package| package.latest().is_none())
         .collect();
-    if separates_settled(&outdated, batch, &settled) {
-        menu.append(&PredefinedMenuItem::separator())?;
-    }
     for package in &settled {
-        menu.append(&package_entry(package, busy)?)?;
+        built.item(&package_entry(package, busy)?)?;
     }
+    built.split()?;
 
-    menu.append(&PredefinedMenuItem::separator())?;
     if !outdated.is_empty() {
-        menu.append(&MenuItem::with_id(
+        built.item(&MenuItem::with_id(
             ID_UPDATE_ALL,
             format!("Update all ({})", outdated.len()),
             !busy,
             None,
         ))?;
     }
-    menu.append(&MenuItem::with_id(ID_CHECK_NOW, "Check now", !busy, None))?;
-    menu.append(&CheckMenuItem::with_id(
+    built.item(&MenuItem::with_id(ID_CHECK_NOW, "Check now", !busy, None))?;
+    built.item(&CheckMenuItem::with_id(
         ID_AUTOSTART,
         "Run at startup",
         true,
         view.autostart,
         None,
     ))?;
-    menu.append(&MenuItem::with_id(ID_OPEN_LOG, "Open last log", true, None))?;
-    menu.append(&PredefinedMenuItem::separator())?;
-    menu.append(&MenuItem::with_id(ID_QUIT, "Quit", true, None))?;
+    built.item(&MenuItem::with_id(ID_OPEN_LOG, "Open last log", true, None))?;
+    built.split()?;
+    built.item(&MenuItem::with_id(ID_QUIT, "Quit", true, None))?;
 
-    Ok(Built { menu, header, rows })
+    Ok(Built {
+        menu: built.menu,
+        header,
+        rows,
+    })
 }
 
 fn in_batch(batch: Option<&Batch>, package: &Package) -> bool {
@@ -148,10 +178,6 @@ fn in_batch(batch: Option<&Batch>, package: &Package) -> bool {
             .iter()
             .any(|target| target.name == package.name && target.source == package.source)
     })
-}
-
-fn separates_settled(outdated: &[&Package], batch: Option<&Batch>, settled: &[&Package]) -> bool {
-    !settled.is_empty() && outdated.iter().any(|package| !in_batch(batch, package))
 }
 
 pub fn batch_row_text(view: &View, position: usize) -> Option<String> {
@@ -567,39 +593,6 @@ mod tests {
         let view = updating_view(&activity, Duration::ZERO);
 
         assert_eq!(batch_row_text(&view, 7), None);
-    }
-
-    #[test]
-    fn a_batch_covering_every_outdated_package_needs_no_second_separator() {
-        let targets = [behind("alpha", "2.0.0"), behind("beta", "2.0.0")];
-        let outdated: Vec<&Package> = targets.iter().collect();
-        let settled = [package("prettier", SourceKind::Npm, Status::Current)];
-        let settled_refs: Vec<&Package> = settled.iter().collect();
-        let batch = Batch::new(targets.iter().filter_map(Package::update_target).collect());
-
-        assert!(!separates_settled(&outdated, Some(&batch), &settled_refs));
-    }
-
-    #[test]
-    fn an_outdated_package_outside_the_batch_still_gets_its_separator() {
-        let targets = [behind("alpha", "2.0.0"), behind("beta", "2.0.0")];
-        let outdated: Vec<&Package> = targets.iter().collect();
-        let settled = [package("prettier", SourceKind::Npm, Status::Current)];
-        let settled_refs: Vec<&Package> = settled.iter().collect();
-        let batch = Batch::new(vec![targets[0].update_target().unwrap()]);
-
-        assert!(separates_settled(&outdated, Some(&batch), &settled_refs));
-    }
-
-    #[test]
-    fn an_idle_menu_separates_outdated_from_settled() {
-        let targets = [behind("alpha", "2.0.0")];
-        let outdated: Vec<&Package> = targets.iter().collect();
-        let settled = [package("prettier", SourceKind::Npm, Status::Current)];
-        let settled_refs: Vec<&Package> = settled.iter().collect();
-
-        assert!(separates_settled(&outdated, None, &settled_refs));
-        assert!(!separates_settled(&outdated, None, &[]));
     }
 
     #[test]
