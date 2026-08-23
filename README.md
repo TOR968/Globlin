@@ -10,7 +10,7 @@
 </div>
 
 **[Install](#install)** · **[Using it](#using-it)** · **[Icon states](#icon-states)** ·
-**[Keeping itself updated](#keeping-itself-updated)** · **[More](#more)**
+**[Keeping itself updated](#keeping-itself-updated)** · **[More](#more)** · **[License](#license)**
 
 ## What it does
 
@@ -175,3 +175,15 @@ itself.
 
 For architecture notes, the verified environment workarounds, tests, lints, and the CI/release pipeline,
 see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+
+## License
+
+Copyright (C) 2026 TOR968.
+
+Globlin is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License as published by the Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY — without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU General Public
+License](LICENSE) for details, or <https://www.gnu.org/licenses/>.
