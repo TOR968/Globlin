@@ -91,6 +91,10 @@ the hand-rolled encoder in `src/icon/png.rs`. Regenerate it, never hand-edit it;
   behaviour it describes.
 - Test names are full sentences describing the rule being pinned
   (`a_package_missing_from_the_registry_reply_is_unknown_not_current`).
+- Tests live in a sibling child-module file, not inline: `foo.rs` carries `#[cfg(test)] mod tests;` and
+  the cases sit in `foo/tests.rs` (`icon/mod.rs` pairs with `icon/tests.rs`, `main.rs` with `tests.rs`).
+  They stay unit tests — the crate is binary-only, so a top-level `tests/` directory cannot link to it,
+  and the cases exercise private items that must not be made `pub` for testing.
 - `#![windows_subsystem = "windows"]` means there is no console: `println!` debugging is invisible. Use
   the diagnostics files (`diagnostics.rs`) or a notification.
 - Conventional Commits are load-bearing — release-plz derives the version bump and CHANGELOG from them,

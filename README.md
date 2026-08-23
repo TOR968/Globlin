@@ -48,8 +48,12 @@ Globlin — 3 updates available
 Update all (3)
 Check now
 ☑ Run at startup
-☐ Auto-update this app
 Open last log
+─────────────────────────────────────
+Globlin v0.2.3                        ▸  Update Globlin 0.2.3 → 0.3.0
+                                         ☐ Auto-update Globlin
+                                         Open Globlin-update log
+─────────────────────────────────────
 Quit
 ```
 
@@ -79,8 +83,9 @@ The tray icon is drawn from code, not an image file, so its colour always matche
 ## Keeping itself updated
 
 Globlin also checks its own [GitHub releases](https://github.com/TOR968/globlin/releases) on the same
-schedule as the package check. When a newer build is published, the menu grows an
-`Update Globlin <current> → <new>` row; ticking **Auto-update this app** installs it unattended the next
+schedule as the package check. The `Globlin v<current>` submenu names the build that is running, so you
+can always tell which one is live. When a newer one is published the submenu grows an
+`Update Globlin <current> → <new>` row; ticking **Auto-update Globlin** installs it unattended the next
 time one is found, no click needed.
 
 Before installing anything, the download is verified against a published SHA-256 checksum — a mismatch
