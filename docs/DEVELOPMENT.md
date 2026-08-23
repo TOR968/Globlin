@@ -155,7 +155,14 @@ and a toolchain bump should not turn a green build red.
 
 ## CI and releases
 
-Three workflows, all Windows-only, because that is the only platform arm this project implements.
+Three workflows, all Windows-only, because that is the only platform arm this project implements. That
+includes `release-plz.yml`, which is not obvious: computing a version number sounds platform-independent,
+but release-plz runs `cargo package` with verification to compare the packaged files against the last
+release, and verification *compiles* the crate. `tao` and `tray-icon` sit in plain `[dependencies]`, so on
+a Linux runner they pull the GTK stack and the build dies on `The system library glib-2.0 ... was not
+found`, taking the whole job with it — `failed to determine next versions: run cargo package`. There is no
+config switch for this: `publish_no_verify` only reaches `cargo publish`, not the packaging done while
+determining versions.
 
 - **`ci.yml`** — every push to `master`/`main` and every pull request: fmt, clippy, test, then a release
   build whose `.exe` is attached to the run as an artifact. The `#[ignore]`d tests never run here.
