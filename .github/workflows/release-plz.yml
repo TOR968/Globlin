@@ -8,6 +8,7 @@ on:
 jobs:
   release-pr:
     name: Open or refresh the release PR
+    needs: tag
     runs-on: windows-latest
     permissions:
       contents: write
