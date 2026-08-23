@@ -167,7 +167,11 @@ Three workflows, all Windows-only, because that is the only platform arm this pr
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
   tag, which triggers `release.yml`. `release-plz.toml` sets `git_release_enable = false` so the two do
-  not race to create the same release — release-plz stops at the tag and hands over.
+  not race to create the same release — release-plz stops at the tag and hands over. It also sets
+  `git_only = true`: globlin is not published to a cargo registry, and without that flag release-plz
+  looks for the previous release on crates.io, logs `Package globlin@*.*.* not found`, treats every run
+  as an initial release, and proposes the version already in `Cargo.toml`. The job stays green while
+  proposing nothing, which is the confusing part — no error, no release PR, no release.
 
 To cut a version, write [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) —
 `feat:` minor, `fix:` patch, `feat!:` or a `BREAKING CHANGE:` footer major. The subject becomes the
@@ -175,9 +179,23 @@ changelog line, so write it for a reader. Push to `master`, then merge the relea
 worth shipping. Tagging by hand works too; `release.yml` only cares that a `v*` tag appeared and agrees
 with `Cargo.toml`.
 
+### The release token
+
+Both release-plz jobs read `secrets.RELEASE_PLZ_TOKEN`, a fine-grained PAT scoped to this repository with
+**Contents: read/write** and **Pull requests: read/write**. The default `secrets.GITHUB_TOKEN` is not
+enough, and the reason is easy to lose an afternoon to: **GitHub does not start a workflow run for an
+event raised by `GITHUB_TOKEN`**, a deliberate guard against a workflow triggering itself. A `v*` tag
+pushed by release-plz under that token therefore lands in the repository without `release.yml` ever
+noticing, and the release never gets built. Releases up to v0.2.0 worked only because those tags were
+pushed by hand from a developer account.
+
+If the token expires or is removed, the symptom is exactly that: the tag appears, no `Release` run
+starts. Re-pushing the tag from a personal account (`git push origin :refs/tags/vX.Y.Z` then
+`git push origin refs/tags/vX.Y.Z`) rebuilds it without moving the commit, and is the manual escape
+hatch.
+
 **Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull
-requests"** must be enabled, or the `release-pr` job fails with a permissions error while everything else
-keeps working.
+requests"** must also be enabled, or the `release-pr` job cannot open the pull request.
 
 ## Other platforms
 
