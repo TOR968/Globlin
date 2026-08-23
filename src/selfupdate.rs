@@ -45,6 +45,14 @@ fn offer(body: &str, current: &Version) -> Option<Release> {
     })
 }
 
+pub fn should_auto_apply(release: &Version, auto_update: bool, blocked: Option<&Version>) -> bool {
+    auto_update && blocked != Some(release)
+}
+
+pub fn supersedes(release: &Version, installed: Option<&Version>) -> bool {
+    installed.is_none_or(|installed| release > installed)
+}
+
 fn asset_url(assets: &[ApiAsset], name: &str) -> Option<String> {
     assets
         .iter()
@@ -120,8 +128,13 @@ fn swap(current: &Path, staged: &Path) -> Result<()> {
 
 pub fn clean_stale() {
     if let Ok(current) = std::env::current_exe() {
-        fs::remove_file(previous_path(&current)).ok();
+        remove_leftovers(&current);
     }
+}
+
+fn remove_leftovers(current: &Path) {
+    fs::remove_file(previous_path(current)).ok();
+    fs::remove_file(staged_path(current)).ok();
 }
 
 const LATEST_URL: &str = "https://api.github.com/repos/TOR968/globlin/releases/latest";
@@ -212,6 +225,38 @@ mod tests {
         let release = latest().unwrap().expect("no newer release is published");
         let version = apply(&release).unwrap();
         println!("installed {version}");
+    }
+
+    #[test]
+    fn a_release_that_already_failed_is_not_auto_applied() {
+        let release = Version::parse("0.2.0").unwrap();
+        assert!(!should_auto_apply(&release, true, Some(&release)));
+    }
+
+    #[test]
+    fn a_newer_release_is_auto_applied_after_an_older_one_failed() {
+        let blocked = Version::parse("0.2.0").unwrap();
+        let release = Version::parse("0.3.0").unwrap();
+        assert!(should_auto_apply(&release, true, Some(&blocked)));
+    }
+
+    #[test]
+    fn nothing_is_auto_applied_while_auto_update_is_off() {
+        let release = Version::parse("0.2.0").unwrap();
+        assert!(!should_auto_apply(&release, false, None));
+    }
+
+    #[test]
+    fn an_installed_but_unlaunched_version_is_not_offered_again() {
+        let installed = Version::parse("0.2.0").unwrap();
+        assert!(!supersedes(&installed, Some(&installed)));
+    }
+
+    #[test]
+    fn a_release_newer_than_the_installed_one_is_still_offered() {
+        let installed = Version::parse("0.2.0").unwrap();
+        let release = Version::parse("0.3.0").unwrap();
+        assert!(supersedes(&release, Some(&installed)));
     }
 
     fn body(tag: &str, assets: &[&str]) -> String {
@@ -414,6 +459,21 @@ mod tests {
         fs::write(&current, b"old build").unwrap();
 
         assert!(should_discard_staged(&current));
+    }
+
+    #[test]
+    fn clean_stale_removes_both_the_previous_and_the_staged_build() {
+        let dir = scratch("clean-stale");
+        let current = dir.join("globlin.exe");
+        fs::write(&current, b"current build").unwrap();
+        fs::write(previous_path(&current), b"old build").unwrap();
+        fs::write(staged_path(&current), b"new build").unwrap();
+
+        remove_leftovers(&current);
+
+        assert!(current.exists());
+        assert!(!previous_path(&current).exists());
+        assert!(!staged_path(&current).exists());
     }
 
     #[test]

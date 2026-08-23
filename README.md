@@ -86,9 +86,11 @@ time one is found, no click needed.
 Before installing anything, the download is verified against a published SHA-256 checksum — a mismatch
 is discarded and the running app is never touched. The one real failure mode: if Globlin can't write next
 to itself (installed under `Program Files` without elevation, or a directory an antivirus is holding
-open), the update keeps being offered but never lands — you'll get a single toast about it, not a repeat
-nag. See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#self-update-mechanics) for exactly how the swap,
-rollback and restart work.
+open), the install fails. You get one toast about it, not a repeat nag; auto-update stops retrying that
+build rather than re-downloading it every few hours, and the reason lands in a log you can open from the
+menu. The row stays, so you can still retry by hand. See
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#self-update-mechanics) for exactly how the swap, rollback and
+restart work.
 
 ## More
 

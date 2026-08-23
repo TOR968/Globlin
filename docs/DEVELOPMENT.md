@@ -79,11 +79,13 @@ Two things about the environment the code has to work around, both verified rath
 The full mechanics behind the brief version in the [README](../README.md#keeping-itself-updated).
 
 On the same schedule as the package check, the app makes one extra request per cycle to
-`https://api.github.com/repos/TOR968/globlin/releases/latest`. That endpoint always resolves to the
-newest *published* release; GitHub excludes pre-releases and drafts from it, so neither can reach a user
-by accident. A release is offered only when its tag parses as semver strictly newer than the running
-build, and both `globlin.exe` and `globlin.exe.sha256` are attached — a release missing either asset is
-skipped rather than half-offered.
+`https://api.github.com/repos/TOR968/globlin/releases/latest`. The two are deliberately independent:
+`check::run` looks the release up first and returns a `Report` carrying `packages: Result<Vec<Package>>`,
+so a missing npm, a `PATH` without bun, or an unreachable registry cannot stop the app from finding — and
+installing — its own update. That endpoint always resolves to the newest *published* release; GitHub
+excludes pre-releases and drafts from it, so neither can reach a user by accident. A release is offered
+only when its tag parses as semver strictly newer than the running build, and both `globlin.exe` and
+`globlin.exe.sha256` are attached — a release missing either asset is skipped rather than half-offered.
 
 Applying an update downloads both assets, hashes the `.exe` with SHA-256, and compares that against the
 published `.sha256`; a mismatch discards the download and reports a failure, and the running binary is
@@ -94,16 +96,32 @@ renamed straight back and the installation is left exactly as it was. In the rar
 also fails, the live path is left empty — but nothing is lost: the previous build is still intact at
 `globlin.exe.old`, and the freshly verified new build is still intact at `globlin.exe.new`, because the
 staged file is only deleted after a failed swap when the live executable is still there to replace it.
-Renaming either file back to `globlin.exe` recovers the app. On the next clean start, `globlin.exe.old` is
-deleted, so a successful update leaves nothing extra behind. If a swap completes but the new build fails
-to start, `globlin.exe.old` — the previous working build — is still sitting next to it and can be renamed
-back to `globlin.exe`; that is the only recovery path in that case.
+Renaming either file back to `globlin.exe` recovers the app. On the next clean start both
+`globlin.exe.old` and `globlin.exe.new` are deleted, so a successful update leaves nothing extra behind
+and a crash between the write and the swap does not strand a multi-megabyte staged binary. If a swap
+completes but the new build fails to start, `globlin.exe.old` — the previous working build — is still
+sitting next to it and can be renamed back to `globlin.exe`; that is the only recovery path in that case.
 
 None of this works if the process cannot write next to itself — an install under `Program Files` without
 elevation, or a directory an antivirus is holding a handle into, are the two cases seen in practice. Both
 fail the same way: the check keeps finding the release, the rename keeps failing, and the app keeps
-running the old build. The failure is toasted once per version — tracked in `last_self_notice` in
-`globlin.json` — rather than on every check.
+running the old build.
+
+Three things keep that from becoming a silent loop. Every failure is written to `self-update.log` next to
+the other diagnostics — last one wins, the same shape as `last-run.log` — and the tray grows an **Open
+self-update log** row as soon as that file exists. The failure is toasted once per version, tracked in
+`last_self_notice` in `globlin.json`, rather than on every check; clicking **Update Globlin** clears that
+stamp first, so a deliberate retry always reports its outcome. And the failed version is remembered in
+`App.blocked_self`, which gates only the *automatic* path (`selfupdate::should_auto_apply`), so
+auto-update stops re-downloading a build that cannot be installed. That block is in memory, not in
+`globlin.json`: most failures are transient — a lock, a dropped connection — so a restart is meant to
+retry, and a newer release lifts the block on its own.
+
+The other half of that loop is a swap that works but a relaunch that does not. The process is still
+running the old image, so the next check would offer — and reinstall — the release already sitting on
+disk. The installed version is therefore recorded in `App.pending_restart`; `selfupdate::supersedes`
+filters it out of later checks, `start_self_update` refuses to run, and the menu reads `Restart to finish
+the update to <version>` instead of offering it again.
 
 A successful swap restarts the app itself: it spawns the new `.exe` with `--replaced` and exits. The new
 process waits up to 10 seconds (50 attempts, 200 ms apart) for the single-instance mutex the old process is
@@ -115,7 +133,7 @@ still holding while it shuts down, then raises a `Globlin — updated / now runn
 cargo test
 ```
 
-174 tests: 166 run by default (no network, no side effects), 8 `#[ignore]`d because they touch the real
+183 tests: 175 run by default (no network, no side effects), 8 `#[ignore]`d because they touch the real
 system — the HKCU Run key, a real toast, a real `npm install -g`, two icon/PNG dump tests, and two that
 hit `TOR968/globlin`'s real GitHub releases. Each carries its own exact invocation in its
 `#[ignore = "…"]` message; `grep -rn "#\[ignore" src/` lists them. `updates_a_package_for_real` really

@@ -30,7 +30,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub enum Message {
     Menu(MenuEvent),
-    Checked(Result<Report>),
+    Checked(Report),
     Step(Step),
     Updated(Outcome),
     Replaced(Result<semver::Version>),
