@@ -186,6 +186,12 @@ changelog line, so write it for a reader. Push to `master`, then merge the relea
 worth shipping. Tagging by hand works too; `release.yml` only cares that a `v*` tag appeared and agrees
 with `Cargo.toml`.
 
+The two jobs are ordered — `release-pr` declares `needs: tag` — and that ordering is load-bearing. Run
+without it, both start at the same second, `release-pr` checks the repository out before `tag` has pushed
+the new `v*` tag, and so it still believes the previous release is the latest one. It then opens a second
+release pull request proposing the version that was just released, whose diff against `master` is empty.
+Harmless, but it appears after every release and has to be closed by hand.
+
 ### The release token
 
 Both release-plz jobs read `secrets.RELEASE_PLZ_TOKEN`, a fine-grained PAT scoped to this repository with
