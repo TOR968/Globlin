@@ -7,6 +7,17 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/TOR968/Globlin/compare/v0.2.0...v0.2.1) - 2026-08-23
+
+### Fixed
+
+- make self-update reliable when a check or an install fails
+
+### Other
+
+- license Globlin under the GNU GPL v3 or later
+- compare releases against git tags instead of crates.io
+
 ## [0.2.0] - 2026-08-23
 
 ### Added
