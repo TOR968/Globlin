@@ -108,14 +108,14 @@ fail the same way: the check keeps finding the release, the rename keeps failing
 running the old build.
 
 Three things keep that from becoming a silent loop. Every failure is written to `self-update.log` next to
-the other diagnostics — last one wins, the same shape as `last-run.log` — and the tray grows an **Open
-self-update log** row as soon as that file exists. The failure is toasted once per version, tracked in
-`last_self_notice` in `globlin.json`, rather than on every check; clicking **Update Globlin** clears that
-stamp first, so a deliberate retry always reports its outcome. And the failed version is remembered in
-`App.blocked_self`, which gates only the *automatic* path (`selfupdate::should_auto_apply`), so
-auto-update stops re-downloading a build that cannot be installed. That block is in memory, not in
-`globlin.json`: most failures are transient — a lock, a dropped connection — so a restart is meant to
-retry, and a newer release lifts the block on its own.
+the other diagnostics — last one wins, the same shape as `last-run.log` — and the `Globlin v<current>`
+submenu grows an **Open Globlin-update log** row as soon as that file exists. The failure is toasted once
+per version, tracked in `last_self_notice` in `globlin.json`, rather than on every check; clicking
+**Update Globlin** clears that stamp first, so a deliberate retry always reports its outcome. And the
+failed version is remembered in `App.blocked_self`, which gates only the *automatic* path
+(`selfupdate::should_auto_apply`), so auto-update stops re-downloading a build that cannot be installed.
+That block is in memory, not in `globlin.json`: most failures are transient — a lock, a dropped
+connection — so a restart is meant to retry, and a newer release lifts the block on its own.
 
 The other half of that loop is a swap that works but a relaunch that does not. The process is still
 running the old image, so the next check would offer — and reinstall — the release already sitting on
