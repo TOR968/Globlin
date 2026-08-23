@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use semver::Version;
@@ -25,6 +26,8 @@ pub struct App {
     tray: Tray,
     packages: Vec<Package>,
     available_release: Option<Release>,
+    blocked_self: Option<Version>,
+    pending_restart: Option<Version>,
     activity: Option<Activity>,
     failed: bool,
     frame: u32,
@@ -42,6 +45,8 @@ impl App {
             tray: Tray::new()?,
             packages: Vec::new(),
             available_release: None,
+            blocked_self: None,
+            pending_restart: None,
             activity: None,
             failed: false,
             frame: 0,
@@ -72,7 +77,7 @@ impl App {
     pub fn handle(&mut self, message: Message) -> Control {
         match message {
             Message::Menu(event) => return self.on_menu(&event),
-            Message::Checked(result) => self.on_checked(result),
+            Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome),
             Message::Replaced(result) => return self.on_replaced(result),
@@ -102,9 +107,13 @@ impl App {
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
             Action::ToggleAutostart => self.toggle_autostart(),
-            Action::UpdateSelf => self.start_self_update(),
+            Action::UpdateSelf => {
+                self.config.last_self_notice = None;
+                self.start_self_update();
+            }
             Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::OpenLog => open_log(),
+            Action::OpenSelfLog => open_self_log(),
         }
         Control::Continue
     }
@@ -171,7 +180,7 @@ impl App {
     }
 
     fn start_self_update(&mut self) {
-        if self.activity.is_some() {
+        if self.activity.is_some() || self.pending_restart.is_some() {
             return;
         }
         let Some(release) = self.available_release.clone() else {
@@ -198,11 +207,12 @@ impl App {
     fn on_replaced(&mut self, result: Result<Version>) -> Control {
         self.activity = None;
         match result {
-            Ok(_) => {
+            Ok(version) => {
                 self.available_release = None;
                 if selfupdate::relaunch().is_ok() {
                     return Control::Exit;
                 }
+                self.pending_restart = Some(version);
                 platform::notify(
                     "Globlin",
                     "The new build is installed; restart the app to run it.",
@@ -219,7 +229,12 @@ impl App {
         let Some(release) = self.available_release.as_ref() else {
             return;
         };
-        let version = release.version.to_string();
+        let version = release.version.clone();
+        self.blocked_self = Some(version.clone());
+        let version = version.to_string();
+        diagnostics::record_self_update_failure(&format!(
+            "self-update failed: {version}: {error}\n"
+        ));
         if !notice::self_failure(&version, self.config.last_self_notice.as_deref()) {
             return;
         }
@@ -246,6 +261,7 @@ impl App {
             &self.packages,
             self.activity.as_ref(),
             self.available_release.as_ref(),
+            self.pending_restart.as_ref(),
             self.config.auto_update,
             self.frame,
             self.elapsed(),
@@ -264,24 +280,36 @@ impl App {
         self.render();
     }
 
-    fn on_checked(&mut self, result: Result<Report>) {
+    fn on_checked(&mut self, report: Report) {
         self.activity = None;
-        match result {
-            Ok(report) => {
-                self.packages = report.packages;
-                self.available_release = report.release;
+        self.available_release = report.release.filter(|release| {
+            selfupdate::supersedes(&release.version, self.pending_restart.as_ref())
+        });
+        match report.packages {
+            Ok(packages) => {
+                self.packages = packages;
                 self.failed = false;
                 self.announce_new_updates();
-                if self.config.auto_update && self.available_release.is_some() {
-                    self.start_self_update();
-                }
             }
             Err(error) => {
                 self.failed = true;
                 platform::notify("Globlin — check failed", &error.to_string()).ok();
             }
         }
+        if self.wants_auto_update() {
+            self.start_self_update();
+        }
         self.render();
+    }
+
+    fn wants_auto_update(&self) -> bool {
+        self.available_release.as_ref().is_some_and(|release| {
+            selfupdate::should_auto_apply(
+                &release.version,
+                self.config.auto_update,
+                self.blocked_self.as_ref(),
+            )
+        })
     }
 
     fn announce_new_updates(&mut self) {
@@ -334,6 +362,7 @@ impl App {
             &self.packages,
             self.activity.as_ref(),
             self.available_release.as_ref(),
+            self.pending_restart.as_ref(),
             self.config.auto_update,
             self.frame,
             self.elapsed(),
@@ -365,11 +394,24 @@ impl App {
 }
 
 fn open_log() {
-    let path = diagnostics::log_path();
+    open_diagnostic(
+        &diagnostics::log_path(),
+        "No failures have been logged yet.",
+    );
+}
+
+fn open_self_log() {
+    open_diagnostic(
+        &diagnostics::self_update_log_path(),
+        "No self-update failures have been logged yet.",
+    );
+}
+
+fn open_diagnostic(path: &Path, empty: &str) {
     if path.is_file() {
-        platform::open_in_shell(&path).ok();
+        platform::open_in_shell(path).ok();
     } else {
-        platform::notify("Globlin", "No failures have been logged yet.").ok();
+        platform::notify("Globlin", empty).ok();
     }
 }
 
@@ -377,6 +419,7 @@ fn view_of<'a>(
     packages: &'a [Package],
     activity: Option<&'a Activity>,
     release: Option<&'a Release>,
+    pending_restart: Option<&'a Version>,
     auto_update: bool,
     frame: u32,
     elapsed: Duration,
@@ -385,6 +428,8 @@ fn view_of<'a>(
         packages,
         activity,
         release,
+        pending_restart,
+        self_log: diagnostics::self_update_log_path().is_file(),
         autostart: platform::autostart_enabled(),
         auto_update,
         frame,

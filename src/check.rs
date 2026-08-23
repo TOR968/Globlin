@@ -12,11 +12,19 @@ use crate::Result;
 
 #[derive(Debug)]
 pub struct Report {
-    pub packages: Vec<Package>,
+    pub packages: Result<Vec<Package>>,
     pub release: Option<Release>,
 }
 
-pub fn run(config: &Config) -> Result<Report> {
+pub fn run(config: &Config) -> Report {
+    let release = look_up_release(selfupdate::latest());
+    Report {
+        packages: collect_packages(config),
+        release,
+    }
+}
+
+fn collect_packages(config: &Config) -> Result<Vec<Package>> {
     let sources = source::enabled(config)?;
     let installed = collect(&sources)?;
     let latest = registry::latest_versions(&lookup_names(&installed, config))?;
@@ -25,10 +33,7 @@ pub fn run(config: &Config) -> Result<Report> {
         .map(|item| classify(item, config, &latest))
         .collect();
     diagnostics::record_snapshot(&packages);
-    Ok(Report {
-        packages,
-        release: look_up_release(selfupdate::latest()),
-    })
+    Ok(packages)
 }
 
 fn look_up_release(outcome: Result<Option<Release>>) -> Option<Release> {
@@ -210,5 +215,20 @@ mod tests {
             sha_url: "https://example.test/sha".to_string(),
         };
         assert_eq!(look_up_release(Ok(Some(release.clone()))), Some(release));
+    }
+
+    #[test]
+    fn a_failed_package_check_still_carries_the_release() {
+        let release = crate::selfupdate::Release {
+            version: Version::parse("0.2.0").unwrap(),
+            exe_url: "https://example.test/exe".to_string(),
+            sha_url: "https://example.test/sha".to_string(),
+        };
+        let report = Report {
+            packages: Err("npm is not installed".into()),
+            release: Some(release.clone()),
+        };
+        assert!(report.packages.is_err());
+        assert_eq!(report.release, Some(release));
     }
 }

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use semver::Version;
 use tray_icon::menu::{
     CheckMenuItem, IsMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu,
 };
@@ -15,6 +16,7 @@ const ID_AUTOSTART: &str = "autostart";
 const ID_UPDATE_SELF: &str = "update-self";
 const ID_AUTO_UPDATE: &str = "auto-update";
 const ID_OPEN_LOG: &str = "open-log";
+const ID_OPEN_SELF_LOG: &str = "open-self-log";
 const ID_QUIT: &str = "quit";
 const UPDATE_PREFIX: &str = "update:";
 const IGNORE_PREFIX: &str = "ignore:";
@@ -32,6 +34,7 @@ pub enum Action {
     UpdateSelf,
     ToggleAutoUpdate,
     OpenLog,
+    OpenSelfLog,
     Quit,
 }
 
@@ -47,6 +50,8 @@ pub struct View<'a> {
     pub autostart: bool,
     pub auto_update: bool,
     pub release: Option<&'a Release>,
+    pub pending_restart: Option<&'a Version>,
+    pub self_log: bool,
     pub frame: u32,
     pub elapsed: Duration,
 }
@@ -64,6 +69,7 @@ impl Action {
             ID_UPDATE_SELF => Some(Self::UpdateSelf),
             ID_AUTO_UPDATE => Some(Self::ToggleAutoUpdate),
             ID_OPEN_LOG => Some(Self::OpenLog),
+            ID_OPEN_SELF_LOG => Some(Self::OpenSelfLog),
             ID_QUIT => Some(Self::Quit),
             other => Self::parse_update(other).or_else(|| Self::parse_ignore(other)),
         }
@@ -169,6 +175,13 @@ pub fn build(view: &View) -> Result<Built> {
             None,
         ))?;
     }
+    if let Some(version) = view.pending_restart {
+        built.item(&MenuItem::new(
+            format!("Restart to finish the update to {version}"),
+            false,
+            None,
+        ))?;
+    }
     built.item(&MenuItem::with_id(ID_CHECK_NOW, "Check now", !busy, None))?;
     built.item(&CheckMenuItem::with_id(
         ID_AUTOSTART,
@@ -185,6 +198,14 @@ pub fn build(view: &View) -> Result<Built> {
         None,
     ))?;
     built.item(&MenuItem::with_id(ID_OPEN_LOG, "Open last log", true, None))?;
+    if view.self_log {
+        built.item(&MenuItem::with_id(
+            ID_OPEN_SELF_LOG,
+            "Open self-update log",
+            true,
+            None,
+        ))?;
+    }
     built.split()?;
     built.item(&MenuItem::with_id(ID_QUIT, "Quit", true, None))?;
 
@@ -246,7 +267,7 @@ fn self_update_text(release: &Release) -> String {
 
 pub fn headline(view: &View) -> String {
     match view.activity {
-        Some(Activity::Checking) => format!("Checking Globlin{}", dots(view.frame)),
+        Some(Activity::Checking) => format!("Checking for updates{}", dots(view.frame)),
         Some(Activity::Updating { batch }) => match batch.current() {
             Some(target) => {
                 let progress = if batch.total() > 1 {
@@ -262,7 +283,7 @@ pub fn headline(view: &View) -> String {
                     dots(view.frame)
                 )
             }
-            None => format!("Updating Globlin{}", dots(view.frame)),
+            None => format!("Updating packages{}", dots(view.frame)),
         },
         Some(Activity::SelfUpdate) => {
             format!("Updating Globlin{}", dots(view.frame))
@@ -384,6 +405,8 @@ mod tests {
             autostart: false,
             auto_update: false,
             release: None,
+            pending_restart: None,
+            self_log: false,
             frame,
             elapsed: Duration::ZERO,
         }
@@ -396,6 +419,8 @@ mod tests {
             autostart: false,
             auto_update: false,
             release: None,
+            pending_restart: None,
+            self_log: false,
             frame: 0,
             elapsed,
         }
@@ -522,10 +547,10 @@ mod tests {
             .map(|frame| headline(&view(&[], Some(&activity), frame)))
             .collect();
 
-        assert_eq!(rendered[0], "Checking Globlin");
-        assert_eq!(rendered[2], "Checking Globlin.");
-        assert_eq!(rendered[4], "Checking Globlin..");
-        assert_eq!(rendered[6], "Checking Globlin...");
+        assert_eq!(rendered[0], "Checking for updates");
+        assert_eq!(rendered[2], "Checking for updates.");
+        assert_eq!(rendered[4], "Checking for updates..");
+        assert_eq!(rendered[6], "Checking for updates...");
     }
 
     #[test]
@@ -682,11 +707,33 @@ mod tests {
     }
 
     #[test]
+    fn the_self_update_log_action_round_trips_through_its_id() {
+        assert_eq!(
+            Action::from_key(ID_OPEN_SELF_LOG),
+            Some(Action::OpenSelfLog)
+        );
+    }
+
+    #[test]
     fn the_auto_update_id_parses_back_to_its_action() {
         assert_eq!(
             Action::from_key(ID_AUTO_UPDATE),
             Some(Action::ToggleAutoUpdate)
         );
+    }
+
+    #[test]
+    fn a_package_batch_and_a_self_update_never_share_a_headline() {
+        let empty_batch = Activity::Updating {
+            batch: crate::model::Batch::new(Vec::new()),
+        };
+        let self_update = Activity::SelfUpdate;
+
+        let batch_headline = headline(&view(&[], Some(&empty_batch), 0));
+        let self_update_headline = headline(&view(&[], Some(&self_update), 0));
+
+        assert_ne!(batch_headline, self_update_headline);
+        assert!(!headline(&view(&[], Some(&Activity::Checking), 0)).contains("Globlin"));
     }
 
     #[test]

@@ -22,6 +22,8 @@ impl Tray {
             autostart: false,
             auto_update: false,
             release: None,
+            pending_restart: None,
+            self_log: false,
             frame: 0,
             elapsed: std::time::Duration::ZERO,
         };
