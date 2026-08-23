@@ -1,7 +1,8 @@
 [package]
 name = "globlin"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
+license = "GPL-3.0-or-later"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
