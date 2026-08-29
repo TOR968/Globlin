@@ -65,7 +65,9 @@ fn each_state_renders_a_distinct_image() {
 fn sky_pixels(level: f32) -> usize {
     let pixels = rgba(IconState::Busy, 0, level, 32);
     pixels
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|pixel| pixel[3] > 128 && pixel[2] > pixel[0] + 40)
         .count()
 }

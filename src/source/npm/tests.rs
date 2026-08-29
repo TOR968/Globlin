@@ -50,3 +50,22 @@ fn unparseable_output_is_an_error() {
     assert!(parse_listing(b"").is_err());
     assert!(parse_listing(b"npm ERR! code ENOENT").is_err());
 }
+
+fn arguments(command: &std::process::Command) -> Vec<String> {
+    command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect()
+}
+
+#[test]
+fn the_npm_uninstall_command_removes_the_package_globally() {
+    let npm = Npm {
+        command: PathBuf::from("npm"),
+    };
+
+    assert_eq!(
+        arguments(&npm.uninstall_command("@salesforce/cli")),
+        vec!["uninstall", "-g", "@salesforce/cli"]
+    );
+}

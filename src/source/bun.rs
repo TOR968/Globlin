@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use semver::Version;
 use serde::Deserialize;
 
 use super::{find_on_path, hidden_command, PackageSource};
+use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
 use crate::platform;
 use crate::Result;
@@ -19,7 +20,7 @@ const EXECUTABLE: &str = "bun";
 
 pub struct Bun {
     command: PathBuf,
-    global_dir: PathBuf,
+    global_dir: Option<PathBuf>,
 }
 
 impl Bun {
@@ -29,22 +30,7 @@ impl Bun {
             .ok_or("bun was not found on PATH")?;
         Ok(Self {
             command,
-            global_dir: global_dir(),
-        })
-    }
-
-    fn version_of(&self, name: &str) -> Option<Installed> {
-        let manifest = self
-            .global_dir
-            .join("node_modules")
-            .join(name)
-            .join("package.json");
-        let raw = fs::read_to_string(manifest).ok()?;
-        let installed: InstalledManifest = serde_json::from_str(&raw).ok()?;
-        Some(Installed {
-            name: name.to_string(),
-            version: Version::parse(&installed.version).ok()?,
-            source: SourceKind::Bun,
+            global_dir: resolve_global_dir(&candidates()),
         })
     }
 }
@@ -55,13 +41,17 @@ impl PackageSource for Bun {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let Ok(raw) = fs::read_to_string(self.global_dir.join("package.json")) else {
+        let Some(root) = self.global_dir.as_deref() else {
+            diagnostics::record_note(&missing_root_report(&candidates()));
+            return Ok(Vec::new());
+        };
+        let Ok(raw) = fs::read_to_string(root.join("package.json")) else {
             return Ok(Vec::new());
         };
         let names = parse_manifest(&raw)?;
         Ok(names
             .iter()
-            .filter_map(|name| self.version_of(name))
+            .filter_map(|name| version_of(root, name))
             .collect())
     }
 
@@ -70,10 +60,76 @@ impl PackageSource for Bun {
         command.args(["add", "-g", &format!("{name}@latest")]);
         command
     }
+
+    fn uninstall_command(&self, name: &str) -> Command {
+        let mut command = hidden_command(&self.command);
+        command.args(["remove", "-g", name]);
+        command
+    }
 }
 
-fn global_dir() -> PathBuf {
-    install_root().join("install").join("global")
+fn version_of(root: &Path, name: &str) -> Option<Installed> {
+    let manifest = root.join("node_modules").join(name).join("package.json");
+    let raw = fs::read_to_string(manifest).ok()?;
+    let installed: InstalledManifest = serde_json::from_str(&raw).ok()?;
+    Some(Installed {
+        name: name.to_string(),
+        version: Version::parse(&installed.version).ok()?,
+        source: SourceKind::Bun,
+    })
+}
+
+fn candidates() -> Vec<PathBuf> {
+    candidates_from(
+        std::env::var_os("BUN_INSTALL").map(PathBuf::from),
+        platform::home_dir(),
+    )
+}
+
+fn candidates_from(install: Option<PathBuf>, home: Option<PathBuf>) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(root) = install {
+        paths.push(root.join("install").join("global"));
+    }
+    if let Some(home) = home {
+        paths.push(home.join(".bun").join("install").join("global"));
+        paths.push(home);
+    }
+    paths
+}
+
+fn resolve_global_dir(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates
+        .iter()
+        .find(|root| manifest_parses(root) && has_lockfile(root))
+        .or_else(|| candidates.iter().find(|root| manifest_has_dependency(root)))
+        .cloned()
+}
+
+fn manifest_parses(root: &Path) -> bool {
+    fs::read_to_string(root.join("package.json")).is_ok_and(|raw| parse_manifest(&raw).is_ok())
+}
+
+fn has_lockfile(root: &Path) -> bool {
+    root.join("bun.lock").is_file() || root.join("bun.lockb").is_file()
+}
+
+fn manifest_has_dependency(root: &Path) -> bool {
+    fs::read_to_string(root.join("package.json"))
+        .ok()
+        .and_then(|raw| parse_manifest(&raw).ok())
+        .is_some_and(|names| !names.is_empty())
+}
+
+fn missing_root_report(candidates: &[PathBuf]) -> String {
+    use std::fmt::Write;
+
+    let mut report = String::from("bun: no global package.json found; probed:\n");
+    for candidate in candidates {
+        writeln!(report, "  {}", candidate.display()).ok();
+    }
+    report.push('\n');
+    report
 }
 
 fn install_root() -> PathBuf {

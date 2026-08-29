@@ -10,6 +10,7 @@ mod notice;
 mod platform;
 mod progress;
 mod registry;
+mod remove;
 mod selfupdate;
 mod source;
 mod tray;
@@ -23,6 +24,7 @@ use tray_icon::menu::MenuEvent;
 
 use app::{App, Control};
 use check::Report;
+use model::RemoveTarget;
 use update::{Outcome, Step};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -33,6 +35,7 @@ pub enum Message {
     Checked(Report),
     Step(Step),
     Updated(Outcome),
+    Removed { target: RemoveTarget, ok: bool },
     Replaced(Result<semver::Version>),
 }
 

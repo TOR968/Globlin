@@ -1,5 +1,6 @@
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use crate::model::{Package, Status};
 use crate::platform;
@@ -17,7 +18,21 @@ pub fn self_update_log_path() -> PathBuf {
 }
 
 pub fn record_failures(report: &str) {
-    fs::write(log_path(), report).ok();
+    truncate(&log_path(), report);
+}
+
+pub fn record_note(note: &str) {
+    append(&log_path(), note);
+}
+
+fn truncate(path: &Path, text: &str) {
+    fs::write(path, text).ok();
+}
+
+fn append(path: &Path, text: &str) {
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        file.write_all(text.as_bytes()).ok();
+    }
 }
 
 pub fn record_self_update_failure(report: &str) {

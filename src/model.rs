@@ -84,6 +84,12 @@ pub struct UpdateTarget {
     pub to: Version,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoveTarget {
+    pub name: String,
+    pub source: SourceKind,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RowState {
     Done,
@@ -148,6 +154,7 @@ impl Batch {
 pub enum Activity {
     Checking,
     Updating { batch: Batch },
+    Removing { target: RemoveTarget },
     SelfUpdate,
 }
 

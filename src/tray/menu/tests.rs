@@ -422,3 +422,147 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
     assert!(self_block_ids.contains(&ID_AUTO_UPDATE.to_string()));
     assert!(self_block_ids.contains(&ID_OPEN_SELF_LOG.to_string()));
 }
+
+fn confirm_ids(built: &Built) -> Vec<String> {
+    let mut ids = Vec::new();
+    for item in built.menu.items() {
+        let Some(row) = item.as_submenu() else {
+            continue;
+        };
+        for entry in row.items() {
+            let Some(nested) = entry.as_submenu() else {
+                continue;
+            };
+            for leaf in nested.items() {
+                ids.push(leaf.id().as_ref().to_string());
+            }
+        }
+    }
+    ids
+}
+
+#[test]
+fn a_remove_id_round_trips_including_scoped_names() {
+    assert_eq!(
+        Action::from_key("remove:npm:@salesforce/cli"),
+        Some(Action::Remove {
+            name: "@salesforce/cli".to_string(),
+            source: SourceKind::Npm,
+        })
+    );
+    assert_eq!(
+        Action::from_key("remove:bun:prettier"),
+        Some(Action::Remove {
+            name: "prettier".to_string(),
+            source: SourceKind::Bun,
+        })
+    );
+}
+
+#[test]
+fn a_remove_id_with_an_unknown_source_is_rejected() {
+    assert_eq!(Action::from_key("remove:pnpm:prettier"), None);
+    assert_eq!(Action::from_key("remove:prettier"), None);
+}
+
+#[test]
+fn every_row_offers_a_confirmed_uninstall_whatever_its_status() {
+    let packages = vec![
+        behind("prettier", "2.0.0"),
+        package("typescript", SourceKind::Npm, Status::Current),
+        package("npm", SourceKind::Npm, Status::Ignored),
+        package("mystery", SourceKind::Bun, Status::Unknown),
+    ];
+    let built = build(&view(&packages, None, 0)).unwrap();
+    let ids = confirm_ids(&built);
+
+    for expected in [
+        "remove:npm:prettier",
+        "remove:npm:typescript",
+        "remove:npm:npm",
+        "remove:bun:mystery",
+    ] {
+        assert!(
+            ids.contains(&expected.to_string()),
+            "{expected} missing from {ids:?}"
+        );
+    }
+}
+
+#[test]
+fn the_uninstall_submenu_itself_triggers_no_action() {
+    let packages = vec![behind("prettier", "2.0.0")];
+    let built = build(&view(&packages, None, 0)).unwrap();
+    let mut seen = 0;
+
+    for item in built.menu.items() {
+        let Some(row) = item.as_submenu() else {
+            continue;
+        };
+        for entry in row.items() {
+            let Some(nested) = entry.as_submenu() else {
+                continue;
+            };
+            seen += 1;
+            assert_eq!(nested.text(), "Uninstall");
+            assert_eq!(Action::from_id(nested.id()), None);
+        }
+    }
+
+    assert_eq!(seen, 1);
+}
+
+#[test]
+fn a_busy_menu_disables_the_confirm_item() {
+    let packages = vec![package("typescript", SourceKind::Npm, Status::Current)];
+    let activity = updating("alpha", 0, 1);
+    let built = build(&view(&packages, Some(&activity), 0)).unwrap();
+    let mut checked = 0;
+
+    for item in built.menu.items() {
+        let Some(row) = item.as_submenu() else {
+            continue;
+        };
+        for entry in row.items() {
+            let Some(nested) = entry.as_submenu() else {
+                continue;
+            };
+            for leaf in nested.items() {
+                let leaf = leaf.as_menuitem().expect("the confirm row is a plain item");
+                assert!(!leaf.is_enabled(), "{} should be disabled", leaf.text());
+                checked += 1;
+            }
+        }
+    }
+
+    assert_eq!(checked, 1);
+}
+
+#[test]
+fn the_remove_headline_names_the_package_and_its_source() {
+    let activity = Activity::Removing {
+        target: crate::model::RemoveTarget {
+            name: "prettier".to_string(),
+            source: SourceKind::Bun,
+        },
+    };
+
+    let text = headline(&view(&[], Some(&activity), 0));
+
+    assert!(text.starts_with("Removing prettier (bun)"), "{text}");
+}
+
+#[test]
+fn removing_and_checking_never_share_a_headline() {
+    let activity = Activity::Removing {
+        target: crate::model::RemoveTarget {
+            name: "prettier".to_string(),
+            source: SourceKind::Npm,
+        },
+    };
+
+    assert_ne!(
+        headline(&view(&[], Some(&activity), 0)),
+        headline(&view(&[], Some(&Activity::Checking), 0))
+    );
+}
