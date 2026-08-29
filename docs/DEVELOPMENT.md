@@ -63,16 +63,24 @@ That writes `docs/img/logo.png` (128 px, idle state) and `docs/img/icon-{idle,up
 
 ### Environment workarounds
 
-Two things about the environment the code has to work around, both verified rather than assumed:
+Three things about the environment the code has to work around, all verified rather than assumed:
 
 - **`npm ls -g --json` exits non-zero when the global tree has problems** (an orphaned directory in
   `node_modules` is enough). The exit code is therefore ignored and stdout is parsed anyway; entries with
   no usable `version` are skipped instead of failing the whole listing.
 - **`bun pm ls -g` does not list global packages.** It ignores `-g` and prints the tree for whatever
   directory it is run from, so it will happily report a project's dependencies as if they were global. The
-  bun source instead reads `~/.bun/install/global/package.json` (honouring `BUN_INSTALL`) and resolves
-  versions from that directory's `node_modules`. An empty global store reports zero packages, which is not
-  an error.
+  bun source instead reads the global manifest directly — see below for where that manifest actually
+  lives — and resolves versions from that directory's `node_modules`. An empty global store reports zero
+  packages, which is not an error.
+- **bun does not keep its global manifest in one fixed place.** On bun 1.3.3 for Windows the global
+  `package.json`, `bun.lock`, and `node_modules` sit directly in `%USERPROFILE%`, while
+  `~/.bun/install/global` — the layout older builds used, and the one the app originally hard-coded —
+  exists but stays empty. `bun pm bin -g` still points at `~/.bun/bin`, so the shim directory is no
+  guide to where the manifest lives. `Bun::new` therefore probes `$BUN_INSTALL/install/global`, then
+  `~/.bun/install/global`, then `~`, and takes the first that holds a readable `package.json`. When
+  none does, the source reports zero packages — a bun install with no global packages is legitimate —
+  and writes the probed paths to the failure log so an empty list is explained rather than silent.
 
 ## Self-update mechanics
 
