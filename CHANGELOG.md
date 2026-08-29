@@ -7,6 +7,19 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5](https://github.com/TOR968/Globlin/compare/v0.2.4...v0.2.5) - 2026-08-29
+
+### Added
+
+- uninstall a global package from its tray row
+- offer a two-step Uninstall in every package row
+
+### Fixed
+
+- satisfy the clippy 1.98 lints CI runs
+- keep the bun note from clobbering the failure log and tighten the global-root probe
+- find bun global packages when the manifest lives in the home directory
+
 ## [0.2.4](https://github.com/TOR968/Globlin/compare/v0.2.3...v0.2.4) - 2026-08-23
 
 ### Added
