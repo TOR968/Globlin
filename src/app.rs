@@ -106,6 +106,7 @@ impl App {
                 }
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
+            Action::Remove { .. } => {}
             Action::ToggleAutostart => self.toggle_autostart(),
             Action::UpdateSelf => {
                 self.config.last_self_notice = None;

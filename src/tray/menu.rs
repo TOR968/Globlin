@@ -20,6 +20,7 @@ const ID_OPEN_SELF_LOG: &str = "open-self-log";
 const ID_QUIT: &str = "quit";
 const UPDATE_PREFIX: &str = "update:";
 const IGNORE_PREFIX: &str = "ignore:";
+const REMOVE_PREFIX: &str = "remove:";
 
 const DOT_CYCLE: u32 = 4;
 const FRAMES_PER_DOT: u32 = 2;
@@ -28,6 +29,7 @@ const FRAMES_PER_DOT: u32 = 2;
 pub enum Action {
     Update { name: String, source: SourceKind },
     ToggleIgnore { name: String },
+    Remove { name: String, source: SourceKind },
     UpdateAll,
     CheckNow,
     ToggleAutostart,
@@ -71,7 +73,9 @@ impl Action {
             ID_OPEN_LOG => Some(Self::OpenLog),
             ID_OPEN_SELF_LOG => Some(Self::OpenSelfLog),
             ID_QUIT => Some(Self::Quit),
-            other => Self::parse_update(other).or_else(|| Self::parse_ignore(other)),
+            other => Self::parse_update(other)
+                .or_else(|| Self::parse_ignore(other))
+                .or_else(|| Self::parse_remove(other)),
         }
     }
 
@@ -88,6 +92,14 @@ impl Action {
         SourceKind::from_label(label)?;
         Some(Self::ToggleIgnore {
             name: name.to_string(),
+        })
+    }
+
+    fn parse_remove(key: &str) -> Option<Self> {
+        let (label, name) = key.strip_prefix(REMOVE_PREFIX)?.split_once(':')?;
+        Some(Self::Remove {
+            name: name.to_string(),
+            source: SourceKind::from_label(label)?,
         })
     }
 }
@@ -324,6 +336,10 @@ fn ignore_id(package: &Package) -> String {
     format!("{IGNORE_PREFIX}{}:{}", package.source.label(), package.name)
 }
 
+fn remove_id(package: &Package) -> String {
+    format!("{REMOVE_PREFIX}{}:{}", package.source.label(), package.name)
+}
+
 fn offers_update(package: &Package) -> bool {
     package.latest().is_some()
 }
@@ -345,6 +361,14 @@ fn package_entry(package: &Package, busy: bool) -> Result<Submenu> {
         package.status == Status::Ignored,
         None,
     ))?;
+    let uninstall = Submenu::new("Uninstall", !busy);
+    uninstall.append(&MenuItem::with_id(
+        remove_id(package),
+        format!("Confirm — remove {}", package.name),
+        !busy,
+        None,
+    ))?;
+    entry.append(&uninstall)?;
     Ok(entry)
 }
 
