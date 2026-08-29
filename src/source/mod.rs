@@ -17,6 +17,8 @@ pub trait PackageSource {
     fn installed(&self) -> Result<Vec<Installed>>;
 
     fn update_command(&self, name: &str) -> Command;
+
+    fn uninstall_command(&self, name: &str) -> Command;
 }
 
 pub fn enabled(config: &Config) -> Result<Vec<Box<dyn PackageSource>>> {

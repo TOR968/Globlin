@@ -8,7 +8,8 @@ use tray_icon::menu::MenuEvent;
 use crate::check::{self, Report};
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
-use crate::model::{self, Activity, Batch, Package, Status, UpdateTarget};
+use crate::model::{self, Activity, Batch, Package, RemoveTarget, Status, UpdateTarget};
+use crate::remove;
 use crate::selfupdate::{self, Release};
 use crate::tray::{Action, Tray, View};
 use crate::update::{self, Outcome, Step};
@@ -80,6 +81,7 @@ impl App {
             Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome),
+            Message::Removed { name, ok } => self.on_removed(&name, ok),
             Message::Replaced(result) => return self.on_replaced(result),
         }
         Control::Continue
@@ -106,7 +108,15 @@ impl App {
                 }
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
-            Action::Remove { .. } => {}
+            Action::Remove { name, source } => {
+                let known = self
+                    .packages
+                    .iter()
+                    .any(|package| package.name == name && package.source == source);
+                if known {
+                    self.start_remove(RemoveTarget { name, source });
+                }
+            }
             Action::ToggleAutostart => self.toggle_autostart(),
             Action::UpdateSelf => {
                 self.config.last_self_notice = None;
@@ -177,6 +187,27 @@ impl App {
             };
             let outcome = update::run(&config, &targets, announce);
             proxy.send_event(Message::Updated(outcome)).ok();
+        });
+    }
+
+    fn start_remove(&mut self, target: RemoveTarget) {
+        if self.activity.is_some() {
+            return;
+        }
+        self.begin(Activity::Removing {
+            target: target.clone(),
+        });
+
+        let config = self.config.clone();
+        let proxy = self.proxy.clone();
+        std::thread::spawn(move || {
+            let ok = remove::run(&config, &target);
+            proxy
+                .send_event(Message::Removed {
+                    name: target.name,
+                    ok,
+                })
+                .ok();
         });
     }
 
@@ -344,6 +375,20 @@ impl App {
         self.start_check();
     }
 
+    fn on_removed(&mut self, name: &str, ok: bool) {
+        self.activity = None;
+        if ok {
+            platform::notify("Globlin — removed", name).ok();
+        } else {
+            platform::notify(
+                "Globlin — uninstall failed",
+                &format!("{name} (see Open last log)"),
+            )
+            .ok();
+        }
+        self.start_check();
+    }
+
     fn toggle_autostart(&mut self) {
         let desired = !platform::autostart_enabled();
         if let Err(error) = platform::set_autostart(desired) {
@@ -384,7 +429,9 @@ impl App {
             Some(Activity::Updating { batch }) => {
                 progress::level(batch.done(), batch.total(), self.elapsed())
             }
-            Some(Activity::Checking | Activity::SelfUpdate) => progress::creep(self.elapsed()),
+            Some(Activity::Checking | Activity::SelfUpdate | Activity::Removing { .. }) => {
+                progress::creep(self.elapsed())
+            }
             None => 0.0,
         }
     }

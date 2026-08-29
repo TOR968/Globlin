@@ -537,3 +537,32 @@ fn a_busy_menu_disables_the_confirm_item() {
 
     assert_eq!(checked, 1);
 }
+
+#[test]
+fn the_remove_headline_names_the_package_and_its_source() {
+    let activity = Activity::Removing {
+        target: crate::model::RemoveTarget {
+            name: "prettier".to_string(),
+            source: SourceKind::Bun,
+        },
+    };
+
+    let text = headline(&view(&[], Some(&activity), 0));
+
+    assert!(text.starts_with("Removing prettier (bun)"), "{text}");
+}
+
+#[test]
+fn removing_and_checking_never_share_a_headline() {
+    let activity = Activity::Removing {
+        target: crate::model::RemoveTarget {
+            name: "prettier".to_string(),
+            source: SourceKind::Npm,
+        },
+    };
+
+    assert_ne!(
+        headline(&view(&[], Some(&activity), 0)),
+        headline(&view(&[], Some(&Activity::Checking), 0))
+    );
+}

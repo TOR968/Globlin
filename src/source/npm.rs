@@ -45,6 +45,12 @@ impl PackageSource for Npm {
         command.args(["install", "-g", &format!("{name}@latest")]);
         command
     }
+
+    fn uninstall_command(&self, name: &str) -> Command {
+        let mut command = hidden_command(&self.command);
+        command.args(["uninstall", "-g", name]);
+        command
+    }
 }
 
 fn resolve(configured: Option<&Path>) -> Option<PathBuf> {

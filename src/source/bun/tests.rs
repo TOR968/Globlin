@@ -127,3 +127,23 @@ fn a_dependency_missing_from_node_modules_drops_out_instead_of_failing_the_sourc
     assert_eq!(installed[0].version, Version::parse("1.4.2").unwrap());
     assert_eq!(installed[0].source, SourceKind::Bun);
 }
+
+fn arguments(command: &std::process::Command) -> Vec<String> {
+    command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect()
+}
+
+#[test]
+fn the_bun_uninstall_command_removes_the_package_globally() {
+    let bun = Bun {
+        command: PathBuf::from("bun"),
+        global_dir: None,
+    };
+
+    assert_eq!(
+        arguments(&bun.uninstall_command("@scope/tool")),
+        vec!["remove", "-g", "@scope/tool"]
+    );
+}

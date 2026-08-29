@@ -10,6 +10,7 @@ mod notice;
 mod platform;
 mod progress;
 mod registry;
+mod remove;
 mod selfupdate;
 mod source;
 mod tray;
@@ -33,6 +34,7 @@ pub enum Message {
     Checked(Report),
     Step(Step),
     Updated(Outcome),
+    Removed { name: String, ok: bool },
     Replaced(Result<semver::Version>),
 }
 

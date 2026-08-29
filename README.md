@@ -36,14 +36,14 @@ Right-click the tray icon:
 ```
 Globlin — 3 updates available
 ─────────────────────────────────────
-↑  @google/gemini-cli   0.53.1 → 0.54.4      ▸  Update · ☐ Ignore
-↑  @salesforce/cli      2.145.6 → 2.146.3    ▸  Update · ☐ Ignore
-↑  vercel               58.4.4 → 58.9.1      ▸  Update · ☐ Ignore
+↑  @google/gemini-cli   0.53.1 → 0.54.4      ▸  Update · ☐ Ignore · Uninstall
+↑  @salesforce/cli      2.145.6 → 2.146.3    ▸  Update · ☐ Ignore · Uninstall
+↑  vercel               58.4.4 → 58.9.1      ▸  Update · ☐ Ignore · Uninstall
 ─────────────────────────────────────
-✓  prettier             3.9.6                ▸  ☐ Ignore
-✓  typescript           7.0.2                ▸  ☐ Ignore
-·  npm                  12.0.2      (ignored) ▸ ☑ Ignore
-?  some-package         1.0.0   (not checked) ▸ ☐ Ignore
+✓  prettier             3.9.6                ▸  ☐ Ignore · Uninstall
+✓  typescript           7.0.2                ▸  ☐ Ignore · Uninstall
+·  npm                  12.0.2      (ignored) ▸ ☑ Ignore · Uninstall
+?  some-package         1.0.0   (not checked) ▸ ☐ Ignore · Uninstall
 ─────────────────────────────────────
 Update all (3)
 Check now
@@ -61,6 +61,9 @@ Quit
 - Every row opens a submenu: **Update** runs `npm install -g <name>@latest` (or the bun equivalent) with
   no console window, then re-checks. **Ignore** removes it from checks and from `Update all` without
   touching the network — untick it and it's re-checked immediately.
+  **Uninstall** opens onto a single `Confirm — remove <name>` item and removes the package from your
+  machine with `npm uninstall -g <name>` (or `bun remove -g <name>`), then re-checks. The two steps are
+  the confirmation — there is no dialog, and the outer `Uninstall` entry does nothing on its own.
 - **Update all** updates every outdated package as a queue: the header shows a `[2/3]` counter, the
   active row spins with a progress bar, finished rows show `✓ done` or `✗ failed`.
 - **Check now** re-checks immediately instead of waiting for the schedule (every 6 hours by default).

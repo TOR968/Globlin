@@ -306,6 +306,12 @@ pub fn headline(view: &View) -> String {
             }
             None => format!("Updating packages{}", dots(view.frame)),
         },
+        Some(Activity::Removing { target }) => format!(
+            "Removing {}{}{}",
+            target.name,
+            target.source.suffix(),
+            dots(view.frame)
+        ),
         Some(Activity::SelfUpdate) => {
             format!("Updating Globlin{}", dots(view.frame))
         }

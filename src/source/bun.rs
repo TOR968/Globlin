@@ -60,6 +60,12 @@ impl PackageSource for Bun {
         command.args(["add", "-g", &format!("{name}@latest")]);
         command
     }
+
+    fn uninstall_command(&self, name: &str) -> Command {
+        let mut command = hidden_command(&self.command);
+        command.args(["remove", "-g", name]);
+        command
+    }
 }
 
 fn version_of(root: &Path, name: &str) -> Option<Installed> {
