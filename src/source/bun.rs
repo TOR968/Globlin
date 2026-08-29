@@ -107,9 +107,7 @@ fn resolve_global_dir(candidates: &[PathBuf]) -> Option<PathBuf> {
 }
 
 fn manifest_parses(root: &Path) -> bool {
-    fs::read_to_string(root.join("package.json"))
-        .ok()
-        .is_some_and(|raw| parse_manifest(&raw).is_ok())
+    fs::read_to_string(root.join("package.json")).is_ok_and(|raw| parse_manifest(&raw).is_ok())
 }
 
 fn has_lockfile(root: &Path) -> bool {
