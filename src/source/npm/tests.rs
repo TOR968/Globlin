@@ -51,8 +51,6 @@ fn unparseable_output_is_an_error() {
     assert!(parse_listing(b"npm ERR! code ENOENT").is_err());
 }
 
-use std::path::PathBuf;
-
 fn arguments(command: &std::process::Command) -> Vec<String> {
     command
         .get_args()

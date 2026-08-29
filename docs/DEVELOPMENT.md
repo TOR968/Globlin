@@ -78,9 +78,13 @@ Three things about the environment the code has to work around, all verified rat
   `~/.bun/install/global` — the layout older builds used, and the one the app originally hard-coded —
   exists but stays empty. `bun pm bin -g` still points at `~/.bun/bin`, so the shim directory is no
   guide to where the manifest lives. `Bun::new` therefore probes `$BUN_INSTALL/install/global`, then
-  `~/.bun/install/global`, then `~`, and takes the first that holds a readable `package.json`. When
-  none does, the source reports zero packages — a bun install with no global packages is legitimate —
-  and writes the probed paths to the failure log so an empty list is explained rather than silent.
+  `~/.bun/install/global`, then `~`, and takes the first candidate whose `package.json` parses and has a
+  sibling `bun.lock` or `bun.lockb` next to it — a bare parse check would adopt any project's
+  `package.json`, including a stale empty manifest an older bun left behind. If no candidate has a
+  lockfile, it falls back to the first whose manifest parses and declares at least one dependency. When
+  nothing matches either rule, the source reports zero packages — a bun install with no global packages
+  is legitimate — and writes the probed paths to the log so an empty list is explained rather than
+  silent.
 
 ## Self-update mechanics
 

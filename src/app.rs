@@ -81,7 +81,7 @@ impl App {
             Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome),
-            Message::Removed { name, ok } => self.on_removed(&name, ok),
+            Message::Removed { target, ok } => self.on_removed(&target, ok),
             Message::Replaced(result) => return self.on_replaced(result),
         }
         Control::Continue
@@ -202,12 +202,7 @@ impl App {
         let proxy = self.proxy.clone();
         std::thread::spawn(move || {
             let ok = remove::run(&config, &target);
-            proxy
-                .send_event(Message::Removed {
-                    name: target.name,
-                    ok,
-                })
-                .ok();
+            proxy.send_event(Message::Removed { target, ok }).ok();
         });
     }
 
@@ -375,10 +370,11 @@ impl App {
         self.start_check();
     }
 
-    fn on_removed(&mut self, name: &str, ok: bool) {
+    fn on_removed(&mut self, target: &RemoveTarget, ok: bool) {
         self.activity = None;
+        let name = format!("{}{}", target.name, target.source.suffix());
         if ok {
-            platform::notify("Globlin — removed", name).ok();
+            platform::notify("Globlin — removed", &name).ok();
         } else {
             platform::notify(
                 "Globlin — uninstall failed",

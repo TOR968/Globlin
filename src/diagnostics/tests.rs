@@ -52,3 +52,31 @@ fn the_diagnostic_files_do_not_collide() {
     assert!(self_update_log_path().ends_with(SELF_UPDATE_FAILURES));
     assert_ne!(log_path(), self_update_log_path());
 }
+
+fn scratch(label: &str) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!("globlin-test-{label}"));
+    std::fs::remove_file(&path).ok();
+    path
+}
+
+#[test]
+fn a_note_appended_after_a_failure_leaves_both_texts_in_the_file() {
+    let path = scratch("diagnostics-note-after-failure");
+    truncate(&path, "failure report\n");
+    append(&path, "bun note\n");
+
+    let contents = std::fs::read_to_string(&path).unwrap();
+    assert!(contents.contains("failure report"), "{contents}");
+    assert!(contents.contains("bun note"), "{contents}");
+}
+
+#[test]
+fn a_failure_written_after_a_note_replaces_everything() {
+    let path = scratch("diagnostics-failure-after-note");
+    append(&path, "bun note\n");
+    truncate(&path, "failure report\n");
+
+    let contents = std::fs::read_to_string(&path).unwrap();
+    assert!(!contents.contains("bun note"), "{contents}");
+    assert!(contents.contains("failure report"), "{contents}");
+}

@@ -24,6 +24,7 @@ use tray_icon::menu::MenuEvent;
 
 use app::{App, Control};
 use check::Report;
+use model::RemoveTarget;
 use update::{Outcome, Step};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -34,7 +35,7 @@ pub enum Message {
     Checked(Report),
     Step(Step),
     Updated(Outcome),
-    Removed { name: String, ok: bool },
+    Removed { target: RemoveTarget, ok: bool },
     Replaced(Result<semver::Version>),
 }
 

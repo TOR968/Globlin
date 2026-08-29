@@ -1,5 +1,4 @@
 use super::*;
-use std::path::Path;
 
 #[test]
 fn reads_dependency_names_from_the_global_manifest() {
@@ -30,6 +29,10 @@ fn scratch(label: &str) -> PathBuf {
 
 fn with_manifest(root: &Path, raw: &str) {
     std::fs::write(root.join("package.json"), raw).unwrap();
+}
+
+fn with_lockfile(root: &Path) {
+    std::fs::write(root.join("bun.lock"), "").unwrap();
 }
 
 fn with_installed(root: &Path, name: &str, version: &str) {
@@ -77,6 +80,46 @@ fn no_candidate_with_a_manifest_resolves_to_nothing() {
     let second = scratch("bun-none-second");
 
     assert_eq!(resolve_global_dir(&[first, second]), None);
+}
+
+#[test]
+fn a_stale_empty_manifest_does_not_shadow_a_later_candidate_with_a_lockfile() {
+    let stale = scratch("bun-stale-empty");
+    let real = scratch("bun-real-root");
+    with_manifest(&stale, "{}");
+    with_manifest(&real, r#"{"dependencies":{"a":"1.0.0"}}"#);
+    with_lockfile(&real);
+
+    assert_eq!(resolve_global_dir(&[stale, real.clone()]), Some(real));
+}
+
+#[test]
+fn a_candidate_with_a_lockfile_beats_an_earlier_candidate_without_one() {
+    let first = scratch("bun-no-lockfile");
+    let second = scratch("bun-with-lockfile");
+    with_manifest(&first, r#"{"dependencies":{"a":"1.0.0"}}"#);
+    with_manifest(&second, r#"{"dependencies":{"b":"1.0.0"}}"#);
+    with_lockfile(&second);
+
+    assert_eq!(resolve_global_dir(&[first, second.clone()]), Some(second));
+}
+
+#[test]
+fn with_no_lockfile_anywhere_the_first_manifest_declaring_a_dependency_wins() {
+    let first = scratch("bun-fallback-first");
+    let second = scratch("bun-fallback-second");
+    with_manifest(&first, r#"{"dependencies":{"a":"1.0.0"}}"#);
+    with_manifest(&second, r#"{"dependencies":{"b":"1.0.0"}}"#);
+
+    assert_eq!(resolve_global_dir(&[first.clone(), second]), Some(first));
+}
+
+#[test]
+fn a_manifest_with_no_dependencies_and_no_lockfile_resolves_to_nothing() {
+    let root = scratch("bun-empty-manifest-no-lockfile");
+    with_manifest(&root, "{}");
+
+    assert_eq!(resolve_global_dir(&[root]), None);
 }
 
 #[test]

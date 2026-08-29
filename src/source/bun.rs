@@ -42,7 +42,7 @@ impl PackageSource for Bun {
 
     fn installed(&self) -> Result<Vec<Installed>> {
         let Some(root) = self.global_dir.as_deref() else {
-            diagnostics::record_failures(&missing_root_report(&candidates()));
+            diagnostics::record_note(&missing_root_report(&candidates()));
             return Ok(Vec::new());
         };
         let Ok(raw) = fs::read_to_string(root.join("package.json")) else {
@@ -101,12 +101,26 @@ fn candidates_from(install: Option<PathBuf>, home: Option<PathBuf>) -> Vec<PathB
 fn resolve_global_dir(candidates: &[PathBuf]) -> Option<PathBuf> {
     candidates
         .iter()
-        .find(|root| {
-            fs::read_to_string(root.join("package.json"))
-                .ok()
-                .is_some_and(|raw| parse_manifest(&raw).is_ok())
-        })
+        .find(|root| manifest_parses(root) && has_lockfile(root))
+        .or_else(|| candidates.iter().find(|root| manifest_has_dependency(root)))
         .cloned()
+}
+
+fn manifest_parses(root: &Path) -> bool {
+    fs::read_to_string(root.join("package.json"))
+        .ok()
+        .is_some_and(|raw| parse_manifest(&raw).is_ok())
+}
+
+fn has_lockfile(root: &Path) -> bool {
+    root.join("bun.lock").is_file() || root.join("bun.lockb").is_file()
+}
+
+fn manifest_has_dependency(root: &Path) -> bool {
+    fs::read_to_string(root.join("package.json"))
+        .ok()
+        .and_then(|raw| parse_manifest(&raw).ok())
+        .is_some_and(|names| !names.is_empty())
 }
 
 fn missing_root_report(candidates: &[PathBuf]) -> String {
