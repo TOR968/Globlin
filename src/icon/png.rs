@@ -54,7 +54,7 @@ impl BitWriter {
     }
 
     fn write(&mut self, value: u32, bits: u32) {
-        self.buffer |= value << self.filled;
+        self.buffer |= (value & ((1 << bits) - 1)) << self.filled;
         self.filled += bits;
         while self.filled >= 8 {
             self.bytes

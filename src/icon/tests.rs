@@ -156,7 +156,7 @@ fn blit(canvas: &mut [u8], canvas_width: u32, patch: &[u8], patch_size: u32, lef
             for channel in 0..3 {
                 let over = u32::from(patch[source + channel]) * alpha;
                 let under = u32::from(canvas[target + channel]) * (255 - alpha);
-                canvas[target + channel] = u8::try_from((over + under) / 255).unwrap();
+                canvas[target + channel] = u8::try_from((over + under + 127) / 255).unwrap();
             }
         }
     }
@@ -204,6 +204,7 @@ fn open_graph_card() -> Vec<u8> {
 fn the_open_graph_card_is_the_size_social_networks_expect() {
     let card = open_graph_card();
 
+    assert_eq!((OG_WIDTH, OG_HEIGHT), (1200, 630));
     assert_eq!(
         card.len(),
         usize::try_from(OG_WIDTH * OG_HEIGHT * 4).unwrap()
@@ -217,6 +218,22 @@ fn the_open_graph_card_paints_the_logo_over_the_background() {
     let centre = usize::try_from((OG_HEIGHT / 3) * OG_WIDTH + OG_WIDTH / 2).unwrap() * 4;
 
     assert_ne!(&card[centre..centre + 4], &OG_BACKGROUND);
+}
+
+#[test]
+fn the_state_row_on_the_open_graph_card_paints_its_first_and_last_mark() {
+    let card = open_graph_card();
+    let row_width = 4 * OG_STATE_SIZE + 3 * OG_STATE_GAP;
+    let row_left = (OG_WIDTH - row_width) / 2;
+    let top = 456;
+    let centre_y = top + OG_STATE_SIZE / 2;
+    let first_x = row_left + OG_STATE_SIZE / 2;
+    let last_x = row_left + 3 * (OG_STATE_SIZE + OG_STATE_GAP) + OG_STATE_SIZE / 2;
+
+    for x in [first_x, last_x] {
+        let pixel = usize::try_from(centre_y * OG_WIDTH + x).unwrap() * 4;
+        assert_ne!(&card[pixel..pixel + 4], &OG_BACKGROUND);
+    }
 }
 
 #[test]

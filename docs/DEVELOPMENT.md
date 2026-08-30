@@ -61,6 +61,19 @@ cargo test -- --ignored --exact icon::tests::dump_readme_images
 That writes `docs/img/logo.png` (128 px, idle state) and `docs/img/icon-{idle,updates,error,busy}.png`
 (32 px each). Commit the results alongside the render change.
 
+**The landing page's artwork (`site/img/*.png`) is generated the same way, by a second ignored test.**
+Regenerate it after any change to `src/icon/render.rs`, or after any change to the Open Graph card layout
+in `src/icon/tests.rs`:
+
+```
+cargo test -- --ignored --exact icon::tests::dump_site_images
+```
+
+That writes six files: `site/img/logo.png` (256 px, idle state), `site/img/icon-{idle,updates,error,busy}.png`
+(64 px each), and `site/img/og.png`, the Open Graph card the landing page's meta tags point social
+previews at (1200×630, the size Facebook, Twitter/X and Slack all expect without cropping). Commit the
+results alongside the render change.
+
 ### Environment workarounds
 
 Three things about the environment the code has to work around, all verified rather than assumed:
