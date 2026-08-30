@@ -5,6 +5,7 @@ const ADLER_MODULUS: u32 = 65521;
 const MIN_MATCH: usize = 3;
 const MAX_MATCH: usize = 258;
 const END_OF_BLOCK: u32 = 256;
+const FIRST_LENGTH_SYMBOL: u32 = 256;
 
 const LENGTH_CODES: [(u32, usize, u32); 29] = [
     (257, 3, 0),
@@ -85,7 +86,7 @@ fn write_symbol(writer: &mut BitWriter, symbol: u32) {
     } else if symbol < 256 {
         writer.write_code(0x190 + symbol - 144, 9);
     } else if symbol < 280 {
-        writer.write_code(symbol - END_OF_BLOCK, 7);
+        writer.write_code(symbol - FIRST_LENGTH_SYMBOL, 7);
     } else {
         writer.write_code(0xc0 + symbol - 280, 8);
     }
