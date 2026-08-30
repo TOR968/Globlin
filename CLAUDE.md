@@ -96,7 +96,7 @@ encoder in `src/icon/png.rs`. Regenerate them, never hand-edit them; see
 - `Cargo.toml` declares the package at the repository root, so release-plz reads every commit in the
   repository, not just the ones that touch it. A commit that touches only `site/` must therefore be
   `chore(site):` or `docs(site):` — a `feat:` there would still publish a version bump and a git tag for
-  the application, over a copy edit. This is the hardest mistake on this branch to undo.
+  the application, over a copy edit. It is the hardest mistake in this repository to undo.
 - Test names are full sentences describing the rule being pinned
   (`a_package_missing_from_the_registry_reply_is_unknown_not_current`).
 - Tests live in a sibling child-module file, not inline: `foo.rs` carries `#[cfg(test)] mod tests;` and
