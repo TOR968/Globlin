@@ -23,3 +23,9 @@ Globlin needs no runtime of its own — it drives whatever npm or bun is already
 
 - [Repository](https://github.com/TOR968/Globlin): Rust, Windows-only, GPL-3.0
 - [Issues](https://github.com/TOR968/Globlin/issues)
+
+## Support
+
+Globlin is free and stays free; there is no paid tier and no telemetry.
+
+- [Patreon](https://www.patreon.com/c/TOR968): support the author's work
