@@ -498,6 +498,7 @@
 
       .states strong {
         display: block;
+        color: var(--text);
       }
 
       .states span {
@@ -778,19 +779,19 @@
           </p>
           <ul class="states">
             <li>
-              <img src="/img/icon-idle.png" width="32" height="32" alt="Emerald tray icon">
+              <img src="/img/icon-idle.png" width="32" height="32" alt="">
               <span><strong>Idle — emerald</strong> Everything installed is current.</span>
             </li>
             <li>
-              <img src="/img/icon-updates.png" width="32" height="32" alt="Amber tray icon">
+              <img src="/img/icon-updates.png" width="32" height="32" alt="">
               <span><strong>Updates — amber</strong> One or more packages are behind.</span>
             </li>
             <li>
-              <img src="/img/icon-error.png" width="32" height="32" alt="Red tray icon">
+              <img src="/img/icon-error.png" width="32" height="32" alt="">
               <span><strong>Error — red</strong> The last registry check failed. A failure never renders as &ldquo;everything is fine&rdquo;.</span>
             </li>
             <li>
-              <img src="/img/icon-busy.png" width="32" height="32" alt="Sky blue tray icon">
+              <img src="/img/icon-busy.png" width="32" height="32" alt="">
               <span><strong>Busy — sky blue</strong> A check or an update is running, filling like a glass.</span>
             </li>
           </ul>
@@ -801,7 +802,7 @@
         <div class="shell">
           <p class="eyebrow">Install</p>
           <h2>Two steps, no installer</h2>
-          <ol class="steps">
+          <ol class="steps" role="list">
             <li>
               <strong>Download globlin.exe</strong>
               One file, 1.7 MB, nothing to unzip.
