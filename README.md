@@ -5,8 +5,10 @@
 
   A tray icon that watches your global npm and bun packages and tells you when one falls behind.
 
-  [![CI](https://github.com/TOR968/globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/globlin/actions/workflows/ci.yml)
-  [![Release](https://img.shields.io/github/v/release/TOR968/globlin)](https://github.com/TOR968/globlin/releases/latest)
+  [![CI](https://github.com/TOR968/Globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/Globlin/actions/workflows/ci.yml)
+  [![Release](https://img.shields.io/github/v/release/TOR968/Globlin)](https://github.com/TOR968/Globlin/releases/latest)
+
+  [**globlin.pages.dev**](https://globlin.pages.dev)
 </div>
 
 **[Install](#install)** · **[Using it](#using-it)** · **[Icon states](#icon-states)** ·
@@ -23,7 +25,7 @@ Single portable `.exe`, ~1.7 MB, no installer, no runtime dependencies, Windows 
 
 ## Install
 
-1. Download `globlin.exe` from the [latest release](https://github.com/TOR968/globlin/releases/latest).
+1. Download `globlin.exe` from the [latest release](https://github.com/TOR968/Globlin/releases/latest).
 2. Run it. That's it — no installer, nothing to unzip.
 
 It keeps its config next to itself, so it's portable: move the `.exe` anywhere and it keeps working.
@@ -85,7 +87,7 @@ The tray icon is drawn from code, not an image file, so its colour always matche
 
 ## Keeping itself updated
 
-Globlin also checks its own [GitHub releases](https://github.com/TOR968/globlin/releases) on the same
+Globlin also checks its own [GitHub releases](https://github.com/TOR968/Globlin/releases) on the same
 schedule as the package check. The `Globlin v<current>` submenu names the build that is running, so you
 can always tell which one is live. When a newer one is published the submenu grows an
 `Update Globlin <current> → <new>` row; ticking **Auto-update Globlin** installs it unattended the next
