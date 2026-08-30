@@ -99,6 +99,27 @@ Three things about the environment the code has to work around, all verified rat
   is legitimate — and writes the probed paths to the log so an empty list is explained rather than
   silent.
 
+## The landing page
+
+`site/` is the marketing page at [globlin.pages.dev](https://globlin.pages.dev). Cloudflare Pages is
+pointed at the `site` directory on the `master` branch with no build command — every push republishes
+it verbatim. There is no bundler, no `package.json`, and no third-party request at render time; the CSS
+and the one script are inline in `site/index.html`.
+
+See [The icon](#the-icon) section above for how the landing page's artwork is regenerated.
+
+The download button points at `releases/latest/download/globlin.exe`, a permanent GitHub redirect, so it
+needs no maintenance when a version ships. The script only replaces the word `latest` with the resolved
+tag, and the page is correct without it.
+
+`site/_headers` carries the security headers and cache lifetimes. Its `connect-src` allows
+`api.github.com` and nothing else; enabling Cloudflare Web Analytics means adding
+`static.cloudflareinsights.com` to `script-src` and `cloudflareinsights.com` to `connect-src`.
+
+Commits that touch only `site/` must use `chore(site):` or `docs(site):`. `release-plz.toml` declares the
+root Cargo package, so release-plz reads every commit in the repository — a `feat:` on the landing page
+would publish a minor version bump of the application.
+
 ## Self-update mechanics
 
 The full mechanics behind the brief version in the [README](../README.md#keeping-itself-updated).

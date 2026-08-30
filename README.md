@@ -7,6 +7,8 @@
 
   [![CI](https://github.com/TOR968/globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/globlin/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/TOR968/globlin)](https://github.com/TOR968/globlin/releases/latest)
+
+  [**globlin.pages.dev**](https://globlin.pages.dev)
 </div>
 
 **[Install](#install)** · **[Using it](#using-it)** · **[Icon states](#icon-states)** ·
