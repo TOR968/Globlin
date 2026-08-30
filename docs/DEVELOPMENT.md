@@ -147,9 +147,18 @@ The download button points at `releases/latest/download/globlin.exe`, a permanen
 needs no maintenance when a version ships. The script only replaces the word `latest` with the resolved
 tag, and the page is correct without it.
 
-`site/_headers` carries the security headers and cache lifetimes. Its `connect-src` allows
-`api.github.com` and nothing else; enabling Cloudflare Web Analytics means adding
-`static.cloudflareinsights.com` to `script-src` and `cloudflareinsights.com` to `connect-src`.
+`site/_headers` carries the security headers and cache lifetimes. The Content-Security-Policy allows
+scripts from the page itself and from `static.cloudflareinsights.com`, and network calls to
+`api.github.com` and `cloudflareinsights.com` — nothing else. Those two Cloudflare hosts are there for
+Web Analytics, which Pages injects into every `pages.dev` response on its own: with the policy that
+shipped first, the beacon was blocked, the analytics panel showed zero visits with no error anywhere,
+and Lighthouse marked the console error down to 92 on Best Practices. A blocked beacon is silent, so
+the symptom to look for is missing data rather than a failure.
+
+`site/llms.txt` describes the project for AI agents, in the format Lighthouse's agentic-browsing
+category checks for: a title, a one-line summary, a few paragraphs of prose, and link sections pointing
+at the releases, the README, the development notes and the repository. Keep it in step with the
+README — it is a summary of the same facts, not a second source of truth.
 
 Commits that touch only `site/` must be scoped `chore(site):` or `docs(site):`. `Cargo.toml` declares
 the package at the repository root, so release-plz reads every commit in the repository, and by default
