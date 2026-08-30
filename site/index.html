@@ -300,6 +300,88 @@
           animation: none !important;
         }
       }
+
+      .menu {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        overflow: hidden;
+        max-width: 640px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      }
+
+      .menu-header,
+      .menu-row,
+      .menu-footer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 18px;
+      }
+
+      .menu-header {
+        border-bottom: 1px solid var(--border);
+        color: var(--amber);
+        font-weight: 600;
+      }
+
+      .menu-row + .menu-row {
+        border-top: 1px solid rgba(48, 54, 61, 0.5);
+      }
+
+      .menu-mark {
+        width: 1.2em;
+        flex: none;
+        text-align: center;
+      }
+
+      .menu-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .menu-version {
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .is-outdated .menu-mark,
+      .is-outdated .menu-version {
+        color: var(--amber);
+      }
+
+      .is-current .menu-mark {
+        color: var(--emerald);
+      }
+
+      .is-ignored,
+      .is-unknown {
+        color: var(--muted);
+      }
+
+      .menu-footer {
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        justify-content: space-between;
+      }
+
+      @media (max-width: 560px) {
+        .menu {
+          font-size: 0.78rem;
+        }
+
+        .menu-header,
+        .menu-row,
+        .menu-footer {
+          padding: 10px 12px;
+          gap: 8px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -346,6 +428,60 @@
             <li>Portable single .exe</li>
             <li>Open source, GPL-3.0</li>
           </ul>
+        </div>
+      </section>
+
+      <section class="section" id="menu">
+        <div class="shell">
+          <p class="eyebrow">What you actually see</p>
+          <h2>One right-click, the whole picture</h2>
+          <p class="lede">
+            Every globally installed package, its version, and whether it has fallen behind. Click a row
+            to update it, or update everything at once.
+          </p>
+          <div class="menu" role="img" aria-label="The Globlin tray menu listing three outdated packages, two current packages, one ignored and one not yet checked, with Update all and Check now at the bottom">
+            <div class="menu-header" aria-hidden="true">Globlin — 3 updates available</div>
+            <div class="menu-row is-outdated" aria-hidden="true">
+              <span class="menu-mark">↑</span>
+              <span class="menu-name">@google/gemini-cli</span>
+              <span class="menu-version">0.53.1 → 0.54.4</span>
+            </div>
+            <div class="menu-row is-outdated" aria-hidden="true">
+              <span class="menu-mark">↑</span>
+              <span class="menu-name">@salesforce/cli</span>
+              <span class="menu-version">2.145.6 → 2.146.3</span>
+            </div>
+            <div class="menu-row is-outdated" aria-hidden="true">
+              <span class="menu-mark">↑</span>
+              <span class="menu-name">vercel</span>
+              <span class="menu-version">58.4.4 → 58.9.1</span>
+            </div>
+            <div class="menu-row is-current" aria-hidden="true">
+              <span class="menu-mark">✓</span>
+              <span class="menu-name">prettier</span>
+              <span class="menu-version">3.9.6</span>
+            </div>
+            <div class="menu-row is-current" aria-hidden="true">
+              <span class="menu-mark">✓</span>
+              <span class="menu-name">typescript</span>
+              <span class="menu-version">7.0.2</span>
+            </div>
+            <div class="menu-row is-ignored" aria-hidden="true">
+              <span class="menu-mark">·</span>
+              <span class="menu-name">npm</span>
+              <span class="menu-version">12.0.2 (ignored)</span>
+            </div>
+            <div class="menu-row is-unknown" aria-hidden="true">
+              <span class="menu-mark">?</span>
+              <span class="menu-name">some-package</span>
+              <span class="menu-version">1.0.0 (not checked)</span>
+            </div>
+            <div class="menu-footer" aria-hidden="true">
+              <span>Update all (3)</span>
+              <span>Check now</span>
+              <span>Run at startup</span>
+            </div>
+          </div>
         </div>
       </section>
     </main>
