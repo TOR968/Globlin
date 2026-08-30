@@ -263,7 +263,8 @@ determining versions.
 - **`release.yml`** — a `v*` tag only. It first refuses to continue if the tag does not match the
   `version` in `Cargo.toml`, so a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a
   mislabelled build. Then it tests, builds, and creates the GitHub Release with the bare `.exe` and a
-  `.sha256` next to it.
+  `.sha256` next to it. Between the build and the release it uploads the `.exe` to VirusTotal and appends
+  a **Virus scan** section to the notes — see below.
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
@@ -288,6 +289,38 @@ without it, both start at the same second, `release-pr` checks the repository ou
 the new `v*` tag, and so it still believes the previous release is the latest one. It then opens a second
 release pull request proposing the version that was just released, whose diff against `master` is empty.
 Harmless, but it appears after every release and has to be closed by hand.
+
+### The VirusTotal scan
+
+Every release uploads its `globlin.exe` to VirusTotal and links the report from the release notes, because
+an unsigned binary that writes an autostart key, spawns `npm` and rewrites its own `.exe` is flagged by
+machine-learning heuristics on a regular basis. Defender has quarantined the download as
+`Trojan:Win32/Wacatac.B!ml` and as `Program:Win32/Wacapew.C!ml`; the README explains this to users, and the
+per-release report is what turns "trust me" into a number they can check against seventy other engines.
+
+`.github/virustotal-scan.ps1` does the work: `POST /api/v3/files`, then poll `GET /api/v3/analyses/{id}`
+every 20 seconds until the status is `completed`, then emit a markdown section naming the flagged count.
+The denominator sums `malicious`, `suspicious`, `undetected`, `harmless`, `timeout` and `failure` from
+`stats`, deliberately excluding `type-unsupported` — that is what makes the number agree with the ratio
+the VirusTotal web report shows.
+
+Three things about it are deliberate:
+
+- **It can never fail the release.** No `VIRUSTOTAL_API_KEY` secret, a failed upload, a failed poll, or an
+  analysis still running after six minutes: each returns an empty string instead of throwing, the step
+  carries `continue-on-error: true` on top of that, and the notes step only appends the section when
+  `dist/virustotal.md` exists. A third-party API having a bad afternoon must not block a tagged build.
+  Because the key is a secret, the step is also a no-op on a fork.
+- **It runs before `gh release create`, not after.** That costs the release up to six minutes of polling,
+  which buys a single-pass notes file rather than creating the release and editing it afterwards.
+- **A timed-out analysis still publishes the link.** The report URL is `gui/file/<sha256>` and is valid
+  the moment the upload lands, so the section is emitted saying the analysis was still running.
+
+The key is a free VirusTotal Community API key (`VIRUSTOTAL_API_KEY` in repository secrets), whose 4
+requests/minute and 500/day are far more than one upload plus a handful of polls per release. Note that
+uploading publishes the sample: VirusTotal shares files with the antivirus industry and with Intelligence
+subscribers, and there is no way to withdraw one. That is acceptable here only because the same binary is
+already a public release asset.
 
 ### The release token
 

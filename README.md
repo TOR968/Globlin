@@ -32,7 +32,8 @@ It keeps its config next to itself, so it's portable: move the `.exe` anywhere a
 Right-click the tray icon and tick **Run at startup** if you want it running every time you log in.
 
 <details>
-<summary><strong>If Windows Defender flags the download</strong> — an unsigned new binary has no reputation</summary>
+<summary><strong>If Windows Defender flags the download</strong> —
+an unsigned new binary has no reputation</summary>
 
 <br>
 
@@ -41,8 +42,8 @@ Defender sometimes quarantines `globlin.exe` on first download as `Trojan:Win32/
 guessed. Three of the seventy-one engines on VirusTotal flag v0.2.5 —
 [see the report](https://www.virustotal.com/gui/file/8d57490fe20f689b25907bb97a9998e70fb9cb6b1b256047f04d968b8a2036ef)
 — and all three are heuristics: Microsoft, McAfee and SecureAge. Bitdefender, Avast, AVG, CrowdStrike and
-the other sixty-eight read it as clean. Every detection so far has been reported to Microsoft as a false
-positive.
+the other sixty-eight read it as clean. Every release links its own report from its release notes, and
+every detection so far has been reported to Microsoft as a false positive.
 
 Nothing about the build is hidden, but several of the things Globlin exists to do look, taken one at a
 time, exactly like malware:

@@ -33,13 +33,25 @@ jobs:
         run: cargo build --release
 
       - name: Package the download
+        id: package
         shell: pwsh
         run: |
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item target/release/globlin.exe dist/
           $hash = (Get-FileHash dist/globlin.exe -Algorithm SHA256).Hash.ToLower()
           "$hash  globlin.exe" | Set-Content dist/globlin.exe.sha256
+          "sha256=$hash" | Add-Content $env:GITHUB_OUTPUT
           Get-ChildItem dist | Select-Object Name, Length
+
+      - name: Scan the build with VirusTotal
+        id: virustotal
+        continue-on-error: true
+        shell: pwsh
+        env:
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        run: |
+          $section = & ./.github/virustotal-scan.ps1 -Path dist/globlin.exe -Sha256 '${{ steps.package.outputs.sha256 }}'
+          if ($section) { $section | Set-Content dist/virustotal.md -Encoding utf8 }
 
       - name: Assemble the release notes
         shell: pwsh
@@ -53,6 +65,9 @@ jobs:
             "no CHANGELOG.md section found for $version; using the static notes only"
           }
           $parts += (Get-Content .github/release-notes.md -Raw).Trim()
+          if (Test-Path dist/virustotal.md) {
+            $parts += (Get-Content dist/virustotal.md -Raw).Trim()
+          }
           ($parts -join "`n`n") | Set-Content dist/notes.md -Encoding utf8
 
       - name: Create the release
