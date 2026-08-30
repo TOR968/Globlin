@@ -31,6 +31,48 @@ Single portable `.exe`, ~1.7 MB, no installer, no runtime dependencies, Windows 
 It keeps its config next to itself, so it's portable: move the `.exe` anywhere and it keeps working.
 Right-click the tray icon and tick **Run at startup** if you want it running every time you log in.
 
+<details>
+<summary><strong>If Windows Defender flags the download</strong> —
+an unsigned new binary has no reputation</summary>
+
+<br>
+
+Defender sometimes quarantines `globlin.exe` on first download as `Trojan:Win32/Wacatac.B!ml` or
+`Program:Win32/Wacapew.C!ml`. The `!ml` suffix is the tell: no signature matched, a machine-learning model
+guessed. Three of the seventy-one engines on VirusTotal flag v0.2.5 —
+[see the report](https://www.virustotal.com/gui/file/8d57490fe20f689b25907bb97a9998e70fb9cb6b1b256047f04d968b8a2036ef)
+— and all three are heuristics: Microsoft, McAfee and SecureAge. Bitdefender, Avast, AVG, CrowdStrike and
+the other sixty-eight read it as clean. Every release links its own report from its release notes, and
+every detection so far has been reported to Microsoft as a false positive.
+
+Nothing about the build is hidden, but several of the things Globlin exists to do look, taken one at a
+time, exactly like malware:
+
+- **It survives a reboot.** *Run at startup* writes a value under the `HKCU` `Run` key — the same key a
+  persistent implant would want.
+- **It launches other programs.** Every update runs `npm install -g` or the bun equivalent as a child
+  process, with no console window.
+- **It talks to the network unprompted.** `registry.npmjs.org` for `dist-tags`, `api.github.com` for its
+  own release check, on a schedule you didn't trigger.
+- **It rewrites its own executable.** [Self-update](#keeping-itself-updated) downloads a new build and
+  swaps the running `.exe` on disk. Very little legitimate software does this.
+- **It has no window.** A GUI-subsystem binary that never opens one is, to a classifier, a binary hiding.
+- **It is unsigned and new.** No code-signing certificate and few downloads means no reputation to weigh
+  against any of the above.
+
+What to do about it, in order of paranoia:
+
+1. **Check the hash.** Every release publishes `globlin.exe.sha256` next to the `.exe`. Run
+   `Get-FileHash globlin.exe` and compare — if it matches, the file is the one CI built from this
+   repository, and the detection is about behaviour, not about a tampered download.
+2. **Paste that hash into [VirusTotal](https://www.virustotal.com/)** and see the full engine spread
+   rather than one engine's guess.
+3. **Restore it from quarantine**, or exclude the folder you keep it in, once you're satisfied.
+4. **Build it yourself** — see *Building from source* below. The source is all here and
+   `cargo build --release` is the whole of it.
+
+</details>
+
 ## Using it
 
 Right-click the tray icon:
