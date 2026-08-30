@@ -151,9 +151,13 @@ tag, and the page is correct without it.
 `api.github.com` and nothing else; enabling Cloudflare Web Analytics means adding
 `static.cloudflareinsights.com` to `script-src` and `cloudflareinsights.com` to `connect-src`.
 
-Commits that touch only `site/` must use `chore(site):` or `docs(site):`. `Cargo.toml` declares the
-package at the repository root, so release-plz reads every commit in the repository — a `feat:` on the
-landing page would publish a minor version bump of the application.
+Commits that touch only `site/` must be scoped `chore(site):` or `docs(site):`. `Cargo.toml` declares
+the package at the repository root, so release-plz reads every commit in the repository, and by default
+any commit at all bumps the version — the type only decides which changelog section it lands in. Two
+settings in `release-plz.toml` do the work: `release_commits = "^(feat|fix)"` means only a `feat` or a
+`fix` opens a release PR, and the first entry in `[changelog] commit_parsers` skips anything scoped
+`(site)`, so the landing page never appears in a changelog that documents the application. Both match on
+the scope, which is why it is not optional.
 
 ## Self-update mechanics
 
@@ -256,7 +260,10 @@ determining versions.
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
   tag, which triggers `release.yml`. `release-plz.toml` sets `git_release_enable = false` so the two do
   not race to create the same release — release-plz stops at the tag and hands over. It also sets
-  `git_only = true`: globlin is not published to a cargo registry, and without that flag release-plz
+  `release_commits = "^(feat|fix)"`, because release-plz otherwise proposes a patch bump for *any*
+  unreleased commit regardless of its type: the landing page arrived as sixteen `chore(site)` and
+  `docs(site)` commits that changed no shipped code, and release-plz still opened a release PR for them.
+  And `git_only = true`: globlin is not published to a cargo registry, and without that flag release-plz
   looks for the previous release on crates.io, logs `Package globlin@*.*.* not found`, treats every run
   as an initial release, and proposes the version already in `Cargo.toml`. The job stays green while
   proposing nothing, which is the confusing part — no error, no release PR, no release.

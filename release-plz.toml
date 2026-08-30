@@ -4,3 +4,15 @@ git_only = true
 git_tag_enable = true
 git_release_enable = false
 changelog_update = true
+release_commits = "^(feat|fix)"
+
+[changelog]
+commit_parsers = [
+  { message = "^[a-z]+\\(site\\)", skip = true },
+  { message = "^feat", group = "added" },
+  { message = "^changed", group = "changed" },
+  { message = "^deprecated", group = "deprecated" },
+  { message = "^fix", group = "fixed" },
+  { message = "^security", group = "security" },
+  { message = "^.*", group = "other" },
+]
