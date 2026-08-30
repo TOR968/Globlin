@@ -91,7 +91,12 @@ encoder in `src/icon/png.rs`. Regenerate them, never hand-edit them; see
   is unusually complete and carries the rest — the verified environment workarounds
   (`npm ls -g --json` exits non-zero on a healthy-enough tree; `bun pm ls -g` ignores `-g`), the full
   self-update swap/rollback mechanics, and the release machinery. Read the relevant one before changing
-  behaviour it describes.
+  behaviour it describes. The same rule extends to `site/` — no `<!-- -->`, no `/* */` — and the site
+  holds that line today.
+- `Cargo.toml` declares the package at the repository root, so release-plz reads every commit in the
+  repository, not just the ones that touch it. A commit that touches only `site/` must therefore be
+  `chore(site):` or `docs(site):` — a `feat:` there would still publish a version bump and a git tag for
+  the application, over a copy edit. This is the hardest mistake on this branch to undo.
 - Test names are full sentences describing the rule being pinned
   (`a_package_missing_from_the_registry_reply_is_unknown_not_current`).
 - Tests live in a sibling child-module file, not inline: `foo.rs` carries `#[cfg(test)] mod tests;` and

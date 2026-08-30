@@ -51,7 +51,11 @@ dropping the notification to the unbranded PowerShell fallback app id.
 
 **The README's logo and per-state images (`docs/img/*.png`) are generated, not hand-drawn.** They come
 from the same `render::rgba` the tray and the `.ico` writer use, encoded to PNG by a hand-written encoder
-in `src/icon/png.rs` (stored/uncompressed zlib — no external crate). Regenerate them after any change to
+in `src/icon/png.rs`. Each row is filtered — Sub for the first row, Up for every row after it — before the
+encoder packs the result into a single fixed-Huffman DEFLATE block whose only match distance is 1, which
+is exactly what a run of repeated bytes from those filters looks like, so it comes out as run-length
+encoding in practice. It stays dependency-free and `#[cfg(test)]`-only; that filtering and compression is
+what took the 1200×630 Open Graph card from about 3 MB to about 50 KB. Regenerate them after any change to
 `src/icon/render.rs`:
 
 ```
@@ -73,6 +77,37 @@ That writes six files: `site/img/logo.png` (256 px, idle state), `site/img/icon-
 (64 px each), and `site/img/og.png`, the Open Graph card the landing page's meta tags point social
 previews at (1200×630, the size Facebook, Twitter/X and Slack all expect without cropping). Commit the
 results alongside the render change.
+
+Both dump tests round-trip the encoder's output only against `inflate_fixed`, its own sibling in the same
+`#[cfg(test)]` module — and that reader shares the `LENGTH_CODES` table with the encoder, so a wrong entry
+there would round-trip cleanly without ever failing a test. Nothing checks the PNGs that actually get
+committed against an independent implementation. After regenerating either set of images, inflate at
+least one of them with a real zlib and confirm the byte count matches the dimensions in the `IHDR` chunk:
+
+```
+python -c "
+import struct, zlib, sys
+data = open(sys.argv[1], 'rb').read()
+assert data[:8] == b'\x89PNG\r\n\x1a\n'
+offset, idat, width, height = 8, b'', None, None
+while offset < len(data):
+    length = struct.unpack('>I', data[offset:offset + 4])[0]
+    kind = data[offset + 4:offset + 8]
+    body = data[offset + 8:offset + 8 + length]
+    if kind == b'IHDR':
+        width, height = struct.unpack('>II', body[:8])
+    elif kind == b'IDAT':
+        idat += body
+    offset += 12 + length
+raw = zlib.decompress(idat)
+print(f'{sys.argv[1]}: {width}x{height}, inflated {len(raw)} bytes, IDAT {len(idat)} bytes')
+" site/img/og.png
+```
+
+Verified against `site/img/og.png` on Python 3.14.4, which printed
+`site/img/og.png: 1200x630, inflated 3024630 bytes, IDAT 50126 bytes` — `3024630` is exactly
+`(1200 * 4 + 1) * 630`, the filtered-row stride times the height, which is what a correctly-shaped stream
+inflates to regardless of what the encoder's own reader would have accepted.
 
 ### Environment workarounds
 
@@ -116,9 +151,9 @@ tag, and the page is correct without it.
 `api.github.com` and nothing else; enabling Cloudflare Web Analytics means adding
 `static.cloudflareinsights.com` to `script-src` and `cloudflareinsights.com` to `connect-src`.
 
-Commits that touch only `site/` must use `chore(site):` or `docs(site):`. `release-plz.toml` declares the
-root Cargo package, so release-plz reads every commit in the repository — a `feat:` on the landing page
-would publish a minor version bump of the application.
+Commits that touch only `site/` must use `chore(site):` or `docs(site):`. `Cargo.toml` declares the
+package at the repository root, so release-plz reads every commit in the repository — a `feat:` on the
+landing page would publish a minor version bump of the application.
 
 ## Self-update mechanics
 
