@@ -7,6 +7,27 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6](https://github.com/TOR968/Globlin/compare/v0.2.5...v0.2.6) - 2026-08-30
+
+### Other
+
+- *(site)* word the commit-scope note for the repository, not the branch
+- *(site)* tighten the install copy, the card alt text and the menu footer
+- *(site)* correct the encoder and site notes in the development docs
+- *(site)* link the landing page from the README and development notes
+- *(site)* keep the install steps and state labels legible to assistive tech
+- *(site)* add the features, states, install and FAQ sections
+- *(site)* name every footer action in the menu illustration label
+- *(site)* recreate the tray menu as markup instead of a screenshot
+- *(site)* add the header, hero and download call to action
+- *(site)* use sameAs for the repository link in the JSON-LD
+- *(site)* add the search and social metadata
+- *(site)* scaffold the static landing page directory
+- *(icon)* correct the test counts in CLAUDE.md
+- *(icon)* tighten the PNG bit writer and the Open Graph card tests
+- *(icon)* compress the generated PNGs with fixed-Huffman deflate
+- *(site)* render the landing-page artwork from the icon code
+
 ## [0.2.5](https://github.com/TOR968/Globlin/compare/v0.2.4...v0.2.5) - 2026-08-29
 
 ### Added
