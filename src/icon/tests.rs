@@ -131,3 +131,129 @@ fn a_stale_app_icon_is_overwritten_rather_than_kept() {
 
     fs::remove_file(&path).ok();
 }
+
+const OG_WIDTH: u32 = 1200;
+const OG_HEIGHT: u32 = 630;
+const OG_BACKGROUND: [u8; 4] = [0x0d, 0x11, 0x17, 0xff];
+const OG_LOGO_SIZE: u32 = 288;
+const OG_STATE_SIZE: u32 = 72;
+const OG_STATE_GAP: u32 = 48;
+
+fn blit(canvas: &mut [u8], canvas_width: u32, patch: &[u8], patch_size: u32, left: u32, top: u32) {
+    let width = usize::try_from(canvas_width).unwrap();
+    let size = usize::try_from(patch_size).unwrap();
+    let left = usize::try_from(left).unwrap();
+    let top = usize::try_from(top).unwrap();
+
+    for row in 0..size {
+        for column in 0..size {
+            let source = (row * size + column) * 4;
+            let alpha = u32::from(patch[source + 3]);
+            if alpha == 0 {
+                continue;
+            }
+            let target = ((top + row) * width + left + column) * 4;
+            for channel in 0..3 {
+                let over = u32::from(patch[source + channel]) * alpha;
+                let under = u32::from(canvas[target + channel]) * (255 - alpha);
+                canvas[target + channel] = u8::try_from((over + under) / 255).unwrap();
+            }
+        }
+    }
+}
+
+fn open_graph_card() -> Vec<u8> {
+    let pixels = usize::try_from(OG_WIDTH * OG_HEIGHT).unwrap();
+    let mut canvas = OG_BACKGROUND.repeat(pixels);
+
+    let logo = render::rgba(IconState::Idle, 0, 0.0, OG_LOGO_SIZE);
+    blit(
+        &mut canvas,
+        OG_WIDTH,
+        &logo,
+        OG_LOGO_SIZE,
+        (OG_WIDTH - OG_LOGO_SIZE) / 2,
+        96,
+    );
+
+    let states = [
+        (IconState::Idle, 0, 0.0),
+        (IconState::Updates, 0, 0.0),
+        (IconState::Error, 0, 0.0),
+        (IconState::Busy, BUSY_FRAMES / 2, 0.6),
+    ];
+    let row_width = 4 * OG_STATE_SIZE + 3 * OG_STATE_GAP;
+    let row_left = (OG_WIDTH - row_width) / 2;
+    for (index, (state, frame, level)) in states.into_iter().enumerate() {
+        let offset = u32::try_from(index).unwrap() * (OG_STATE_SIZE + OG_STATE_GAP);
+        let patch = render::rgba(state, frame, level, OG_STATE_SIZE);
+        blit(
+            &mut canvas,
+            OG_WIDTH,
+            &patch,
+            OG_STATE_SIZE,
+            row_left + offset,
+            456,
+        );
+    }
+
+    canvas
+}
+
+#[test]
+fn the_open_graph_card_is_the_size_social_networks_expect() {
+    let card = open_graph_card();
+
+    assert_eq!(
+        card.len(),
+        usize::try_from(OG_WIDTH * OG_HEIGHT * 4).unwrap()
+    );
+    assert_eq!(&card[..4], &OG_BACKGROUND);
+}
+
+#[test]
+fn the_open_graph_card_paints_the_logo_over_the_background() {
+    let card = open_graph_card();
+    let centre = usize::try_from((OG_HEIGHT / 3) * OG_WIDTH + OG_WIDTH / 2).unwrap() * 4;
+
+    assert_ne!(&card[centre..centre + 4], &OG_BACKGROUND);
+}
+
+#[test]
+#[ignore = "writes the landing-page PNGs into site/img: cargo test -- --ignored --exact icon::tests::dump_site_images"]
+fn dump_site_images() {
+    let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("site/img");
+    fs::create_dir_all(&directory).unwrap();
+
+    let logo_size = 256;
+    let logo = render::rgba(IconState::Idle, 0, 0.0, logo_size);
+    fs::write(
+        directory.join("logo.png"),
+        png::encode(logo_size, logo_size, &logo),
+    )
+    .unwrap();
+
+    let icon_size = 64;
+    let states = [
+        ("icon-idle", IconState::Idle, 0, 0.0),
+        ("icon-updates", IconState::Updates, 0, 0.0),
+        ("icon-error", IconState::Error, 0, 0.0),
+        ("icon-busy", IconState::Busy, BUSY_FRAMES / 2, 0.6),
+    ];
+    for (name, state, frame, level) in states {
+        let pixels = render::rgba(state, frame, level, icon_size);
+        fs::write(
+            directory.join(format!("{name}.png")),
+            png::encode(icon_size, icon_size, &pixels),
+        )
+        .unwrap();
+    }
+
+    fs::write(
+        directory.join("og.png"),
+        png::encode(OG_WIDTH, OG_HEIGHT, &open_graph_card()),
+    )
+    .unwrap();
+
+    println!("site images written to {}", directory.display());
+}
