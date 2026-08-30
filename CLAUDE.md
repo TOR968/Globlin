@@ -94,9 +94,12 @@ encoder in `src/icon/png.rs`. Regenerate them, never hand-edit them; see
   behaviour it describes. The same rule extends to `site/` — no `<!-- -->`, no `/* */` — and the site
   holds that line today.
 - `Cargo.toml` declares the package at the repository root, so release-plz reads every commit in the
-  repository, not just the ones that touch it. A commit that touches only `site/` must therefore be
-  `chore(site):` or `docs(site):` — a `feat:` there would still publish a version bump and a git tag for
-  the application, over a copy edit. It is the hardest mistake in this repository to undo.
+  repository, not just the ones that touch it — and by default *any* commit bumps the version, whatever
+  its type. The commit type only picks the changelog section. Two settings in `release-plz.toml` carry
+  the real rule: `release_commits = "^(feat|fix)"`, so only a `feat` or a `fix` opens a release PR, and
+  the first `[changelog] commit_parsers` entry, which skips anything scoped `(site)` so the landing page
+  stays out of a changelog that documents the application. Both key on the scope, so a site-only commit
+  must be `chore(site):` or `docs(site):` — unscoped, it ships a release to every user for a copy edit.
 - Test names are full sentences describing the rule being pinned
   (`a_package_missing_from_the_registry_reply_is_unknown_not_current`).
 - Tests live in a sibling child-module file, not inline: `foo.rs` carries `#[cfg(test)] mod tests;` and
