@@ -51,8 +51,321 @@
         "sameAs": "https://github.com/TOR968/Globlin"
       }
     </script>
+
+    <style>
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --emerald: #10b981;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --sky: #38bdf8;
+        --deep: #334155;
+        --radius: 12px;
+        --shell: 1040px;
+        --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 17px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a {
+        color: var(--sky);
+      }
+
+      img {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .shell {
+        width: 100%;
+        max-width: var(--shell);
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      .section {
+        padding: 88px 0;
+        border-top: 1px solid var(--border);
+      }
+
+      .section h2 {
+        font-size: clamp(1.6rem, 3.2vw, 2.1rem);
+        line-height: 1.25;
+        margin: 0 0 12px;
+        letter-spacing: -0.01em;
+      }
+
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 14px;
+      }
+
+      .lede {
+        color: var(--muted);
+        max-width: 62ch;
+        margin: 0 0 40px;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(13, 17, 23, 0.88);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .site-header .shell {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        min-height: 64px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 650;
+        color: var(--text);
+        text-decoration: none;
+        letter-spacing: -0.01em;
+      }
+
+      .brand img {
+        width: 28px;
+        height: 28px;
+      }
+
+      .site-nav {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .site-nav a {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.95rem;
+      }
+
+      .site-nav a:hover,
+      .site-nav a:focus-visible {
+        color: var(--text);
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 13px 24px;
+        border-radius: var(--radius);
+        border: 1px solid transparent;
+        font: inherit;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+      }
+
+      .button:focus-visible {
+        outline: 2px solid var(--sky);
+        outline-offset: 3px;
+      }
+
+      .button-primary {
+        background: var(--emerald);
+        color: #04120c;
+      }
+
+      .button-primary:hover {
+        background: #34d399;
+      }
+
+      .button-ghost {
+        border-color: var(--border);
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      .button-ghost:hover {
+        border-color: var(--muted);
+      }
+
+      .hero {
+        padding: 104px 0 88px;
+      }
+
+      .hero h1 {
+        font-size: clamp(2.1rem, 5.4vw, 3.4rem);
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+        margin: 0 0 20px;
+        max-width: 18ch;
+      }
+
+      .hero p {
+        font-size: 1.15rem;
+        color: var(--muted);
+        max-width: 58ch;
+        margin: 0 0 32px;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+      }
+
+      .download-note {
+        font-family: var(--mono);
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin: 18px 0 0;
+      }
+
+      .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 0;
+        margin: 36px 0 0;
+        list-style: none;
+      }
+
+      .badges li {
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 13px;
+      }
+
+      @media (max-width: 720px) {
+        body {
+          font-size: 16px;
+        }
+
+        .site-nav a:not(.brand) {
+          font-size: 0.88rem;
+        }
+
+        .site-nav a[href^="#"] {
+          display: none;
+        }
+
+        .section {
+          padding: 64px 0;
+        }
+
+        .hero {
+          padding: 64px 0 56px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+    </style>
   </head>
   <body>
-    <h1>Globlin</h1>
+    <header class="site-header">
+      <div class="shell">
+        <a class="brand" href="/">
+          <img src="/img/logo.png" width="28" height="28" alt="">
+          Globlin
+        </a>
+        <nav class="site-nav">
+          <a href="#features">Features</a>
+          <a href="#states">Icon states</a>
+          <a href="#install">Install</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/TOR968/Globlin">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="shell">
+          <p class="eyebrow">Windows tray app · npm + bun</p>
+          <h1>Keep your global npm and bun packages up to date</h1>
+          <p>
+            Global CLIs rot silently. Nothing tells you <code>@salesforce/cli</code> is six versions
+            behind until a command breaks in a way that turns out to be &ldquo;oh, I&rsquo;m ancient.&rdquo;
+            Globlin sits in the Windows tray, checks the registry on a schedule, and shows you exactly
+            what has fallen behind.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin.exe" rel="nofollow">
+              Download for Windows
+            </a>
+            <a class="button button-ghost" href="https://github.com/TOR968/Globlin">View source on GitHub</a>
+          </div>
+          <p class="download-note">
+            globlin.exe · <span data-version>latest</span> · 1.7 MB ·
+            <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin.exe.sha256" rel="nofollow">SHA-256</a>
+          </p>
+          <ul class="badges">
+            <li>No installer</li>
+            <li>No runtime dependencies</li>
+            <li>Portable single .exe</li>
+            <li>Open source, GPL-3.0</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      fetch("https://api.github.com/repos/TOR968/Globlin/releases/latest", {
+        headers: { Accept: "application/vnd.github+json" },
+      })
+        .then(function (response) {
+          return response.ok ? response.json() : null;
+        })
+        .then(function (release) {
+          if (!release || !release.tag_name) {
+            return;
+          }
+          document.querySelectorAll("[data-version]").forEach(function (node) {
+            node.textContent = release.tag_name;
+          });
+        })
+        .catch(function () {});
+    </script>
   </body>
 </html>
