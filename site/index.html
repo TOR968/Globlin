@@ -52,6 +52,71 @@
       }
     </script>
 
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is Globlin free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Globlin is free and open source under the GNU General Public License v3.0. There is no paid tier, no account, and no telemetry."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work on macOS or Linux?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Not today. Globlin is Windows only — it is built around the Windows tray and ships as a single portable .exe for Windows 10 and 11."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do I need Node.js installed?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Globlin itself has no runtime dependencies, but it drives the npm or bun that is already on your machine. If neither is installed there is nothing for it to check."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Will it update anything without asking?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Packages are only ever updated when you click. Globlin can update itself unattended, but that setting is off by default and applies to Globlin alone."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How is this different from npm-check-updates?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "npm-check-updates is a command you run by hand against a project's package.json. Globlin is a background tray app for the CLIs you installed globally, and it tells you they are outdated without you remembering to ask."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How often does it check?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Every six hours by default, and immediately whenever you pick Check now. The interval is configurable in globlin.json."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I remove it?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. There is no installer, no service and no scheduled task to clean up."
+            }
+          }
+        ]
+      }
+    </script>
+
     <style>
       :root {
         --bg: #0d1117;
@@ -382,6 +447,172 @@
           gap: 8px;
         }
       }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 24px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 1.05rem;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .states {
+        display: grid;
+        gap: 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .states li {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 16px 20px;
+      }
+
+      .states img {
+        width: 32px;
+        height: 32px;
+        flex: none;
+      }
+
+      .states strong {
+        display: block;
+      }
+
+      .states span {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .steps {
+        counter-reset: step;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 20px;
+      }
+
+      .steps li {
+        counter-increment: step;
+        position: relative;
+        padding-left: 52px;
+        color: var(--muted);
+      }
+
+      .steps li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: -2px;
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--emerald);
+        font-family: var(--mono);
+        font-size: 0.9rem;
+      }
+
+      .steps strong {
+        color: var(--text);
+        display: block;
+      }
+
+      .steps + .hero-actions {
+        margin-top: 36px;
+      }
+
+      .faq details {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 18px 22px;
+      }
+
+      .faq details + details {
+        margin-top: 12px;
+      }
+
+      .faq summary {
+        cursor: pointer;
+        font-weight: 600;
+        list-style: none;
+      }
+
+      .faq summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .faq summary::after {
+        content: "+";
+        float: right;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+
+      .faq details[open] summary::after {
+        content: "−";
+      }
+
+      .faq p {
+        margin: 12px 0 0;
+        color: var(--muted);
+      }
+
+      .site-footer {
+        border-top: 1px solid var(--border);
+        padding: 44px 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .site-footer .shell {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px 28px;
+        align-items: center;
+      }
+
+      .site-footer nav {
+        margin-left: auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 0.92em;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 6px;
+      }
     </style>
   </head>
   <body>
@@ -484,7 +715,164 @@
           </div>
         </div>
       </section>
+
+      <section class="section" id="features">
+        <div class="shell">
+          <p class="eyebrow">Features</p>
+          <h2>It watches, it tells you, it waits for your click</h2>
+          <p class="lede">Globlin never touches anything on its own unless you turn that on.</p>
+          <div class="grid">
+            <article class="card">
+              <h3>npm and bun, side by side</h3>
+              <p>
+                Both package managers are checked. The same package installed under both stays
+                distinguishable — the bun copy is suffixed <code>(bun)</code>.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Update one, or update all</h3>
+              <p>
+                A row updates a single package. Update all runs the outdated ones as a queue with a
+                counter, a progress bar on the active row, and a result on each finished row.
+              </p>
+            </article>
+            <article class="card">
+              <h3>An ignore list that costs nothing</h3>
+              <p>
+                Ignored packages still show their version but are never checked, flagged or notified
+                about. Untick one and it is re-checked immediately.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Uninstall without a dialog</h3>
+              <p>
+                Every row offers Uninstall, which opens onto a single confirm item. The two steps are the
+                confirmation — the outer entry does nothing on its own.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Notifications only when something changes</h3>
+              <p>
+                A toast fires when the set of outdated packages changes, not every six hours about the
+                same three packages.
+              </p>
+            </article>
+            <article class="card">
+              <h3>It updates itself, verified</h3>
+              <p>
+                Globlin checks its own releases on the same schedule. Every download is checked against a
+                published SHA-256 sum, and a mismatch is discarded without touching the running app.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="states">
+        <div class="shell">
+          <p class="eyebrow">Icon states</p>
+          <h2>The colour is the status</h2>
+          <p class="lede">
+            The tray icon is drawn from code, not loaded from an image file, so what it shows always
+            matches what it found.
+          </p>
+          <ul class="states">
+            <li>
+              <img src="/img/icon-idle.png" width="32" height="32" alt="Emerald tray icon">
+              <span><strong>Idle — emerald</strong> Everything installed is current.</span>
+            </li>
+            <li>
+              <img src="/img/icon-updates.png" width="32" height="32" alt="Amber tray icon">
+              <span><strong>Updates — amber</strong> One or more packages are behind.</span>
+            </li>
+            <li>
+              <img src="/img/icon-error.png" width="32" height="32" alt="Red tray icon">
+              <span><strong>Error — red</strong> The last registry check failed. A failure never renders as &ldquo;everything is fine&rdquo;.</span>
+            </li>
+            <li>
+              <img src="/img/icon-busy.png" width="32" height="32" alt="Sky blue tray icon">
+              <span><strong>Busy — sky blue</strong> A check or an update is running, filling like a glass.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section" id="install">
+        <div class="shell">
+          <p class="eyebrow">Install</p>
+          <h2>Two steps, no installer</h2>
+          <ol class="steps">
+            <li>
+              <strong>Download globlin.exe</strong>
+              One file, 1.7 MB, nothing to unzip.
+            </li>
+            <li>
+              <strong>Run it</strong>
+              The icon appears in the tray and the first check starts. The config lives next to the exe,
+              so the whole thing is portable — move it anywhere and it keeps working.
+            </li>
+            <li>
+              <strong>Optional: tick Run at startup</strong>
+              Right-click the tray icon if you want it there every time you log in.
+            </li>
+          </ol>
+          <div class="hero-actions">
+            <a class="button button-primary" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin.exe" rel="nofollow">
+              Download for Windows
+            </a>
+            <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases">All releases</a>
+          </div>
+          <p class="download-note">globlin.exe · <span data-version>latest</span> · Windows 10 and 11</p>
+        </div>
+      </section>
+
+      <section class="section faq" id="faq">
+        <div class="shell">
+          <p class="eyebrow">FAQ</p>
+          <h2>Questions worth answering</h2>
+          <details>
+            <summary>Is Globlin free?</summary>
+            <p>Yes. Globlin is free and open source under the GNU General Public License v3.0. There is no paid tier, no account, and no telemetry.</p>
+          </details>
+          <details>
+            <summary>Does it work on macOS or Linux?</summary>
+            <p>Not today. Globlin is Windows only — it is built around the Windows tray and ships as a single portable .exe for Windows 10 and 11.</p>
+          </details>
+          <details>
+            <summary>Do I need Node.js installed?</summary>
+            <p>Globlin itself has no runtime dependencies, but it drives the npm or bun that is already on your machine. If neither is installed there is nothing for it to check.</p>
+          </details>
+          <details>
+            <summary>Will it update anything without asking?</summary>
+            <p>No. Packages are only ever updated when you click. Globlin can update itself unattended, but that setting is off by default and applies to Globlin alone.</p>
+          </details>
+          <details>
+            <summary>How is this different from npm-check-updates?</summary>
+            <p>npm-check-updates is a command you run by hand against a project's package.json. Globlin is a background tray app for the CLIs you installed globally, and it tells you they are outdated without you remembering to ask.</p>
+          </details>
+          <details>
+            <summary>How often does it check?</summary>
+            <p>Every six hours by default, and immediately whenever you pick Check now. The interval is configurable in globlin.json.</p>
+          </details>
+          <details>
+            <summary>How do I remove it?</summary>
+            <p>Quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. There is no installer, no service and no scheduled task to clean up.</p>
+          </details>
+        </div>
+      </section>
     </main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <span>Globlin — Copyright © 2026 TOR968. GPL-3.0.</span>
+        <nav>
+          <a href="https://github.com/TOR968/Globlin">GitHub</a>
+          <a href="https://github.com/TOR968/Globlin/releases">Releases</a>
+          <a href="https://github.com/TOR968/Globlin/blob/master/CHANGELOG.md">Changelog</a>
+          <a href="https://github.com/TOR968/Globlin/issues">Report an issue</a>
+        </nav>
+      </div>
+    </footer>
 
     <script>
       fetch("https://api.github.com/repos/TOR968/Globlin/releases/latest", {
