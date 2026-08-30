@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://globlin.pages.dev/sitemap.xml
