@@ -1,0 +1,25 @@
+# Globlin
+
+> A Windows tray app that watches your globally installed npm and bun packages and tells you the moment one falls behind. One click to update, no installer, a single portable 1.7 MB .exe, free and open source under GPL-3.0.
+
+Global command-line tools installed with `npm install -g` or `bun add -g` go stale silently — nothing tells you a CLI is six versions behind until a command breaks. Globlin sits in the Windows tray, checks the registry on a schedule (every six hours by default), and shows exactly which packages are outdated. Clicking a row updates that package; Update all runs the outdated ones as a queue.
+
+It never updates a package on its own. It can update itself unattended, but that setting is off by default and every download is verified against a published SHA-256 checksum before anything is replaced. Packages can be ignored, and an ignored package still shows its version but is never checked or notified about. A desktop notification fires only when the set of outdated packages changes.
+
+Globlin needs no runtime of its own — it drives whatever npm or bun is already installed. Windows 10 and 11 only; there is no macOS or Linux build. Configuration lives in `globlin.json` next to the executable, which makes the whole thing portable.
+
+## Download
+
+- [Latest release](https://github.com/TOR968/Globlin/releases/latest): `globlin.exe` and its `.sha256`
+- [All releases](https://github.com/TOR968/Globlin/releases)
+
+## Documentation
+
+- [README](https://github.com/TOR968/Globlin/blob/master/README.md): what it does, install, the tray menu, icon states, configuration, diagnostics, and how to remove it
+- [Development notes](https://github.com/TOR968/Globlin/blob/master/docs/DEVELOPMENT.md): architecture, the verified environment workarounds, self-update mechanics, tests, lints, and the release machinery
+- [Changelog](https://github.com/TOR968/Globlin/blob/master/CHANGELOG.md)
+
+## Source
+
+- [Repository](https://github.com/TOR968/Globlin): Rust, Windows-only, GPL-3.0
+- [Issues](https://github.com/TOR968/Globlin/issues)
