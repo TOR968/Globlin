@@ -331,9 +331,12 @@ per-release report is what turns "trust me" into a number they can check against
 
 `.github/virustotal-scan.ps1` does the work: `POST /api/v3/files`, then poll `GET /api/v3/analyses/{id}`
 every 20 seconds until the status is `completed`, then emit a markdown section naming the flagged count.
-The denominator sums `malicious`, `suspicious`, `undetected`, `harmless`, `timeout` and `failure` from
-`stats`, deliberately excluding `type-unsupported` — that is what makes the number agree with the ratio
-the VirusTotal web report shows.
+The denominator counts only the four `stats` buckets that represent an actual verdict — `malicious`,
+`suspicious`, `undetected` and `harmless`. `type-unsupported`, `timeout` and `failure` are engines that
+did not answer, and VirusTotal leaves them out of the ratio its own report shows. The first release to
+run this, v0.2.6, is what settled it: including `timeout` reported `3 of 71` against a report that read
+`3 of 70`, and a number that disagrees with the link beside it undermines the one thing the section is
+for.
 
 Three things about it are deliberate:
 
