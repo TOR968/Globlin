@@ -26,10 +26,12 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>, frame: u32)
         packages,
         activity,
         autostart: false,
-        auto_update: false,
-        release: None,
+        self_update: SelfUpdate::Own {
+            release: None,
+            auto_update: false,
+            log: false,
+        },
         pending_restart: None,
-        self_log: false,
         frame,
         elapsed: Duration::ZERO,
     }
@@ -40,10 +42,12 @@ fn updating_view(activity: &Activity, elapsed: Duration) -> View<'_> {
         packages: &[],
         activity: Some(activity),
         autostart: false,
-        auto_update: false,
-        release: None,
+        self_update: SelfUpdate::Own {
+            release: None,
+            auto_update: false,
+            log: false,
+        },
         pending_restart: None,
-        self_log: false,
         frame: 0,
         elapsed,
     }
@@ -384,10 +388,12 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
         packages: &[],
         activity: None,
         autostart: false,
-        auto_update: true,
-        release: Some(&release),
+        self_update: SelfUpdate::Own {
+            release: Some(&release),
+            auto_update: true,
+            log: true,
+        },
         pending_restart: Some(&pending_restart),
-        self_log: true,
         frame: 0,
         elapsed: Duration::ZERO,
     };
@@ -421,6 +427,54 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
     assert!(self_block_ids.contains(&ID_UPDATE_SELF.to_string()));
     assert!(self_block_ids.contains(&ID_AUTO_UPDATE.to_string()));
     assert!(self_block_ids.contains(&ID_OPEN_SELF_LOG.to_string()));
+}
+
+#[test]
+fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
+    let winget_view = View {
+        packages: &[],
+        activity: None,
+        autostart: false,
+        self_update: SelfUpdate::Winget,
+        pending_restart: None,
+        frame: 0,
+        elapsed: Duration::ZERO,
+    };
+
+    let built = build(&winget_view).unwrap();
+    let top_level = built.menu.items();
+    let self_block = top_level
+        .iter()
+        .filter_map(|item| item.as_submenu())
+        .find(|submenu| submenu.text().starts_with("Globlin v"))
+        .expect("expected a submenu labelled with the running version");
+
+    let items = self_block.items();
+    let ids: Vec<String> = items
+        .iter()
+        .map(|item| item.id().as_ref().to_string())
+        .collect();
+    assert!(
+        !ids.contains(&ID_UPDATE_SELF.to_string()),
+        "winget owns the binary, so Globlin must not offer to replace it: {ids:?}"
+    );
+    assert!(
+        !ids.contains(&ID_AUTO_UPDATE.to_string()),
+        "an auto-update toggle that cannot act would be a lie: {ids:?}"
+    );
+    assert!(
+        !ids.contains(&ID_OPEN_SELF_LOG.to_string()),
+        "there is no self-update log when self-update never runs: {ids:?}"
+    );
+
+    let texts: Vec<String> = items
+        .iter()
+        .filter_map(|item| item.as_menuitem().map(tray_icon::menu::MenuItem::text))
+        .collect();
+    assert!(
+        texts.iter().any(|text| text.contains("winget")),
+        "the submenu should say where updates come from instead: {texts:?}"
+    );
 }
 
 fn confirm_ids(built: &Built) -> Vec<String> {

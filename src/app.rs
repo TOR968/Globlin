@@ -8,10 +8,11 @@ use tray_icon::menu::MenuEvent;
 use crate::check::{self, Report};
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
+use crate::install;
 use crate::model::{self, Activity, Batch, Package, RemoveTarget, Status, UpdateTarget};
 use crate::remove;
 use crate::selfupdate::{self, Release};
-use crate::tray::{Action, Tray, View};
+use crate::tray::{Action, SelfUpdate, Tray, View};
 use crate::update::{self, Outcome, Step};
 use crate::{diagnostics, notice, platform, progress, Message, Result};
 
@@ -471,11 +472,17 @@ fn view_of<'a>(
     View {
         packages,
         activity,
-        release,
+        self_update: if install::winget_managed() {
+            SelfUpdate::Winget
+        } else {
+            SelfUpdate::Own {
+                release,
+                auto_update,
+                log: diagnostics::self_update_log_path().is_file(),
+            }
+        },
         pending_restart,
-        self_log: diagnostics::self_update_log_path().is_file(),
         autostart: platform::autostart_enabled(),
-        auto_update,
         frame,
         elapsed,
     }

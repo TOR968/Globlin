@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::install;
 use crate::platform;
 use crate::Result;
 
@@ -123,6 +124,9 @@ fn candidate_paths() -> Vec<PathBuf> {
 }
 
 fn exe_dir() -> Option<PathBuf> {
+    if install::winget_managed() {
+        return None;
+    }
     std::env::current_exe().ok()?.parent().map(PathBuf::from)
 }
 
