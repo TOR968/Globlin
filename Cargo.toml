@@ -3,6 +3,10 @@ name = "globlin"
 version = "0.2.6"
 edition = "2021"
 license = "GPL-3.0-or-later"
+description = "Watches your global npm and bun packages and tells you when one falls behind"
+authors = ["TOR968"]
+repository = "https://github.com/TOR968/Globlin"
+homepage = "https://globlin.pages.dev"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
