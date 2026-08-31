@@ -109,6 +109,22 @@ Verified against `site/img/og.png` on Python 3.14.4, which printed
 `(1200 * 4 + 1) * 630`, the filtered-row stride times the height, which is what a correctly-shaped stream
 inflates to regardless of what the encoder's own reader would have accepted.
 
+### The version resource
+
+`build.rs` fills the Win32 VERSIONINFO block, not only the icon. `winresource` derives `ProductName` from
+the crate name and both version fields from `package.version`, and leaves `CompanyName`, `LegalCopyright`,
+`OriginalFilename` and `InternalName` empty unless they are set; `FileDescription` did not pick up
+`package.description` either, so all five are stated explicitly rather than derived.
+
+The reason is the antivirus problem described under [the VirusTotal scan](#the-virustotal-scan). An empty
+version resource is one of the cheap static features heuristic engines weigh, because legitimate software
+fills it in and malware usually does not. It is a small weight next to *unsigned* and *replaces its own
+executable*, and on its own it will not clear a `Wacatac!ml` verdict — but it is the only one of those
+features that can be fixed without removing something Globlin exists to do.
+
+`FileDescription` is the string Task Manager shows in its process list, so it reads as a phrase rather
+than as the bare crate name.
+
 ### Environment workarounds
 
 Three things about the environment the code has to work around, all verified rather than assumed:
