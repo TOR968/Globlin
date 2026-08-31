@@ -46,14 +46,22 @@ pub struct Built {
     pub rows: Vec<MenuItem>,
 }
 
+#[derive(Clone, Copy)]
+pub enum SelfUpdate<'a> {
+    Winget,
+    Own {
+        release: Option<&'a Release>,
+        auto_update: bool,
+        log: bool,
+    },
+}
+
 pub struct View<'a> {
     pub packages: &'a [Package],
     pub activity: Option<&'a Activity>,
     pub autostart: bool,
-    pub auto_update: bool,
-    pub release: Option<&'a Release>,
+    pub self_update: SelfUpdate<'a>,
     pub pending_restart: Option<&'a Version>,
-    pub self_log: bool,
     pub frame: u32,
     pub elapsed: Duration,
 }
@@ -244,7 +252,20 @@ fn target_label(target: &UpdateTarget, marker: char) -> String {
 
 fn self_block(view: &View, busy: bool) -> Result<Submenu> {
     let entry = Submenu::new(format!("Globlin v{}", env!("CARGO_PKG_VERSION")), true);
-    if let Some(release) = view.release {
+    let SelfUpdate::Own {
+        release,
+        auto_update,
+        log,
+    } = view.self_update
+    else {
+        entry.append(&MenuItem::new(
+            "Installed with winget — run winget upgrade",
+            false,
+            None,
+        ))?;
+        return Ok(entry);
+    };
+    if let Some(release) = release {
         entry.append(&MenuItem::with_id(
             ID_UPDATE_SELF,
             self_update_text(release),
@@ -264,10 +285,10 @@ fn self_block(view: &View, busy: bool) -> Result<Submenu> {
         ID_AUTO_UPDATE,
         "Auto-update Globlin",
         true,
-        view.auto_update,
+        auto_update,
         None,
     ))?;
-    if view.self_log {
+    if log {
         entry.append(&MenuItem::with_id(
             ID_OPEN_SELF_LOG,
             "Open Globlin-update log",

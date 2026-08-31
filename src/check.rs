@@ -4,6 +4,7 @@ use semver::Version;
 
 use crate::config::Config;
 use crate::diagnostics;
+use crate::install;
 use crate::model::{Installed, Package, Status};
 use crate::registry;
 use crate::selfupdate::{self, Release};
@@ -17,7 +18,11 @@ pub struct Report {
 }
 
 pub fn run(config: &Config) -> Report {
-    let release = look_up_release(selfupdate::latest());
+    let release = if install::winget_managed() {
+        None
+    } else {
+        look_up_release(selfupdate::latest())
+    };
     Report {
         packages: collect_packages(config),
         release,

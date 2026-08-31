@@ -5,6 +5,7 @@ mod check;
 mod config;
 mod diagnostics;
 mod icon;
+mod install;
 mod model;
 mod notice;
 mod platform;

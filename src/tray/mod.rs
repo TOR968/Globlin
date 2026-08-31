@@ -6,7 +6,7 @@ use crate::Result;
 
 mod menu;
 
-pub use menu::{Action, View};
+pub use menu::{Action, SelfUpdate, View};
 
 pub struct Tray {
     icon: TrayIcon,
@@ -20,10 +20,12 @@ impl Tray {
             packages: &[],
             activity: None,
             autostart: false,
-            auto_update: false,
-            release: None,
+            self_update: SelfUpdate::Own {
+                release: None,
+                auto_update: false,
+                log: false,
+            },
             pending_restart: None,
-            self_log: false,
             frame: 0,
             elapsed: std::time::Duration::ZERO,
         };

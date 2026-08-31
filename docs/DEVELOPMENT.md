@@ -221,6 +221,37 @@ A successful swap restarts the app itself: it spawns the new `.exe` with `--repl
 process waits up to 10 seconds (50 attempts, 200 ms apart) for the single-instance mutex the old process is
 still holding while it shuts down, then raises a `Globlin — updated / now running <version>` toast.
 
+### When winget owns the binary
+
+`install::winget_managed()` answers one question — is this `.exe` running from a directory a package
+manager controls — and two unrelated behaviours hang off it. The predicate is deliberately dumb: the exe
+path contains the adjacent components `WinGet` and `Packages`, matched case-insensitively. That covers the
+user-scope `%LOCALAPPDATA%\Microsoft\WinGet\Packages\` and the machine-scope
+`%PROGRAMFILES%\WinGet\Packages\` without reading either environment variable, and it deliberately does
+not match the shim in `WinGet\Links\`, which is not where the real binary lives. `is_winget_path` takes
+the path as an argument so all of that is unit-testable; `winget_managed` is the one-line wrapper that
+calls `current_exe`.
+
+**The config would otherwise be destroyed on every upgrade.** Globlin is portable: `config::candidate_paths`
+tries `globlin.json` next to the exe first, for both reading and writing, and falls back to
+`%LOCALAPPDATA%\globlin\`. A winget package directory is user-writable, so the config would land inside it
+— and `winget upgrade` deletes that directory and lays down a new one. The ignore list, `auto_update` and
+`last_notified` would silently reset on every upgrade. `exe_dir` therefore returns `None` when the install
+is winget-managed, which drops the first candidate and leaves `%LOCALAPPDATA%` as the only home.
+
+**Self-update is switched off, not merely hidden.** Two installers racing for the same `.exe` is worse than
+either alone: Globlin replaces itself with 0.3.0, winget still records 0.2.5 as installed, and the next
+`winget upgrade --all` cheerfully overwrites the newer binary with the older one. So `check::run` skips the
+release lookup entirely — no network call, no `Release`, nothing for the auto-update path to act on — and
+the menu says `Installed with winget — run winget upgrade` in place of the update row.
+
+That menu change is why `View` carries a `SelfUpdate` enum rather than another `bool`. Adding a fifth flag
+to a struct that already had four tripped `clippy::struct_excessive_bools`, and the lint was right: the two
+cases are alternatives, not independent switches. `SelfUpdate::Winget` has no fields, and
+`SelfUpdate::Own { release, auto_update, log }` groups the three fields that only mean anything when
+Globlin manages itself — so the auto-update checkbox cannot be rendered in a state where ticking it would
+do nothing.
+
 ## Tests
 
 ```
