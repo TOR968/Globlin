@@ -7,6 +7,22 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6](https://github.com/TOR968/Globlin/compare/v0.2.5...v0.2.6) - 2026-08-31
+
+### Added
+
+- stand down when winget owns the binary ([#23](https://github.com/TOR968/Globlin/pull/23))
+
+### Other
+
+- Microsoft removed the Defender detection ([#22](https://github.com/TOR968/Globlin/pull/22))
+- scan each release with VirusTotal and link the report from the notes
+- explain the antivirus false positive in the README
+- stop landing-page commits from proposing a release
+- *(icon)* correct the test counts in CLAUDE.md
+- *(icon)* tighten the PNG bit writer and the Open Graph card tests
+- *(icon)* compress the generated PNGs with fixed-Huffman deflate
+
 ## [0.2.5](https://github.com/TOR968/Globlin/compare/v0.2.4...v0.2.5) - 2026-08-29
 
 ### Added
