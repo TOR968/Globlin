@@ -68,7 +68,7 @@ if (-not $stats) {
 
 $flagged = [int] $stats.malicious + [int] $stats.suspicious
 $total = 0
-foreach ($name in 'malicious', 'suspicious', 'undetected', 'harmless', 'timeout', 'failure') {
+foreach ($name in 'malicious', 'suspicious', 'undetected', 'harmless') {
     $total += [int] $stats.$name
 }
 
