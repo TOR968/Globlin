@@ -1,6 +1,6 @@
 # Globlin
 
-> A Windows tray app that watches your globally installed npm and bun packages and tells you the moment one falls behind. One click to update, no installer, a single portable 1.7 MB .exe, free and open source under GPL-3.0.
+> A Windows tray app that watches your globally installed npm and bun packages and tells you the moment one falls behind. One click to update, no installer, a single portable 2.8 MB .exe, free and open source under GPL-3.0.
 
 Global command-line tools installed with `npm install -g` or `bun add -g` go stale silently — nothing tells you a CLI is six versions behind until a command breaks. Globlin sits in the Windows tray, checks the registry on a schedule (every six hours by default), and shows exactly which packages are outdated. Clicking a row updates that package; Update all runs the outdated ones as a queue.
 

@@ -125,6 +125,40 @@ features that can be fixed without removing something Globlin exists to do.
 `FileDescription` is the string Task Manager shows in its process list, so it reads as a phrase rather
 than as the bare crate name.
 
+### The release profile is an antivirus decision
+
+`[profile.release]` is `opt-level = 3`, `lto = true`, `codegen-units = 1` — and deliberately *not*
+`opt-level = "z"`, `panic = "abort"`, `strip = true`, which is what it used up to v0.2.7. The size-tuned
+profile produced a binary that Microsoft, McAfee and SecureAge flagged; the conventional one does not.
+
+This was measured, not guessed. Three builds of identical source were compared:
+
+| profile | size | entropy | VirusTotal |
+|---|---|---|---|
+| `opt-level = "z"`, `strip`, `panic = "abort"` | 1,758,208 | 6.736 | 3 of 71 |
+| the same, minus `strip` | 1,761,280 | 6.733 | not submitted |
+| `opt-level = 3`, no `strip`, unwind | 2,885,120 | 6.597 | **0 of 71** |
+
+The three that flagged the size-tuned build were Microsoft (`Trojan:Win32/Wacatac.C!ml`), McAfee
+(`Trojan:Win/Malwarex.EFM`) and SecureAge (`Malicious`). The middle build was not submitted because it
+sits 3 KB from a known-flagged one, which makes its verdict predictable and uninformative.
+
+`strip` turned out to be a red herring: under MSVC the debug information lives in a separate `.pdb`, so
+stripping removes 3 KB and changes nothing a scanner sees. `opt-level` is the variable that matters, and
+it is also the one that sets the size — there is no setting that is both 1.7 MB and unflagged.
+
+Two earlier theories were wrong and are recorded here so they are not retried. The verdict was never about
+behaviour: VirusTotal does not run the file, so the `HKCU` `Run` key, the `npm` child process and the
+self-replacing update never entered into it. And [filling the version resource](#the-version-resource),
+tested on its own in v0.2.7, moved nothing — 3 of 71 before and after. What the models react to is the
+static shape of a small, dense, size-optimised binary, which is also the shape of packed malware.
+
+The trade is 1.7 MB → 2.8 MB. For a tray application that is not a cost worth a false positive. Do not
+reintroduce the size-tuned settings without re-running the comparison; the numbers above are the baseline
+to beat. Note also that Rust builds are not byte-reproducible across build directories, so a release build
+will not hash-match the variant tested here — the [VirusTotal step](#the-virustotal-scan) in `release.yml`
+is what confirms each published artifact.
+
 ### Environment workarounds
 
 Three things about the environment the code has to work around, all verified rather than assumed:
