@@ -1,6 +1,6 @@
 [package]
 name = "globlin"
-version = "0.2.8"
+version = "0.2.9"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "Watches your global npm and bun packages and tells you when one falls behind"
