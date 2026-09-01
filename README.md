@@ -33,50 +33,39 @@ Right-click the tray icon and tick **Run at startup** if you want it running eve
 
 <details>
 <summary><strong>If Windows Defender flags the download</strong> —
-an unsigned new binary has no reputation</summary>
+what it was, and what fixed it</summary>
 
 <br>
 
-Defender used to quarantine `globlin.exe` on download as `Trojan:Win32/Wacatac.B!ml` or
-`Program:Win32/Wacapew.C!ml`. The `!ml` suffix is the tell: no signature matched, a machine-learning model
-guessed. **Microsoft reviewed the build and removed the detection**, so if your Defender still objects its
-definitions are behind — update them from an elevated PowerShell and rescan:
+Releases up to v0.2.7 were flagged by a few engines, and Defender quarantined the download as
+`Trojan:Win32/Wacatac.B!ml`. The `!ml` suffix is the tell: no signature matched, a machine-learning model
+guessed.
 
-```powershell
-Update-MpSignature
-```
+**The cause was not what Globlin does.** A scanner never runs the file — it reads its shape. The release
+profile was tuned for a small binary, which produced 1.7 MB of unusually dense code, and small dense
+executables are what packed malware looks like. Nothing here was packed, compressed or hidden; it merely
+resembled something that is.
 
-Two of the seventy-one engines on VirusTotal still flag v0.2.5
-([the report](https://www.virustotal.com/gui/file/8d57490fe20f689b25907bb97a9998e70fb9cb6b1b256047f04d968b8a2036ef)),
-McAfee and SecureAge, both on heuristics. Bitdefender, Avast, AVG, CrowdStrike and the other sixty-eight
-read it as clean. Every release links its own report from its notes, and every detection is reported as a
-false positive.
+Building with a conventional profile settled it: the binary is now 2.8 MB, and three of the four engines
+stopped objecting. The identical source, built the size-tuned way, still draws them — that comparison and
+its numbers are in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#the-release-profile-is-an-antivirus-decision).
 
-Nothing about the build is hidden, but several of the things Globlin exists to do look, taken one at a
-time, exactly like malware:
+Microsoft flags some builds and not others, because an unsigned binary of this shape sits close to the
+model's line. If yours objects:
 
-- **It survives a reboot.** *Run at startup* writes a value under the `HKCU` `Run` key — the same key a
-  persistent implant would want.
-- **It launches other programs.** Every update runs `npm install -g` or the bun equivalent as a child
-  process, with no console window.
-- **It talks to the network unprompted.** `registry.npmjs.org` for `dist-tags`, `api.github.com` for its
-  own release check, on a schedule you didn't trigger.
-- **It rewrites its own executable.** [Self-update](#keeping-itself-updated) downloads a new build and
-  swaps the running `.exe` on disk. Very little legitimate software does this.
-- **It has no window.** A GUI-subsystem binary that never opens one is, to a classifier, a binary hiding.
-- **It is unsigned and new.** No code-signing certificate and few downloads means no reputation to weigh
-  against any of the above.
+1. **Update your definitions** from an elevated PowerShell and rescan. Microsoft has reviewed Globlin
+   before and removed the detection on request.
 
-What to do about it, in order of paranoia:
+   ```powershell
+   Update-MpSignature
+   ```
 
-1. **Update your definitions** with the command above, and rescan. That alone settles the Defender case.
-2. **Check the hash.** Every release publishes `globlin.exe.sha256` next to the `.exe`. Run
-   `Get-FileHash globlin.exe` and compare — if it matches, the file is the one CI built from this
-   repository, and the detection is about behaviour, not about a tampered download.
-3. **Paste that hash into [VirusTotal](https://www.virustotal.com/)** and see the full engine spread
-   rather than one engine's guess.
-4. **Restore it from quarantine**, or exclude the folder you keep it in, once you're satisfied.
-5. **Build it yourself** — see *Building from source* below. The source is all here and
+2. **Check the hash.** Every release publishes `globlin.exe.sha256` beside the `.exe`. Run
+   `Get-FileHash globlin.exe` and compare — a match means the file is the one CI built from this
+   repository and nothing altered the download.
+3. **Read the VirusTotal report** linked from that release's notes. CI uploads every build as it is
+   published, so you get the full engine spread rather than one engine's guess.
+4. **Build it yourself** — see *Building from source* below. The source is all here and
    `cargo build --release` is the whole of it.
 
 </details>
