@@ -150,12 +150,31 @@ it is also the one that sets the size — there is no setting that is both 1.7 M
 Two earlier theories were wrong and are recorded here so they are not retried. The verdict was never about
 behaviour: VirusTotal does not run the file, so the `HKCU` `Run` key, the `npm` child process and the
 self-replacing update never entered into it. And [filling the version resource](#the-version-resource),
-tested on its own in v0.2.7, moved nothing — 3 of 71 before and after. What the models react to is the
-static shape of a small, dense, size-optimised binary, which is also the shape of packed malware.
+tested on its own in v0.2.7, moved nothing — 3 of 71 before and after.
+
+The mechanism is worth stating carefully, because the obvious reading of the table is wrong.
+`opt-level = "z"` is not itself a red flag. [Claude-Code-Usage-Monitor][ccum], an unsigned Rust tray app
+that ships on winget, uses the whole size-tuned set — `opt-level = "z"`, `lto`, `strip`,
+`codegen-units = 1`, `panic = "abort"` — and is not flagged. Its binary is 7.3 MB. Ours was 1.7.
+
+[ccum]: https://github.com/CodeZeno/Claude-Code-Usage-Monitor
+What the models react to is a *small* dense executable, which is the shape of packed malware; the profile
+matters only because it is what sets the size. Anything that shrinks this binary back toward 1.7 MB is
+likely to bring the detections back, whatever setting achieves it.
 
 The trade is 1.7 MB → 2.8 MB. For a tray application that is not a cost worth a false positive. Do not
 reintroduce the size-tuned settings without re-running the comparison; the numbers above are the baseline
 to beat.
+
+**`panic = "abort"` is not free to restore, for a reason unrelated to scanning.** `App` sets
+`activity = Some(..)` on the main thread before spawning a worker, and clears it only when the worker's
+terminal `Message` arrives (`app.rs:170`, cleared at `app.rs:312`). Under `abort` a panic in a worker
+takes the process down — loud, and obvious to the user. Under unwind it kills only that thread: the
+message is never sent, `activity` stays `Some` forever, `start_check` and `start_update` return early
+from then on, and `next_wake` stays pinned at `now + 120 ms`, so the app spins at 8 fps doing nothing
+until it is killed. A silent permanent hang is worse than a crash. The exposure is small — the only
+`unwrap` outside tests and `icon/` writes to a `String` and cannot fail — but if `panic = "abort"` is ever
+restored, or a fallible `unwrap` is added to a worker path, that interaction is what to think about.
 
 `rust-toolchain.toml` pins the compiler for the same reason. v0.2.8 shipped at 2,878,976 bytes while the
 build measured at 0 of 71 was 2,885,120 — 6 KB apart, and not because of the paths baked into the binary,
