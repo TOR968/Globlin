@@ -21,7 +21,7 @@ command breaks in a way that turns out to be "oh, I'm ancient." Globlin sits in 
 registry on a schedule, and shows you exactly what's behind. Click a package to update it, or update
 everything at once. It never touches anything on its own unless you turn that on.
 
-Single portable `.exe`, ~1.7 MB, no installer, no runtime dependencies, Windows only.
+Single portable `.exe`, ~2.8 MB, no installer, no runtime dependencies, Windows only.
 
 ## Install
 
