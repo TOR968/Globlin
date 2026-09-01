@@ -155,9 +155,16 @@ static shape of a small, dense, size-optimised binary, which is also the shape o
 
 The trade is 1.7 MB → 2.8 MB. For a tray application that is not a cost worth a false positive. Do not
 reintroduce the size-tuned settings without re-running the comparison; the numbers above are the baseline
-to beat. Note also that Rust builds are not byte-reproducible across build directories, so a release build
-will not hash-match the variant tested here — the [VirusTotal step](#the-virustotal-scan) in `release.yml`
-is what confirms each published artifact.
+to beat.
+
+`rust-toolchain.toml` pins the compiler for the same reason. v0.2.8 shipped at 2,878,976 bytes while the
+build measured at 0 of 71 was 2,885,120 — 6 KB apart, and not because of the paths baked into the binary,
+since the CI checkout path is *longer* than a typical local checkout and would have made the file
+bigger, not smaller. Neither workflow installed a toolchain, so both took whatever rustc the
+runner image happened to carry, and a different compiler lays out code differently. Without the pin the
+artifact that gets scanned is not the artifact that was tested, and the shipped binary changes whenever
+GitHub refreshes the image. Bumping the channel is a deliberate act: treat it as a change to the released
+binary and watch the next scan.
 
 ### Environment workarounds
 
