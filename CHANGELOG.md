@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9](https://github.com/TOR968/Globlin/compare/v0.2.8...v0.2.9) - 2026-09-01
+
+### Fixed
+
+- pin the Rust toolchain so the scanned build is the tested build ([#30](https://github.com/TOR968/Globlin/pull/30))
+
 ## [0.2.8](https://github.com/TOR968/Globlin/compare/v0.2.7...v0.2.8) - 2026-09-01
 
 ### Fixed
