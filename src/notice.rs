@@ -30,8 +30,8 @@ pub fn decide(packages: &[Package], last_notified: &[String]) -> Decision {
 
 fn title(packages: &[Package]) -> String {
     match model::outdated(packages).len() {
-        1 => "1 npm global update".to_string(),
-        count => format!("{count} npm global updates"),
+        1 => "1 global update".to_string(),
+        count => format!("{count} global updates"),
     }
 }
 

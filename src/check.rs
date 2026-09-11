@@ -5,7 +5,7 @@ use semver::Version;
 use crate::config::Config;
 use crate::diagnostics;
 use crate::install;
-use crate::model::{Installed, Package, Status};
+use crate::model::{Catalog, Installed, Package, Status};
 use crate::registry;
 use crate::selfupdate::{self, Release};
 use crate::source::{self, PackageSource};
@@ -65,6 +65,7 @@ fn collect(sources: &[Box<dyn PackageSource>]) -> Result<Vec<Installed>> {
 fn lookup_names(installed: &[Installed], config: &Config) -> Vec<String> {
     installed
         .iter()
+        .filter(|item| item.source.catalog() == Catalog::Npm)
         .filter(|item| !config.is_ignored(&item.name))
         .map(|item| item.name.clone())
         .collect::<BTreeSet<String>>()
@@ -76,12 +77,9 @@ fn classify(installed: Installed, config: &Config, latest: &HashMap<String, Vers
     let status = if config.is_ignored(&installed.name) {
         Status::Ignored
     } else {
-        match latest.get(&installed.name) {
-            Some(available) if *available > installed.version => Status::Outdated {
-                latest: available.clone(),
-            },
-            Some(_) => Status::Current,
-            None => Status::Unknown,
+        match installed.source.catalog() {
+            Catalog::SelfReported => self_reported(installed.available.as_deref()),
+            Catalog::Npm => from_registry(&installed, latest),
         }
     };
     Package {
@@ -89,6 +87,28 @@ fn classify(installed: Installed, config: &Config, latest: &HashMap<String, Vers
         current: installed.version,
         source: installed.source,
         status,
+    }
+}
+
+fn self_reported(available: Option<&str>) -> Status {
+    available.map_or(Status::Current, |latest| Status::Outdated {
+        latest: latest.to_string(),
+    })
+}
+
+fn from_registry(installed: &Installed, latest: &HashMap<String, Version>) -> Status {
+    let Some(available) = latest.get(&installed.name) else {
+        return Status::Unknown;
+    };
+    let Ok(current) = Version::parse(&installed.version) else {
+        return Status::Unknown;
+    };
+    if *available > current {
+        Status::Outdated {
+            latest: available.to_string(),
+        }
+    } else {
+        Status::Current
     }
 }
 

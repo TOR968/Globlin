@@ -2,11 +2,7 @@ use super::*;
 use crate::model::SourceKind;
 
 fn installed(name: &str, version: &str) -> Installed {
-    Installed {
-        name: name.to_string(),
-        version: Version::parse(version).unwrap(),
-        source: SourceKind::Npm,
-    }
+    Installed::new(name, version, SourceKind::Npm)
 }
 
 fn available(pairs: &[(&str, &str)]) -> HashMap<String, Version> {
@@ -26,7 +22,7 @@ fn a_newer_registry_version_marks_the_package_outdated() {
     assert_eq!(
         package.status,
         Status::Outdated {
-            latest: Version::parse("2.146.3").unwrap()
+            latest: "2.146.3".to_string()
         }
     );
 }
@@ -41,7 +37,7 @@ fn versions_compare_numerically_not_as_strings() {
     assert_eq!(
         package.status,
         Status::Outdated {
-            latest: Version::parse("2.10.0").unwrap()
+            latest: "2.10.0".to_string()
         }
     );
 }
@@ -99,11 +95,7 @@ fn ignored_packages_are_not_looked_up() {
 fn the_same_name_from_two_sources_is_looked_up_once() {
     let items = vec![
         installed("typescript", "7.0.2"),
-        Installed {
-            name: "typescript".to_string(),
-            version: Version::parse("5.9.3").unwrap(),
-            source: SourceKind::Bun,
-        },
+        Installed::new("typescript", "5.9.3", SourceKind::Bun),
     ];
     assert_eq!(
         lookup_names(&items, &Config::default()),
@@ -139,4 +131,56 @@ fn a_failed_package_check_still_carries_the_release() {
     };
     assert!(report.packages.is_err());
     assert_eq!(report.release, Some(release));
+}
+
+#[test]
+fn a_self_reporting_source_is_never_looked_up_in_the_npm_registry() {
+    let items = vec![
+        installed("prettier", "3.9.6"),
+        Installed::new("Git.Git", "2.44.0", SourceKind::Winget),
+    ];
+
+    assert_eq!(
+        lookup_names(&items, &Config::default()),
+        vec!["prettier".to_string()]
+    );
+}
+
+#[test]
+fn a_self_reported_upgrade_is_the_outdated_version() {
+    let package = classify(
+        Installed::new("Git.Git", "2.44.0", SourceKind::Winget)
+            .with_available(Some("2.47.1".to_string())),
+        &Config::default(),
+        &HashMap::new(),
+    );
+
+    assert_eq!(
+        package.status,
+        Status::Outdated {
+            latest: "2.47.1".to_string()
+        }
+    );
+}
+
+#[test]
+fn a_self_reporting_source_without_an_upgrade_is_current_not_unknown() {
+    let package = classify(
+        Installed::new("Git.Git", "2.44.0", SourceKind::Winget),
+        &Config::default(),
+        &HashMap::new(),
+    );
+
+    assert_eq!(package.status, Status::Current);
+}
+
+#[test]
+fn a_version_the_registry_answered_for_but_npm_reported_oddly_is_unknown() {
+    let package = classify(
+        Installed::new("prettier", "not-a-version", SourceKind::Npm),
+        &Config::default(),
+        &available(&[("prettier", "3.9.6")]),
+    );
+
+    assert_eq!(package.status, Status::Unknown);
 }

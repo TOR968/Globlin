@@ -3,7 +3,7 @@ name = "globlin"
 version = "0.2.9"
 edition = "2021"
 license = "GPL-3.0-or-later"
-description = "Watches your global npm and bun packages and tells you when one falls behind"
+description = "Watches your global npm, bun, pnpm, yarn, winget and choco packages and tells you when one falls behind"
 authors = ["TOR968"]
 repository = "https://github.com/TOR968/Globlin"
 homepage = "https://globlin.pages.dev"
@@ -24,6 +24,7 @@ semver = "1"
 winresource = "0.1"
 
 [target.'cfg(windows)'.dependencies]
+wry = { version = "0.57", default-features = false, features = ["os-webview"] }
 tauri-winrt-notification = "0.8"
 winreg = "0.56"
 windows-sys = { version = "0.61", features = [

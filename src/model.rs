@@ -1,31 +1,63 @@
-use semver::Version;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SourceKind {
     Npm,
     Bun,
+    Pnpm,
+    Yarn,
+    Winget,
+    Choco,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Catalog {
+    Npm,
+    SelfReported,
+}
+
+pub const KINDS: [SourceKind; 6] = [
+    SourceKind::Npm,
+    SourceKind::Bun,
+    SourceKind::Pnpm,
+    SourceKind::Yarn,
+    SourceKind::Winget,
+    SourceKind::Choco,
+];
 
 impl SourceKind {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Npm => "npm",
             Self::Bun => "bun",
+            Self::Pnpm => "pnpm",
+            Self::Yarn => "yarn",
+            Self::Winget => "winget",
+            Self::Choco => "choco",
         }
     }
 
     pub fn from_label(label: &str) -> Option<Self> {
-        match label {
-            "npm" => Some(Self::Npm),
-            "bun" => Some(Self::Bun),
-            _ => None,
+        KINDS.into_iter().find(|kind| kind.label() == label)
+    }
+
+    pub const fn catalog(self) -> Catalog {
+        match self {
+            Self::Npm | Self::Bun | Self::Pnpm | Self::Yarn => Catalog::Npm,
+            Self::Winget | Self::Choco => Catalog::SelfReported,
         }
+    }
+
+    pub const fn read_only(self) -> bool {
+        matches!(self.catalog(), Catalog::SelfReported)
     }
 
     pub const fn suffix(self) -> &'static str {
         match self {
             Self::Npm => "",
             Self::Bun => " (bun)",
+            Self::Pnpm => " (pnpm)",
+            Self::Yarn => " (yarn)",
+            Self::Winget => " (winget)",
+            Self::Choco => " (choco)",
         }
     }
 }
@@ -33,28 +65,57 @@ impl SourceKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Installed {
     pub name: String,
-    pub version: Version,
+    pub version: String,
     pub source: SourceKind,
+    pub available: Option<String>,
+}
+
+impl Installed {
+    pub fn new(name: impl Into<String>, version: impl Into<String>, source: SourceKind) -> Self {
+        Self {
+            name: name.into(),
+            version: version.into(),
+            source,
+            available: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_available(mut self, available: Option<String>) -> Self {
+        self.available = available;
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Status {
     Current,
-    Outdated { latest: Version },
+    Outdated { latest: String },
     Unknown,
     Ignored,
+}
+
+impl Status {
+    pub const fn label(&self) -> &'static str {
+        match self {
+            Self::Current => "current",
+            Self::Outdated { .. } => "outdated",
+            Self::Unknown => "unknown",
+            Self::Ignored => "ignored",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Package {
     pub name: String,
-    pub current: Version,
+    pub current: String,
     pub source: SourceKind,
     pub status: Status,
 }
 
 impl Package {
-    pub const fn latest(&self) -> Option<&Version> {
+    pub fn latest(&self) -> Option<&str> {
         match &self.status {
             Status::Outdated { latest } => Some(latest),
             _ => None,
@@ -67,11 +128,14 @@ impl Package {
     }
 
     pub fn update_target(&self) -> Option<UpdateTarget> {
+        if self.source.read_only() {
+            return None;
+        }
         Some(UpdateTarget {
             name: self.name.clone(),
             source: self.source,
             from: self.current.clone(),
-            to: self.latest()?.clone(),
+            to: self.latest()?.to_string(),
         })
     }
 }
@@ -80,8 +144,14 @@ impl Package {
 pub struct UpdateTarget {
     pub name: String,
     pub source: SourceKind,
-    pub from: Version,
-    pub to: Version,
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackageRef {
+    pub name: String,
+    pub source: SourceKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +232,13 @@ pub fn outdated(packages: &[Package]) -> Vec<&Package> {
     packages
         .iter()
         .filter(|package| package.latest().is_some())
+        .collect()
+}
+
+pub fn updatable(packages: &[Package]) -> Vec<&Package> {
+    packages
+        .iter()
+        .filter(|package| package.update_target().is_some())
         .collect()
 }
 

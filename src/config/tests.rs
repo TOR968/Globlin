@@ -16,6 +16,10 @@ fn round_trips_through_json() {
         sources: Sources {
             npm: true,
             bun: false,
+            pnpm: false,
+            yarn: false,
+            winget: false,
+            choco: false,
         },
         ..Default::default()
     };

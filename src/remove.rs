@@ -19,6 +19,14 @@ fn apply(config: &Config, target: &RemoveTarget) -> std::result::Result<(), Stri
     let source = find(&sources, target)?;
     let output = source
         .uninstall_command(&target.name)
+        .ok_or_else(|| {
+            format!(
+                "{}: the {} source is read-only
+",
+                target.name,
+                target.source.label()
+            )
+        })?
         .output()
         .map_err(|error| {
             format!(

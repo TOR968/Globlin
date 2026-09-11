@@ -35,6 +35,10 @@ pub fn tray(state: IconState, frame: u32, level: f32) -> Result<Icon> {
     .map_err(|error| error.to_string())?)
 }
 
+pub fn image(state: IconState, size: u32) -> Vec<u8> {
+    render::rgba(state, 0, 0.0, size)
+}
+
 pub fn write_app_icon(path: &Path) -> std::io::Result<()> {
     let images: Vec<(u32, Vec<u8>)> = ico::SIZES
         .iter()

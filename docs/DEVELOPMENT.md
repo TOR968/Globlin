@@ -16,8 +16,9 @@ pipeline, and the self-update mechanics in full.
 | `progress.rs` | the asymptotic creep, the batch's overall level and the 8-cell bar |
 | `registry.rs` | dist-tags over HTTP |
 | `selfupdate.rs` | the app's own release lookup, download, verification and swap |
-| `source/` | `PackageSource` trait plus the npm and bun adapters |
-| `tray/` | `mod.rs` owns the tray handle; `menu.rs` builds the menu and every label |
+| `source/` | `PackageSource` trait plus the npm, bun, pnpm, yarn, winget and choco adapters |
+| `tray/` | `mod.rs` owns the tray handle; `menu.rs` builds the short menu, every label and every action id |
+| `window/` | the package list: `window.rs` builds the snapshot, `shell.rs` owns the WebView2 window, `ui.html` is the page |
 | `icon/` | `render.rs` draws the states, `ico.rs` writes the container |
 | `platform/` | the OS-specific arm, selected by `cfg` |
 | `diagnostics.rs` | the two files written for troubleshooting |
@@ -26,6 +27,47 @@ pipeline, and the self-update mechanics in full.
 The split follows one rule: anything with branch-worthy logic lives where it can be tested without a
 running Win32 tray. That is why `notice.rs` exists as its own module rather than as methods on `App` — the
 "only notify when the set changed" rule has real edge cases and `App` cannot be constructed in a test.
+The same rule is why `window.rs` builds a `Snapshot` of plain serde structs and `window/ui.html` only
+draws it: every decision the window makes about *what* a row is lands in a unit test, and the untestable
+part — creating a WebView2 — is confined to `window/shell.rs`.
+
+### Two catalogs
+
+`SourceKind::catalog` is the fork in the read path. `Catalog::Npm` (npm, bun, pnpm, yarn) means the
+packages are npm packages whatever installed them, so `registry.rs` resolves `latest` for the union of
+their names in one pass. `Catalog::SelfReported` (winget, choco) means the package manager already knows:
+`winget list` prints an `Available` column, `choco outdated -r` prints the upgrade, and those land in
+`Installed.available`. `check.rs` must never send a winget id to registry.npmjs.org — `Git.Git` is not a
+package there, and a 404 would read as `Unknown` forever.
+
+That fork is also why package versions are `String` in `model.rs` rather than `semver::Version`. winget
+and choco emit `1.2.3.4` and `2024.01.15`; neither parses as semver, and both must still render. Version
+*comparison* still goes through `semver`, but only in `check.rs::from_registry`, where both sides came
+from an npm-catalog source — and a version that fails to parse there yields `Unknown`, never `Current`.
+
+Winget and choco are read-only. Both need elevation to upgrade anything and Globlin runs unelevated, so
+`update_command` and `uninstall_command` return `None` for them, `Package::update_target` returns `None`,
+and they can never enter a batch. `model::outdated` still counts them — the icon should go amber when a
+winget package is behind — while `model::updatable` is what `Update all` and the menu count.
+
+### The window
+
+`tao` and `wry` are the same project, so the window rides the existing event loop: `App::open_window`
+builds it lazily from the `EventLoopWindowTarget` the loop hands to its own closure, and closing it hides
+rather than destroys, because re-creating a WebView2 is visibly slow. State flows one way. `App` renders
+`window.globlin.render(<json>)` through `evaluate_script`; the page posts an id string back over
+`with_ipc_handler`, which becomes `Message::Ipc` on the same queue menu clicks use, and is parsed by the
+same `Action::from_key`. There is one action vocabulary for both surfaces; the only id the tray never
+builds is `update-many:npm:a|pnpm:b`, the bulk form.
+
+Animation is the one place that does not re-render: at 8 fps a full rebuild of a 200-row list is
+noticeable, so `App::advance_animation` sends `window.globlin.tick(...)` with just the headline and the
+batch rows, mirroring the `Tray::render` / `Tray::animate` split exactly.
+
+`src/window/ui.html` is one file with no build step, no bundler and no CDN — it is `include_str!`d into
+the binary. Everything it needs arrives in the snapshot; it owns filtering, sorting, search and the
+two-click uninstall confirmation, and nothing else. The no-comments rule covers it: no `<!-- -->`, no
+`/* */`, no `//`.
 
 ### The icon
 
@@ -162,7 +204,10 @@ What the models react to is a *small* dense executable, which is the shape of pa
 matters only because it is what sets the size. Anything that shrinks this binary back toward 1.7 MB is
 likely to bring the detections back, whatever setting achieves it.
 
-The trade is 1.7 MB → 2.8 MB. For a tray application that is not a cost worth a false positive. Do not
+The trade was 1.7 MB → 2.8 MB, measured on v0.2.8. The binary has grown since — the window links
+WebView2's glue in, and v0.3.0 builds at about 3.4 MB — which moves it further from the dense shape that
+was flagged, so the numbers in the table above are the record of that decision rather than today's size.
+For a tray application that is not a cost worth a false positive. Do not
 reintroduce the size-tuned settings without re-running the comparison; the numbers above are the baseline
 to beat.
 
@@ -187,7 +232,7 @@ binary and watch the next scan.
 
 ### Environment workarounds
 
-Three things about the environment the code has to work around, all verified rather than assumed:
+Things about the environment the code has to work around, all verified rather than assumed:
 
 - **`npm ls -g --json` exits non-zero when the global tree has problems** (an orphaned directory in
   `node_modules` is enough). The exit code is therefore ignored and stdout is parsed anyway; entries with
@@ -209,6 +254,31 @@ Three things about the environment the code has to work around, all verified rat
   nothing matches either rule, the source reports zero packages — a bun install with no global packages
   is legitimate — and writes the probed paths to the log so an empty list is explained rather than
   silent.
+- **pnpm prints an array, npm prints an object.** `pnpm ls -g --json` wraps the dependency map in a
+  one-element array of projects, where `npm ls -g --json` returns the map at the top level. The pnpm
+  source accepts either shape (`#[serde(untagged)]`) and de-duplicates by name, because a multi-project
+  reply can repeat one.
+- **`yarn global` only exists in yarn classic.** Yarn 2+ removed it, so there is no global install to
+  list. Rather than parse `yarn global list`'s `info "pkg@1.2.3" has binaries:` chatter, the source asks
+  `yarn global dir` and then reads that directory's `package.json` and `node_modules` — the same
+  mechanism the bun source uses, shared as `source::node_modules_listing`. On Berry the command fails,
+  the source reports zero packages, and the log says why. `yarn global dir` also prints its own banner
+  and a `Done in 0.2s.` line around the path, so the parser drops known chatter prefixes rather than
+  taking the last line.
+- **`winget list` has no machine-readable output.** There is no `--json`; `winget export` omits anything
+  without a manifest. So the fixed-width table is parsed: find the row of dashes, read column start
+  offsets from the header line above it, and slice each row by those offsets. Column *positions* rather
+  than column *names*, because the headers are localised. The `Available` column only appears when at
+  least one package has an upgrade, so a five-column table means `Name Id Version Available Source` and
+  a four-column one means `Name Id Version Source` — that rule holds in any language. The **Id** is
+  taken as the key, not the display name. One known limit: winget ellipsises cells that overflow their
+  column, so a very long id can arrive truncated. It is a display defect only, because the source is
+  read-only and no command is ever built from that string.
+- **`choco list` changed meaning between v1 and v2.** In Chocolatey 1.x, `choco list -r` lists the
+  *remote* community feed — thousands of packages — and the local set needs `--local-only`; in 2.x that
+  flag is gone and `choco list -r` is local. Guessing wrong is not a small error, so the source reads
+  `choco --version` first and picks the argument list from the major version. `choco outdated -r` is
+  stable across both and supplies the upgrades, merged onto the listing by name.
 
 ## The landing page
 
@@ -334,15 +404,22 @@ do nothing.
 cargo test
 ```
 
-183 tests: 175 run by default (no network, no side effects), 8 `#[ignore]`d because they touch the real
-system — the HKCU Run key, a real toast, a real `npm install -g`, two icon/PNG dump tests, and two that
-hit `TOR968/globlin`'s real GitHub releases. Each carries its own exact invocation in its
+279 tests: 266 run by default (no network, no side effects), 13 `#[ignore]`d because they touch the real
+system — the HKCU Run key, a real toast, a real `npm install -g`, two icon/PNG dump tests, two that hit
+`TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
+(`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
+this machine), and three that run the real `winget`, `choco` and `pnpm`. Those last three exist because
+the parsers below are pinned against captured output, and captured output cannot notice the day a tool
+changes its format — run them after a winget or Chocolatey upgrade. Each carries its own exact invocation
+in its
 `#[ignore = "…"]` message; `grep -rn "#\[ignore" src/` lists them. `updates_a_package_for_real` really
 installs `$env:UPDATE_TARGET` globally, so point it at something harmless. To see the working UI on
 demand, downgrade something disposable (`npm i -g npm-check-updates@23.0.0`) and hit *Check now*.
 
 The update orchestration is exercised by pointing `npm_cmd` at a file that cannot be executed, which
-drives the real failure paths without installing anything.
+drives the real failure paths without installing anything. The source adapters are tested against
+captured stdout — a real `winget list` table, a `choco list -r` listing, a `pnpm ls -g --json` reply —
+rather than by running those tools, so the parsers are pinned without the suite needing them installed.
 
 ## Lints
 
@@ -452,9 +529,10 @@ requests"** must also be enabled, or the `release-pr` job cannot open the pull r
 
 ## Other platforms
 
-Windows only in practice. `src/platform/unix.rs` returns an error from every call it cannot honour; the
-rest of the code, and every dependency, already works on all three OSes — `tao` was chosen over `winit`
-precisely because `tray-icon` needs a **GTK** event loop on Linux, which `tao` provides. Finishing macOS
+Windows only in practice. `src/platform/unix.rs` returns an error from every call it cannot honour, and
+`src/window/stub.rs` does the same for the window; the rest of the code, and every dependency, already
+works on all three OSes — `tao` was chosen over `winit` precisely because `tray-icon` needs a **GTK**
+event loop on Linux, which `tao` provides, and `wry` is `tao`'s sibling. Finishing macOS
 or Linux means writing that one file: `notify-rust` for notifications (not used on Windows because it
 offers no way to set the AppUserModelID, which would leave every toast attributed to PowerShell), a
 `~/Library/LaunchAgents/*.plist` or `~/.config/autostart/*.desktop` entry for autostart, and a lock file
@@ -464,3 +542,8 @@ Two costs to know about first: on macOS, notifications require a signed `.app` b
 `Info.plist`, so "portable, no install" does not survive the port. On Linux, `tray-icon` needs
 `libgtk-3-dev`, `libxdo-dev` and `libayatana-appindicator3-dev` at build time, and GNOME shows no tray at
 all without the AppIndicator extension.
+
+`wry` is declared under `[target.'cfg(windows)'.dependencies]` for the same reason: its Linux backend
+pulls `webkit2gtk` and `soup3`, which a Windows-only build has no business compiling. Porting the window
+means widening that declaration and replacing `window/stub.rs` with the shell — the snapshot, the page
+and the IPC vocabulary are already platform-independent.

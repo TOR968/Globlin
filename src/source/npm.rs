@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use semver::Version;
 use serde::Deserialize;
 
 use super::{find_on_path, hidden_command, PackageSource};
@@ -40,16 +39,16 @@ impl PackageSource for Npm {
         parse_listing(&output.stdout)
     }
 
-    fn update_command(&self, name: &str) -> Command {
+    fn update_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
         command.args(["install", "-g", &format!("{name}@latest")]);
-        command
+        Some(command)
     }
 
-    fn uninstall_command(&self, name: &str) -> Command {
+    fn uninstall_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
         command.args(["uninstall", "-g", name]);
-        command
+        Some(command)
     }
 }
 
@@ -83,11 +82,9 @@ fn parse_listing(stdout: &[u8]) -> Result<Vec<Installed>> {
 }
 
 fn to_installed((name, entry): (String, Entry)) -> Option<Installed> {
-    Some(Installed {
-        name,
-        version: Version::parse(entry.version.as_deref()?).ok()?,
-        source: SourceKind::Npm,
-    })
+    let version = entry.version?;
+    semver::Version::parse(&version).ok()?;
+    Some(Installed::new(name, version, SourceKind::Npm))
 }
 
 #[derive(Deserialize)]
