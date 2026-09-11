@@ -5,24 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
 
-    <title>Globlin — Keep Global npm and bun Packages Updated on Windows</title>
-    <meta name="description" content="A free Windows tray app that watches your global npm and bun packages and tells you the moment one falls behind. One click to update, no installer, 2.8 MB, open source.">
+    <title>Globlin — Keep Your Global Packages Updated on Windows</title>
+    <meta name="description" content="A free Windows tray app that watches your global npm, bun, pnpm, yarn, winget and choco packages and tells you the moment one falls behind. One window, filters, bulk updates, no installer, open source.">
     <link rel="canonical" href="https://globlin.pages.dev/">
     <link rel="icon" href="/img/logo.png" type="image/png">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Globlin">
     <meta property="og:url" content="https://globlin.pages.dev/">
-    <meta property="og:title" content="Globlin — Keep Global npm and bun Packages Updated on Windows">
-    <meta property="og:description" content="A tray icon that watches your global npm and bun packages and tells you when one falls behind. One click to update, no installer, 2.8 MB.">
+    <meta property="og:title" content="Globlin — Keep Your Global Packages Updated on Windows">
+    <meta property="og:description" content="A tray icon that watches your global packages across npm, bun, pnpm, yarn, winget and choco, and tells you when one falls behind. One click to update, no installer.">
     <meta property="og:image" content="https://globlin.pages.dev/img/og.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="The Globlin logo above the tray icon in its four states">
 
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Globlin — Keep Global npm and bun Packages Updated on Windows">
-    <meta name="twitter:description" content="A tray icon that watches your global npm and bun packages and tells you when one falls behind. One click to update, no installer, 2.8 MB.">
+    <meta name="twitter:title" content="Globlin — Keep Your Global Packages Updated on Windows">
+    <meta name="twitter:description" content="A tray icon that watches your global packages across npm, bun, pnpm, yarn, winget and choco, and tells you when one falls behind. One click to update, no installer.">
     <meta name="twitter:image" content="https://globlin.pages.dev/img/og.png">
 
     <script type="application/ld+json">
@@ -30,12 +30,12 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Globlin",
-        "description": "A Windows tray application that watches globally installed npm and bun packages, reports which ones are outdated, and updates them on a click.",
+        "description": "A Windows tray application that watches globally installed npm, bun, pnpm, yarn, winget and choco packages, reports which ones are outdated, and updates them on a click.",
         "url": "https://globlin.pages.dev/",
         "downloadUrl": "https://github.com/TOR968/Globlin/releases/latest/download/globlin.exe",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows 10, Windows 11",
-        "fileSize": "2.8 MB",
+        "fileSize": "3.3 MB",
         "license": "https://www.gnu.org/licenses/gpl-3.0.html",
         "isAccessibleForFree": true,
         "offers": {
@@ -410,6 +410,13 @@
         white-space: nowrap;
       }
 
+      .menu-source {
+        flex: none;
+        width: 4.5em;
+        color: var(--muted);
+        font-size: 0.82em;
+      }
+
       .menu-version {
         color: var(--muted);
         white-space: nowrap;
@@ -449,6 +456,10 @@
         .menu-footer {
           padding: 10px 12px;
           gap: 8px;
+        }
+
+        .menu-source {
+          display: none;
         }
       }
 
@@ -640,13 +651,13 @@
     <main>
       <section class="hero">
         <div class="shell">
-          <p class="eyebrow">Windows tray app · npm + bun</p>
-          <h1>Keep your global npm and bun packages up to date</h1>
+          <p class="eyebrow">Windows tray app · npm · bun · pnpm · yarn · winget · choco</p>
+          <h1>Keep every global package up to date</h1>
           <p>
             Global CLIs rot silently. Nothing tells you <code>@salesforce/cli</code> is six versions
             behind until a command breaks in a way that turns out to be &ldquo;oh, I&rsquo;m ancient.&rdquo;
-            Globlin sits in the Windows tray, checks the registry on a schedule, and shows you exactly
-            what has fallen behind.
+            Globlin sits in the Windows tray, checks on a schedule across every package manager you have
+            installed, and shows you exactly what has fallen behind.
           </p>
           <div class="hero-actions">
             <a class="button button-primary" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin.exe" rel="nofollow">
@@ -655,7 +666,7 @@
             <a class="button button-ghost" href="https://github.com/TOR968/Globlin">View source on GitHub</a>
           </div>
           <p class="download-note">
-            globlin.exe · <span data-version>latest</span> · 2.8 MB ·
+            globlin.exe · <span data-version>latest</span> · 3.3 MB ·
             <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin.exe.sha256" rel="nofollow">SHA-256</a>
           </p>
           <ul class="badges">
@@ -670,50 +681,63 @@
       <section class="section" id="menu">
         <div class="shell">
           <p class="eyebrow">What you actually see</p>
-          <h2>One right-click, the whole picture</h2>
+          <h2>Every package manager, one list</h2>
           <p class="lede">
-            Every globally installed package, its version, and whether it has fallen behind. Click a row
-            to update it, or update everything at once.
+            Everything you installed globally, wherever it came from, with its version and whether it has
+            fallen behind. Filter by status or by source, tick what you want, update it in one batch.
           </p>
-          <div class="menu" role="img" aria-label="The Globlin tray menu listing three outdated packages, two current packages, one ignored and one not yet checked, with Update all, Check now and Run at startup at the bottom">
-            <div class="menu-header" aria-hidden="true">Globlin — 3 updates available</div>
+          <div class="menu" role="img" aria-label="The Globlin window listing outdated packages from npm, pnpm and winget alongside current, ignored and unchecked ones, with Update all, Check now and Run at startup at the bottom">
+            <div class="menu-header" aria-hidden="true">Globlin — 4 updates available</div>
             <div class="menu-row is-outdated" aria-hidden="true">
               <span class="menu-mark">↑</span>
               <span class="menu-name">@google/gemini-cli</span>
+              <span class="menu-source">npm</span>
               <span class="menu-version">0.53.1 → 0.54.4</span>
             </div>
             <div class="menu-row is-outdated" aria-hidden="true">
               <span class="menu-mark">↑</span>
               <span class="menu-name">@salesforce/cli</span>
+              <span class="menu-source">npm</span>
               <span class="menu-version">2.145.6 → 2.146.3</span>
             </div>
             <div class="menu-row is-outdated" aria-hidden="true">
               <span class="menu-mark">↑</span>
-              <span class="menu-name">vercel</span>
-              <span class="menu-version">58.4.4 → 58.9.1</span>
+              <span class="menu-name">vite</span>
+              <span class="menu-source">pnpm</span>
+              <span class="menu-version">6.0.1 → 6.3.2</span>
+            </div>
+            <div class="menu-row is-outdated" aria-hidden="true">
+              <span class="menu-mark">↑</span>
+              <span class="menu-name">Git.Git</span>
+              <span class="menu-source">winget</span>
+              <span class="menu-version">2.44.0 → 2.47.1</span>
             </div>
             <div class="menu-row is-current" aria-hidden="true">
               <span class="menu-mark">✓</span>
               <span class="menu-name">prettier</span>
+              <span class="menu-source">npm</span>
               <span class="menu-version">3.9.6</span>
             </div>
             <div class="menu-row is-current" aria-hidden="true">
               <span class="menu-mark">✓</span>
-              <span class="menu-name">typescript</span>
-              <span class="menu-version">7.0.2</span>
+              <span class="menu-name">yaml-language-server</span>
+              <span class="menu-source">bun</span>
+              <span class="menu-version">1.24.0</span>
             </div>
             <div class="menu-row is-ignored" aria-hidden="true">
               <span class="menu-mark">·</span>
               <span class="menu-name">npm</span>
+              <span class="menu-source">npm</span>
               <span class="menu-version">12.0.2 (ignored)</span>
             </div>
             <div class="menu-row is-unknown" aria-hidden="true">
               <span class="menu-mark">?</span>
               <span class="menu-name">some-package</span>
+              <span class="menu-source">bun</span>
               <span class="menu-version">1.0.0 (not checked)</span>
             </div>
             <div class="menu-footer" aria-hidden="true">
-              <span>Update all (3)</span>
+              <span>Update selected (3)</span>
               <span>Check now</span>
               <span>Run at startup</span>
             </div>
@@ -728,17 +752,27 @@
           <p class="lede">Globlin never touches anything on its own unless you turn that on.</p>
           <div class="grid">
             <article class="card">
-              <h3>npm and bun, side by side</h3>
+              <h3>Six package managers, one list</h3>
               <p>
-                Both package managers are checked. The same package installed under both stays
-                distinguishable — the bun copy is suffixed <code>(bun)</code>.
+                npm, bun, pnpm and yarn are checked out of the box; winget and choco can be switched on.
+                The same package installed under two of them stays distinguishable — each row names its
+                source.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Filter it down, then act in bulk</h3>
+              <p>
+                The sidebar filters by status and by source and counts each one. Search narrows by name.
+                Tick the rows you want and update them as a single queue.
               </p>
             </article>
             <article class="card">
               <h3>Update one, or update all</h3>
               <p>
                 A row updates a single package. Update all runs the outdated ones as a queue with a
-                counter, a progress bar on the active row, and a result on each finished row.
+                counter, a progress bar on the active row, and a result on each finished row. winget and
+                choco are reported rather than updated — both need elevation, and Globlin runs without
+                it.
               </p>
             </article>
             <article class="card">
@@ -751,8 +785,8 @@
             <article class="card">
               <h3>Uninstall without a dialog</h3>
               <p>
-                Every row offers Uninstall, which opens onto a single confirm item. The two steps are the
-                confirmation — the outer entry does nothing on its own.
+                Every row offers Uninstall, which arms into a Confirm button. The two clicks are the
+                confirmation — the first does nothing on its own.
               </p>
             </article>
             <article class="card">
@@ -809,7 +843,7 @@
           <ol class="steps" role="list">
             <li>
               <strong>Download globlin.exe</strong>
-              One file, 2.8 MB, nothing to unzip.
+              One file, 3.3 MB, nothing to unzip.
             </li>
             <li>
               <strong>Run it</strong>
@@ -818,7 +852,7 @@
             </li>
             <li>
               <strong>Optional: tick Run at startup</strong>
-              Right-click the tray icon if you want it there every time you log in.
+              From the tray menu or the window, if you want it there every time you log in.
             </li>
           </ol>
           <div class="hero-actions">
@@ -845,7 +879,7 @@
           </details>
           <details>
             <summary>Do I need Node.js installed?</summary>
-            <p>Globlin itself has no runtime dependencies, but it drives the npm or bun that is already on your machine. If neither is installed there is nothing for it to check.</p>
+            <p>Globlin itself has no runtime dependencies, but it drives the package managers already on your machine — npm, bun, pnpm, yarn, winget or choco. If none is installed there is nothing for it to check. The window is drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 10.</p>
           </details>
           <details>
             <summary>Will it update anything without asking?</summary>
@@ -853,7 +887,7 @@
           </details>
           <details>
             <summary>How is this different from npm-check-updates?</summary>
-            <p>npm-check-updates is a command you run by hand against a project's package.json. Globlin is a background tray app for the CLIs you installed globally, and it tells you they are outdated without you remembering to ask.</p>
+            <p>npm-check-updates is a command you run by hand against a project's package.json. Globlin is a background tray app for the tools you installed globally — across six package managers, not just npm — and it tells you they are outdated without you remembering to ask.</p>
           </details>
           <details>
             <summary>How often does it check?</summary>

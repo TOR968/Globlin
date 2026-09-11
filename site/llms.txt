@@ -1,12 +1,14 @@
 # Globlin
 
-> A Windows tray app that watches your globally installed npm and bun packages and tells you the moment one falls behind. One click to update, no installer, a single portable 2.8 MB .exe, free and open source under GPL-3.0.
+> A Windows tray app that watches your globally installed packages across npm, bun, pnpm, yarn, winget and choco, and tells you the moment one falls behind. One window with filters and bulk updates, no installer, a single portable 3.3 MB .exe, free and open source under GPL-3.0.
 
-Global command-line tools installed with `npm install -g` or `bun add -g` go stale silently — nothing tells you a CLI is six versions behind until a command breaks. Globlin sits in the Windows tray, checks the registry on a schedule (every six hours by default), and shows exactly which packages are outdated. Clicking a row updates that package; Update all runs the outdated ones as a queue.
+Global command-line tools installed with `npm install -g`, `bun add -g`, `pnpm add -g` or `yarn global add` go stale silently — nothing tells you a CLI is six versions behind until a command breaks. Globlin sits in the Windows tray, checks on a schedule (every six hours by default), and opens a window listing every global package with its source, filterable by status or by package manager and searchable by name. Clicking a row updates that package; ticking several and pressing Update selected runs them as a queue.
 
 It never updates a package on its own. It can update itself unattended, but that setting is off by default and every download is verified against a published SHA-256 checksum before anything is replaced. Packages can be ignored, and an ignored package still shows its version but is never checked or notified about. A desktop notification fires only when the set of outdated packages changes.
 
-Globlin needs no runtime of its own — it drives whatever npm or bun is already installed. Windows 10 and 11 only; there is no macOS or Linux build. Configuration lives in `globlin.json` next to the executable, which makes the whole thing portable.
+Six sources are supported. npm, bun, pnpm and yarn are checked by default and their `latest` comes from registry.npmjs.org. winget and choco are switched off by default, report their own available versions, and are read-only: both require an elevated process to upgrade anything and Globlin runs unelevated, so it tells you and leaves the doing to you. yarn means yarn classic (v1), because yarn 2+ removed global installs.
+
+Globlin needs no runtime of its own — it drives whatever package managers are already installed, and the window is drawn by the WebView2 runtime that ships with Windows 11 and current Windows 10. Windows 10 and 11 only; there is no macOS or Linux build. Configuration lives in `globlin.json` next to the executable, which makes the whole thing portable.
 
 ## Download
 
@@ -15,7 +17,7 @@ Globlin needs no runtime of its own — it drives whatever npm or bun is already
 
 ## Documentation
 
-- [README](https://github.com/TOR968/Globlin/blob/master/README.md): what it does, install, the tray menu, icon states, configuration, diagnostics, and how to remove it
+- [README](https://github.com/TOR968/Globlin/blob/master/README.md): what it does, install, the window and the tray menu, the source table, icon states, configuration, diagnostics, and how to remove it
 - [Development notes](https://github.com/TOR968/Globlin/blob/master/docs/DEVELOPMENT.md): architecture, the verified environment workarounds, self-update mechanics, tests, lints, and the release machinery
 - [Changelog](https://github.com/TOR968/Globlin/blob/master/CHANGELOG.md)
 
