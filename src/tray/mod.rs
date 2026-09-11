@@ -6,7 +6,10 @@ use crate::Result;
 
 mod menu;
 
-pub use menu::{Action, SelfUpdate, View};
+pub use menu::{
+    batch_row_text, headline, ignore_id, key_of, remove_id, source_id, update_id, Action,
+    SelfUpdate, View,
+};
 
 pub struct Tray {
     icon: TrayIcon,

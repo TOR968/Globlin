@@ -1,11 +1,21 @@
 use super::*;
 
 fn package(name: &str, current: &str, status: Status) -> Package {
+    sourced(name, current, SourceKind::Npm, status)
+}
+
+fn sourced(name: &str, current: &str, source: SourceKind, status: Status) -> Package {
     Package {
         name: name.to_string(),
-        current: Version::parse(current).unwrap(),
-        source: SourceKind::Npm,
+        current: current.to_string(),
+        source,
         status,
+    }
+}
+
+fn behind(latest: &str) -> Status {
+    Status::Outdated {
+        latest: latest.to_string(),
     }
 }
 
@@ -13,13 +23,7 @@ fn package(name: &str, current: &str, status: Status) -> Package {
 fn only_outdated_packages_are_reported() {
     let packages = vec![
         package("a", "1.0.0", Status::Current),
-        package(
-            "b",
-            "1.0.0",
-            Status::Outdated {
-                latest: Version::parse("2.0.0").unwrap(),
-            },
-        ),
+        package("b", "1.0.0", behind("2.0.0")),
         package("c", "1.0.0", Status::Unknown),
         package("d", "1.0.0", Status::Ignored),
     ];
@@ -37,18 +41,12 @@ fn only_an_outdated_package_yields_an_update_target() {
     let current = package("a", "1.0.0", Status::Current);
     assert_eq!(current.update_target(), None);
 
-    let behind = package(
-        "b",
-        "1.0.0",
-        Status::Outdated {
-            latest: Version::parse("2.0.0").unwrap(),
-        },
-    );
+    let behind = package("b", "1.0.0", behind("2.0.0"));
     let target = behind.update_target().unwrap();
 
     assert_eq!(target.name, "b");
-    assert_eq!(target.from, Version::parse("1.0.0").unwrap());
-    assert_eq!(target.to, Version::parse("2.0.0").unwrap());
+    assert_eq!(target.from, "1.0.0");
+    assert_eq!(target.to, "2.0.0");
     assert_eq!(target.source, SourceKind::Npm);
 }
 
@@ -61,20 +59,8 @@ fn an_ignored_or_unknown_package_is_never_an_update_target() {
 #[test]
 fn stamps_are_sorted_and_carry_source_and_target_version() {
     let packages = vec![
-        package(
-            "zzz",
-            "1.0.0",
-            Status::Outdated {
-                latest: Version::parse("1.2.0").unwrap(),
-            },
-        ),
-        package(
-            "aaa",
-            "1.0.0",
-            Status::Outdated {
-                latest: Version::parse("3.0.0").unwrap(),
-            },
-        ),
+        package("zzz", "1.0.0", behind("1.2.0")),
+        package("aaa", "1.0.0", behind("3.0.0")),
         package("mmm", "1.0.0", Status::Current),
     ];
 
@@ -91,8 +77,8 @@ fn batch_of(names: &[&str]) -> Batch {
             .map(|name| UpdateTarget {
                 name: (*name).to_string(),
                 source: SourceKind::Npm,
-                from: Version::parse("1.0.0").unwrap(),
-                to: Version::parse("2.0.0").unwrap(),
+                from: "1.0.0".to_string(),
+                to: "2.0.0".to_string(),
             })
             .collect(),
     )
@@ -166,4 +152,52 @@ fn the_batch_counts_only_the_targets_it_has_finished() {
 #[test]
 fn a_self_update_is_an_activity_like_any_other() {
     assert_ne!(Activity::SelfUpdate, Activity::Checking);
+}
+
+#[test]
+fn a_read_only_source_never_yields_an_update_target() {
+    let winget = sourced("Git.Git", "2.44.0", SourceKind::Winget, behind("2.47.1"));
+
+    assert_eq!(winget.update_target(), None);
+    assert_eq!(outdated(std::slice::from_ref(&winget)).len(), 1);
+    assert!(updatable(&[winget]).is_empty());
+}
+
+#[test]
+fn a_read_only_package_still_stamps_so_it_can_be_announced_once() {
+    let winget = sourced("Git.Git", "2.44.0", SourceKind::Winget, behind("2.47.1"));
+
+    assert_eq!(winget.stamp().as_deref(), Some("winget:Git.Git@2.47.1"));
+}
+
+#[test]
+fn the_npm_registry_and_the_self_reporting_sources_are_told_apart() {
+    assert_eq!(SourceKind::Npm.catalog(), Catalog::Npm);
+    assert_eq!(SourceKind::Pnpm.catalog(), Catalog::Npm);
+    assert_eq!(SourceKind::Yarn.catalog(), Catalog::Npm);
+    assert_eq!(SourceKind::Winget.catalog(), Catalog::SelfReported);
+    assert_eq!(SourceKind::Choco.catalog(), Catalog::SelfReported);
+}
+
+#[test]
+fn every_source_has_a_distinct_label_and_suffix() {
+    let labels: std::collections::HashSet<&str> = KINDS.iter().map(|kind| kind.label()).collect();
+    let suffixes: std::collections::HashSet<&str> =
+        KINDS.iter().map(|kind| kind.suffix()).collect();
+
+    assert_eq!(labels.len(), KINDS.len());
+    assert_eq!(suffixes.len(), KINDS.len());
+}
+
+#[test]
+fn every_status_reports_a_distinct_label() {
+    let labels = [
+        Status::Current.label(),
+        Status::Unknown.label(),
+        Status::Ignored.label(),
+        behind("2.0.0").label(),
+    ];
+    let unique: std::collections::HashSet<&&str> = labels.iter().collect();
+
+    assert_eq!(unique.len(), labels.len());
 }

@@ -1,12 +1,8 @@
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use semver::Version;
-use serde::Deserialize;
-
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, manifest_names, node_modules_listing, PackageSource};
 use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
 use crate::platform;
@@ -45,38 +41,20 @@ impl PackageSource for Bun {
             diagnostics::record_note(&missing_root_report(&candidates()));
             return Ok(Vec::new());
         };
-        let Ok(raw) = fs::read_to_string(root.join("package.json")) else {
-            return Ok(Vec::new());
-        };
-        let names = parse_manifest(&raw)?;
-        Ok(names
-            .iter()
-            .filter_map(|name| version_of(root, name))
-            .collect())
+        Ok(node_modules_listing(root, SourceKind::Bun))
     }
 
-    fn update_command(&self, name: &str) -> Command {
+    fn update_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
         command.args(["add", "-g", &format!("{name}@latest")]);
-        command
+        Some(command)
     }
 
-    fn uninstall_command(&self, name: &str) -> Command {
+    fn uninstall_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
         command.args(["remove", "-g", name]);
-        command
+        Some(command)
     }
-}
-
-fn version_of(root: &Path, name: &str) -> Option<Installed> {
-    let manifest = root.join("node_modules").join(name).join("package.json");
-    let raw = fs::read_to_string(manifest).ok()?;
-    let installed: InstalledManifest = serde_json::from_str(&raw).ok()?;
-    Some(Installed {
-        name: name.to_string(),
-        version: Version::parse(&installed.version).ok()?,
-        source: SourceKind::Bun,
-    })
 }
 
 fn candidates() -> Vec<PathBuf> {
@@ -107,7 +85,7 @@ fn resolve_global_dir(candidates: &[PathBuf]) -> Option<PathBuf> {
 }
 
 fn manifest_parses(root: &Path) -> bool {
-    fs::read_to_string(root.join("package.json")).is_ok_and(|raw| parse_manifest(&raw).is_ok())
+    fs::read_to_string(root.join("package.json")).is_ok_and(|raw| manifest_names(&raw).is_ok())
 }
 
 fn has_lockfile(root: &Path) -> bool {
@@ -117,7 +95,7 @@ fn has_lockfile(root: &Path) -> bool {
 fn manifest_has_dependency(root: &Path) -> bool {
     fs::read_to_string(root.join("package.json"))
         .ok()
-        .and_then(|raw| parse_manifest(&raw).ok())
+        .and_then(|raw| manifest_names(&raw).ok())
         .is_some_and(|names| !names.is_empty())
 }
 
@@ -142,22 +120,6 @@ fn install_root() -> PathBuf {
 fn default_location() -> Option<PathBuf> {
     let candidate = install_root().join("bin").join(EXECUTABLE);
     candidate.is_file().then_some(candidate)
-}
-
-fn parse_manifest(raw: &str) -> Result<Vec<String>> {
-    let manifest: GlobalManifest = serde_json::from_str(raw)?;
-    Ok(manifest.dependencies.into_keys().collect())
-}
-
-#[derive(Deserialize)]
-struct GlobalManifest {
-    #[serde(default)]
-    dependencies: BTreeMap<String, String>,
-}
-
-#[derive(Deserialize)]
-struct InstalledManifest {
-    version: String,
 }
 
 #[cfg(test)]

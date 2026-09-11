@@ -35,7 +35,7 @@ fn reads_the_version_and_tags_the_source() {
         .find(|item| item.name == "prettier")
         .unwrap();
 
-    assert_eq!(prettier.version, Version::parse("3.9.6").unwrap());
+    assert_eq!(prettier.version, "3.9.6");
     assert_eq!(prettier.source, SourceKind::Npm);
 }
 
@@ -65,7 +65,7 @@ fn the_npm_uninstall_command_removes_the_package_globally() {
     };
 
     assert_eq!(
-        arguments(&npm.uninstall_command("@salesforce/cli")),
+        arguments(&npm.uninstall_command("@salesforce/cli").unwrap()),
         vec!["uninstall", "-g", "@salesforce/cli"]
     );
 }

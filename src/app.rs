@@ -2,19 +2,23 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use semver::Version;
-use tao::event_loop::EventLoopProxy;
-use tray_icon::menu::MenuEvent;
+use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
+use tao::window::WindowId;
+use tray_icon::{MouseButton, TrayIconEvent};
 
 use crate::check::{self, Report};
 use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
 use crate::install;
-use crate::model::{self, Activity, Batch, Package, RemoveTarget, Status, UpdateTarget};
+use crate::model::{
+    self, Activity, Batch, Package, PackageRef, RemoveTarget, SourceKind, Status, UpdateTarget,
+};
 use crate::remove;
 use crate::selfupdate::{self, Release};
 use crate::tray::{Action, SelfUpdate, Tray, View};
 use crate::update::{self, Outcome, Step};
-use crate::{diagnostics, notice, platform, progress, Message, Result};
+use crate::window::Window;
+use crate::{diagnostics, notice, platform, progress, window, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
 
@@ -31,6 +35,7 @@ pub struct App {
     blocked_self: Option<Version>,
     pending_restart: Option<Version>,
     activity: Option<Activity>,
+    window: Option<Window>,
     failed: bool,
     frame: u32,
     next_check: Instant,
@@ -50,6 +55,7 @@ impl App {
             blocked_self: None,
             pending_restart: None,
             activity: None,
+            window: None,
             failed: false,
             frame: 0,
             next_check,
@@ -76,9 +82,11 @@ impl App {
         }
     }
 
-    pub fn handle(&mut self, message: Message) -> Control {
+    pub fn handle(&mut self, message: Message, target: &EventLoopWindowTarget<Message>) -> Control {
         match message {
-            Message::Menu(event) => return self.on_menu(&event),
+            Message::Menu(event) => return self.on_action(Action::from_id(&event.id), target),
+            Message::Ipc(body) => return self.on_action(Action::from_key(&body), target),
+            Message::Tray(event) => self.on_tray(&event, target),
             Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome),
@@ -88,33 +96,52 @@ impl App {
         Control::Continue
     }
 
-    fn on_menu(&mut self, event: &MenuEvent) -> Control {
-        let Some(action) = Action::from_id(&event.id) else {
+    pub fn close_window(&mut self, id: WindowId) {
+        if let Some(window) = self.window.as_ref().filter(|window| window.id() == id) {
+            window.hide();
+        }
+    }
+
+    fn on_tray(&mut self, event: &TrayIconEvent, target: &EventLoopWindowTarget<Message>) {
+        if let TrayIconEvent::DoubleClick {
+            button: MouseButton::Left,
+            ..
+        } = event
+        {
+            self.open_window(target);
+        }
+    }
+
+    fn on_action(
+        &mut self,
+        action: Option<Action>,
+        target: &EventLoopWindowTarget<Message>,
+    ) -> Control {
+        let Some(action) = action else {
             return Control::Continue;
         };
         match action {
             Action::Quit => return Control::Exit,
             Action::CheckNow => self.start_check(),
+            Action::OpenWindow => self.open_window(target),
+            Action::WindowReady => self.render_window(),
+            Action::ToggleSource { kind } => self.toggle_source(kind),
+            Action::UpdateMany { refs } => {
+                let targets = self.targets_for(&refs);
+                self.start_update(targets);
+            }
             Action::UpdateAll => {
                 let targets = self.every_outdated_target();
                 self.start_update(targets);
             }
             Action::Update { name, source } => {
-                let target = self
-                    .packages
-                    .iter()
-                    .find(|package| package.name == name && package.source == source);
-                if let Some(target) = target.and_then(Package::update_target) {
+                if let Some(target) = self.find(&name, source).and_then(Package::update_target) {
                     self.start_update(vec![target]);
                 }
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
             Action::Remove { name, source } => {
-                let known = self
-                    .packages
-                    .iter()
-                    .any(|package| package.name == name && package.source == source);
-                if known {
+                if self.find(&name, source).is_some() {
                     self.start_remove(RemoveTarget { name, source });
                 }
             }
@@ -131,10 +158,51 @@ impl App {
     }
 
     fn every_outdated_target(&self) -> Vec<UpdateTarget> {
-        model::outdated(&self.packages)
+        model::updatable(&self.packages)
             .iter()
             .filter_map(|package| package.update_target())
             .collect()
+    }
+
+    fn targets_for(&self, refs: &[PackageRef]) -> Vec<UpdateTarget> {
+        refs.iter()
+            .filter_map(|reference| self.find(&reference.name, reference.source))
+            .filter_map(Package::update_target)
+            .collect()
+    }
+
+    fn find(&self, name: &str, source: SourceKind) -> Option<&Package> {
+        self.packages
+            .iter()
+            .find(|package| package.name == name && package.source == source)
+    }
+
+    fn open_window(&mut self, target: &EventLoopWindowTarget<Message>) {
+        if self.window.is_none() {
+            match Window::new(target, self.proxy.clone()) {
+                Ok(window) => self.window = Some(window),
+                Err(error) => {
+                    platform::notify("Globlin", &format!("Could not open the window: {error}"))
+                        .ok();
+                    return;
+                }
+            }
+        }
+        if let Some(window) = self.window.as_ref() {
+            window.show();
+        }
+        self.render_window();
+    }
+
+    fn toggle_source(&mut self, kind: SourceKind) {
+        let enabled = !self.config.source_enabled(kind);
+        self.config.set_source_enabled(kind, enabled);
+        if let Err(error) = self.config.save() {
+            platform::notify("Globlin", &format!("Could not save the setting: {error}")).ok();
+        }
+        self.packages.retain(|package| package.source != kind);
+        self.render();
+        self.start_check();
     }
 
     fn toggle_ignore(&mut self, name: &str) {
@@ -295,6 +363,9 @@ impl App {
             self.elapsed(),
         );
         self.tray.animate(&view, level).ok();
+        if let Some(window) = self.window.as_ref().filter(|window| window.visible()) {
+            window.tick(&window::tick(&view));
+        }
     }
 
     fn on_step(&mut self, step: &Step) {
@@ -411,6 +482,25 @@ impl App {
             self.elapsed(),
         );
         self.tray.render(&view, state, level).ok();
+        if let Some(window) = self.window.as_ref().filter(|window| window.visible()) {
+            window.render(&window::snapshot(&view, &self.config));
+        }
+    }
+
+    fn render_window(&self) {
+        let Some(window) = self.window.as_ref() else {
+            return;
+        };
+        let view = view_of(
+            &self.packages,
+            self.activity.as_ref(),
+            self.available_release.as_ref(),
+            self.pending_restart.as_ref(),
+            self.config.auto_update,
+            self.frame,
+            self.elapsed(),
+        );
+        window.render(&window::snapshot(&view, &self.config));
     }
 
     fn icon_state(&self) -> IconState {

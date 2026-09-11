@@ -81,6 +81,14 @@ fn apply(
 
     let output = source
         .update_command(&target.name)
+        .ok_or_else(|| {
+            format!(
+                "{}: the {} source is read-only
+",
+                target.name,
+                target.source.label()
+            )
+        })?
         .output()
         .map_err(|error| {
             format!(

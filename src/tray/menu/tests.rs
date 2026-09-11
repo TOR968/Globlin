@@ -1,11 +1,11 @@
 use super::*;
-use crate::model::UpdateTarget;
+use crate::model::{Status, UpdateTarget};
 use semver::Version;
 
 fn package(name: &str, source: SourceKind, status: Status) -> Package {
     Package {
         name: name.to_string(),
-        current: Version::parse("1.2.3").unwrap(),
+        current: "1.2.3".to_string(),
         source,
         status,
     }
@@ -16,7 +16,7 @@ fn behind(name: &str, latest: &str) -> Package {
         name,
         SourceKind::Npm,
         Status::Outdated {
-            latest: Version::parse(latest).unwrap(),
+            latest: latest.to_string(),
         },
     )
 }
@@ -62,13 +62,22 @@ fn updating(name: &str, index: usize, total: usize) -> Activity {
                 format!("filler-{position}")
             },
             source: SourceKind::Npm,
-            from: Version::parse("1.2.3").unwrap(),
-            to: Version::parse("2.0.0").unwrap(),
+            from: "1.2.3".to_string(),
+            to: "2.0.0".to_string(),
         })
         .collect();
     let mut batch = crate::model::Batch::new(targets);
     batch.start(index);
     Activity::Updating { batch }
+}
+
+fn top_level_ids(built: &Built) -> Vec<String> {
+    built
+        .menu
+        .items()
+        .iter()
+        .map(|item| item.id().as_ref().to_string())
+        .collect()
 }
 
 #[test]
@@ -78,6 +87,8 @@ fn fixed_menu_ids_map_to_their_actions() {
     assert_eq!(Action::from_key("update-all"), Some(Action::UpdateAll));
     assert_eq!(Action::from_key("autostart"), Some(Action::ToggleAutostart));
     assert_eq!(Action::from_key("open-log"), Some(Action::OpenLog));
+    assert_eq!(Action::from_key("open-window"), Some(Action::OpenWindow));
+    assert_eq!(Action::from_key("window-ready"), Some(Action::WindowReady));
 }
 
 #[test]
@@ -95,16 +106,30 @@ fn an_update_id_round_trips_including_scoped_names() {
 }
 
 #[test]
+fn every_source_label_is_a_usable_id_segment() {
+    for kind in crate::model::KINDS {
+        let entry = package("thing", kind, Status::Current);
+        assert_eq!(
+            Action::from_key(&update_id(&entry)),
+            Some(Action::Update {
+                name: "thing".to_string(),
+                source: kind
+            })
+        );
+    }
+}
+
+#[test]
 fn the_same_name_from_two_sources_gets_two_distinct_ids() {
     let from_npm = package("typescript", SourceKind::Npm, Status::Current);
-    let from_bun = package("typescript", SourceKind::Bun, Status::Current);
+    let via_pnpm = package("typescript", SourceKind::Pnpm, Status::Current);
 
-    assert_ne!(update_id(&from_npm), update_id(&from_bun));
+    assert_ne!(update_id(&from_npm), update_id(&via_pnpm));
     assert_eq!(
-        Action::from_key(&update_id(&from_bun)),
+        Action::from_key(&update_id(&via_pnpm)),
         Some(Action::Update {
             name: "typescript".to_string(),
-            source: SourceKind::Bun
+            source: SourceKind::Pnpm
         })
     );
 }
@@ -112,8 +137,110 @@ fn the_same_name_from_two_sources_gets_two_distinct_ids() {
 #[test]
 fn unknown_ids_are_ignored() {
     assert_eq!(Action::from_key("something-else"), None);
-    assert_eq!(Action::from_key("update:pnpm:prettier"), None);
+    assert_eq!(Action::from_key("update:cargo:prettier"), None);
     assert_eq!(Action::from_key("update:npm"), None);
+    assert_eq!(Action::from_key("update:npm:"), None);
+}
+
+#[test]
+fn a_bulk_update_id_carries_every_target_it_names() {
+    assert_eq!(
+        Action::from_key("update-many:npm:@salesforce/cli|pnpm:vite"),
+        Some(Action::UpdateMany {
+            refs: vec![
+                PackageRef {
+                    name: "@salesforce/cli".to_string(),
+                    source: SourceKind::Npm,
+                },
+                PackageRef {
+                    name: "vite".to_string(),
+                    source: SourceKind::Pnpm,
+                },
+            ]
+        })
+    );
+}
+
+#[test]
+fn a_bulk_update_drops_targets_it_cannot_resolve_rather_than_the_whole_batch() {
+    assert_eq!(
+        Action::from_key("update-many:cargo:thing|npm:prettier"),
+        Some(Action::UpdateMany {
+            refs: vec![PackageRef {
+                name: "prettier".to_string(),
+                source: SourceKind::Npm,
+            }]
+        })
+    );
+    assert_eq!(Action::from_key("update-many:cargo:thing"), None);
+}
+
+#[test]
+fn a_source_toggle_id_round_trips() {
+    for kind in crate::model::KINDS {
+        assert_eq!(
+            Action::from_key(&source_id(kind)),
+            Some(Action::ToggleSource { kind })
+        );
+    }
+    assert_eq!(Action::from_key("source:cargo"), None);
+}
+
+#[test]
+fn the_tray_menu_no_longer_lists_packages() {
+    let packages = vec![
+        behind("prettier", "2.0.0"),
+        package("typescript", SourceKind::Npm, Status::Current),
+    ];
+    let built = build(&view(&packages, None, 0)).unwrap();
+    let ids = top_level_ids(&built);
+
+    assert!(
+        !ids.iter().any(|id| id.starts_with(UPDATE_PREFIX)),
+        "package rows belong to the window now: {ids:?}"
+    );
+    assert!(ids.contains(&ID_OPEN_WINDOW.to_string()), "{ids:?}");
+    assert!(ids.contains(&ID_UPDATE_ALL.to_string()), "{ids:?}");
+}
+
+#[test]
+fn update_all_counts_only_what_globlin_can_actually_update() {
+    let packages = vec![
+        behind("prettier", "2.0.0"),
+        Package {
+            name: "Git.Git".to_string(),
+            current: "2.44.0".to_string(),
+            source: SourceKind::Winget,
+            status: Status::Outdated {
+                latest: "2.47.1".to_string(),
+            },
+        },
+    ];
+    let built = build(&view(&packages, None, 0)).unwrap();
+    let text = built
+        .menu
+        .items()
+        .iter()
+        .filter_map(|item| item.as_menuitem().map(tray_icon::menu::MenuItem::text))
+        .find(|text| text.starts_with("Update all"))
+        .expect("expected an update-all row");
+
+    assert_eq!(text, "Update all (1)");
+}
+
+#[test]
+fn a_read_only_source_offers_no_update_all_row_of_its_own() {
+    let packages = vec![Package {
+        name: "Git.Git".to_string(),
+        current: "2.44.0".to_string(),
+        source: SourceKind::Winget,
+        status: Status::Outdated {
+            latest: "2.47.1".to_string(),
+        },
+    }];
+    let built = build(&view(&packages, None, 0)).unwrap();
+
+    assert!(!top_level_ids(&built).contains(&ID_UPDATE_ALL.to_string()));
 }
 
 #[test]
@@ -187,30 +314,6 @@ fn the_dot_animation_repeats_after_a_full_cycle() {
 }
 
 #[test]
-fn each_status_gets_its_own_marker() {
-    let outdated = row(&behind("a", "2.0.0"));
-    let current = row(&package("b", SourceKind::Npm, Status::Current));
-    let unknown = row(&package("c", SourceKind::Npm, Status::Unknown));
-    let ignored = row(&package("d", SourceKind::Npm, Status::Ignored));
-
-    assert!(outdated.starts_with('↑'), "{outdated}");
-    assert!(current.starts_with('✓'), "{current}");
-    assert!(
-        unknown.starts_with('?') && unknown.contains("not checked"),
-        "{unknown}"
-    );
-    assert!(
-        ignored.starts_with('·') && ignored.contains("ignored"),
-        "{ignored}"
-    );
-}
-
-#[test]
-fn an_outdated_row_shows_installed_and_target_versions() {
-    assert!(row(&behind("prettier", "2.0.0")).contains("1.2.3 → 2.0.0"));
-}
-
-#[test]
 fn the_row_spinner_advances_every_frame_and_repeats() {
     let ticks: Vec<char> = (0..5).map(spinner_tick).collect();
 
@@ -222,15 +325,6 @@ fn the_row_spinner_advances_every_frame_and_repeats() {
             .len(),
         4
     );
-}
-
-#[test]
-fn bun_packages_are_labelled_so_duplicates_are_distinguishable() {
-    let from_bun = package("typescript", SourceKind::Bun, Status::Current);
-    let from_npm = package("typescript", SourceKind::Npm, Status::Current);
-
-    assert!(row(&from_bun).contains("(bun)"));
-    assert!(!row(&from_npm).contains("(bun)"));
 }
 
 #[test]
@@ -309,23 +403,32 @@ fn the_same_name_from_two_sources_gets_two_distinct_ignore_ids() {
 
 #[test]
 fn an_ignore_id_with_an_unknown_source_is_rejected() {
-    assert_eq!(Action::from_key("ignore:pnpm:prettier"), None);
+    assert_eq!(Action::from_key("ignore:cargo:prettier"), None);
     assert_eq!(Action::from_key("ignore:prettier"), None);
 }
 
 #[test]
-fn only_an_outdated_package_offers_an_update_item() {
-    assert!(offers_update(&behind("prettier", "2.0.0")));
-    assert!(!offers_update(&package(
-        "npm",
-        SourceKind::Npm,
-        Status::Ignored
-    )));
-    assert!(!offers_update(&package(
-        "typescript",
-        SourceKind::Npm,
-        Status::Current
-    )));
+fn a_remove_id_round_trips_including_scoped_names() {
+    assert_eq!(
+        Action::from_key("remove:npm:@salesforce/cli"),
+        Some(Action::Remove {
+            name: "@salesforce/cli".to_string(),
+            source: SourceKind::Npm,
+        })
+    );
+    assert_eq!(
+        Action::from_key("remove:bun:prettier"),
+        Some(Action::Remove {
+            name: "prettier".to_string(),
+            source: SourceKind::Bun,
+        })
+    );
+}
+
+#[test]
+fn a_remove_id_with_an_unknown_source_is_rejected() {
+    assert_eq!(Action::from_key("remove:cargo:prettier"), None);
+    assert_eq!(Action::from_key("remove:prettier"), None);
 }
 
 #[test]
@@ -400,13 +503,10 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
 
     let built = build(&self_view).unwrap();
     let top_level = built.menu.items();
-    let top_level_ids: Vec<String> = top_level
-        .iter()
-        .map(|item| item.id().as_ref().to_string())
-        .collect();
+    let ids = top_level_ids(&built);
     assert!(
-        !top_level_ids.contains(&ID_UPDATE_SELF.to_string()),
-        "the self-update row should not sit at the top level: {top_level_ids:?}"
+        !ids.contains(&ID_UPDATE_SELF.to_string()),
+        "the self-update row should not sit at the top level: {ids:?}"
     );
 
     let self_block = top_level
@@ -475,121 +575,6 @@ fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
         texts.iter().any(|text| text.contains("winget")),
         "the submenu should say where updates come from instead: {texts:?}"
     );
-}
-
-fn confirm_ids(built: &Built) -> Vec<String> {
-    let mut ids = Vec::new();
-    for item in built.menu.items() {
-        let Some(row) = item.as_submenu() else {
-            continue;
-        };
-        for entry in row.items() {
-            let Some(nested) = entry.as_submenu() else {
-                continue;
-            };
-            for leaf in nested.items() {
-                ids.push(leaf.id().as_ref().to_string());
-            }
-        }
-    }
-    ids
-}
-
-#[test]
-fn a_remove_id_round_trips_including_scoped_names() {
-    assert_eq!(
-        Action::from_key("remove:npm:@salesforce/cli"),
-        Some(Action::Remove {
-            name: "@salesforce/cli".to_string(),
-            source: SourceKind::Npm,
-        })
-    );
-    assert_eq!(
-        Action::from_key("remove:bun:prettier"),
-        Some(Action::Remove {
-            name: "prettier".to_string(),
-            source: SourceKind::Bun,
-        })
-    );
-}
-
-#[test]
-fn a_remove_id_with_an_unknown_source_is_rejected() {
-    assert_eq!(Action::from_key("remove:pnpm:prettier"), None);
-    assert_eq!(Action::from_key("remove:prettier"), None);
-}
-
-#[test]
-fn every_row_offers_a_confirmed_uninstall_whatever_its_status() {
-    let packages = vec![
-        behind("prettier", "2.0.0"),
-        package("typescript", SourceKind::Npm, Status::Current),
-        package("npm", SourceKind::Npm, Status::Ignored),
-        package("mystery", SourceKind::Bun, Status::Unknown),
-    ];
-    let built = build(&view(&packages, None, 0)).unwrap();
-    let ids = confirm_ids(&built);
-
-    for expected in [
-        "remove:npm:prettier",
-        "remove:npm:typescript",
-        "remove:npm:npm",
-        "remove:bun:mystery",
-    ] {
-        assert!(
-            ids.contains(&expected.to_string()),
-            "{expected} missing from {ids:?}"
-        );
-    }
-}
-
-#[test]
-fn the_uninstall_submenu_itself_triggers_no_action() {
-    let packages = vec![behind("prettier", "2.0.0")];
-    let built = build(&view(&packages, None, 0)).unwrap();
-    let mut seen = 0;
-
-    for item in built.menu.items() {
-        let Some(row) = item.as_submenu() else {
-            continue;
-        };
-        for entry in row.items() {
-            let Some(nested) = entry.as_submenu() else {
-                continue;
-            };
-            seen += 1;
-            assert_eq!(nested.text(), "Uninstall");
-            assert_eq!(Action::from_id(nested.id()), None);
-        }
-    }
-
-    assert_eq!(seen, 1);
-}
-
-#[test]
-fn a_busy_menu_disables_the_confirm_item() {
-    let packages = vec![package("typescript", SourceKind::Npm, Status::Current)];
-    let activity = updating("alpha", 0, 1);
-    let built = build(&view(&packages, Some(&activity), 0)).unwrap();
-    let mut checked = 0;
-
-    for item in built.menu.items() {
-        let Some(row) = item.as_submenu() else {
-            continue;
-        };
-        for entry in row.items() {
-            let Some(nested) = entry.as_submenu() else {
-                continue;
-            };
-            for leaf in nested.items() {
-                let leaf = leaf.as_menuitem().expect("the confirm row is a plain item");
-                assert!(!leaf.is_enabled(), "{} should be disabled", leaf.text());
-                checked += 1;
-            }
-        }
-    }
-
-    assert_eq!(checked, 1);
 }
 
 #[test]

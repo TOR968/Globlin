@@ -3,7 +3,8 @@
 
   # Globlin
 
-  A tray icon that watches your global npm and bun packages and tells you when one falls behind.
+  A tray icon that watches your global packages — npm, bun, pnpm, yarn, winget, choco — and tells you
+  when one falls behind.
 
   [![CI](https://github.com/TOR968/Globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/Globlin/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/TOR968/Globlin)](https://github.com/TOR968/Globlin/releases/latest)
@@ -11,17 +12,20 @@
   [**globlin.pages.dev**](https://globlin.pages.dev)
 </div>
 
-**[Install](#install)** · **[Using it](#using-it)** · **[Icon states](#icon-states)** ·
-**[Keeping itself updated](#keeping-itself-updated)** · **[More](#more)** · **[License](#license)**
+**[Install](#install)** · **[Using it](#using-it)** · **[Sources](#sources)** ·
+**[Icon states](#icon-states)** · **[Keeping itself updated](#keeping-itself-updated)** ·
+**[More](#more)** · **[License](#license)**
 
 ## What it does
 
-Global npm CLIs rot silently — nothing tells you `@salesforce/cli` is six versions behind until a
-command breaks in a way that turns out to be "oh, I'm ancient." Globlin sits in the tray, checks the
-registry on a schedule, and shows you exactly what's behind. Click a package to update it, or update
-everything at once. It never touches anything on its own unless you turn that on.
+Global CLIs rot silently — nothing tells you `@salesforce/cli` is six versions behind until a command
+breaks in a way that turns out to be "oh, I'm ancient." Globlin sits in the tray, checks on a schedule,
+and shows you exactly what's behind, across every package manager you have installed. Open the window to
+see the lot in one list, filter it by status or by source, tick the ones you want and update them in a
+batch. It never touches anything on its own unless you turn that on.
 
-Single portable `.exe`, ~2.8 MB, no installer, no runtime dependencies, Windows only.
+Single portable `.exe`, ~3.3 MB, no installer, no runtime dependencies, Windows only. The window is
+drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 10.
 
 ## Install
 
@@ -46,9 +50,12 @@ profile was tuned for a small binary, which produced 1.7 MB of unusually dense c
 executables are what packed malware looks like. Nothing here was packed, compressed or hidden; it merely
 resembled something that is.
 
-Building with a conventional profile settled it: the binary is now 2.8 MB, and three of the four engines
-stopped objecting. The identical source, built the size-tuned way, still draws them — that comparison and
-its numbers are in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#the-release-profile-is-an-antivirus-decision).
+Building with a conventional profile settled it: that took the binary from 1.7 MB to 2.8 MB, and three of
+the four engines stopped objecting. The identical source, built the size-tuned way, still draws them —
+that comparison and its numbers are in
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#the-release-profile-is-an-antivirus-decision). It has grown
+since — the package-list window links WebView2's glue in — and ships at about 3.3 MB today, which moves
+it further from the shape that was flagged, not closer.
 
 Microsoft flags some builds and not others, because an unsigned binary of this shape sits close to the
 model's line. If yours objects:
@@ -72,21 +79,56 @@ model's line. If yours objects:
 
 ## Using it
 
-Right-click the tray icon:
+Double-click the tray icon, or pick **Open Globlin** from its menu:
+
+```
+┌─ Globlin ─────────────────────────────────────────────────────────────────┐
+│ Globlin — 3 updates available          🔍 search…         [Check now]     │
+├──────────────┬────────────────────────────────────────────────────────────┤
+│ STATUS       │ ☐ Select all shown              [Update selected] [Update…] │
+│  All      28 ├────────────────────────────────────────────────────────────┤
+│  Outdated  3 │ ☑ ↑  @salesforce/cli    npm      2.145.6 → 2.146.3  Update │
+│  Up to date… │ ☑ ↑  vercel             npm       58.4.4 → 58.9.1   Update │
+│  Not checked │ ☐ ↑  Git.Git            winget    2.44.0 → 2.47.1 read-only │
+│  Ignored   1 │ ☐ ✓  prettier           npm       3.9.6                     │
+│              │ ☐ ✓  vite               pnpm      6.0.1                     │
+│ SOURCES      │ ☐ ·  npm                npm       12.0.2                    │
+│  ☑ npm  12·2↑│ ☐ ?  some-package       bun       1.0.0                     │
+│  ☑ bun     3 │                                                            │
+│  ☑ pnpm    2 │                                                            │
+│  ☐ yarn    0 │                                                            │
+│  ☑ winget 8·1│                                                            │
+├──────────────┴────────────────────────────────────────────────────────────┤
+│ Globlin v0.3.0        ☑ Run at startup  ☐ Auto-update  Open last log       │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+- `↑` outdated · `✓` current · `·` ignored · `?` the registry hasn't answered yet (never treated as "fine").
+- **The sidebar is the grouping.** Status rows filter the list; source rows filter it too, and each shows
+  `total · outdated`. The small `on`/`off` link beside a source switches that source on or off for good —
+  it goes into `globlin.json` and triggers a fresh check.
+- **Search** narrows by name as you type. Filters, search and selection compose.
+- **Update selected** runs the ticked rows as one queue; **Update all** takes every outdated package the
+  current filters are hiding as well. The header shows a `[2/3]` counter while the queue drains, the
+  active row spins with a progress bar, and finished rows show `✓ done` or `✗ failed`.
+- Per row: **Update** runs `npm install -g <name>@latest` (or the pnpm/yarn/bun equivalent) with no
+  console window, then re-checks. **Ignore** removes it from checks and from `Update all` without
+  touching the network — untick it and it's re-checked immediately. **Uninstall** arms into a **Confirm**
+  button and then removes the package with `npm uninstall -g <name>` (or the equivalent). The two clicks
+  are the confirmation; there is no dialog.
+- **winget and choco rows are read-only.** Both need an elevated process to upgrade anything, and Globlin
+  runs unelevated, so it reports them and leaves the doing to you. Their **Update** button says
+  `read-only` and does nothing.
+- A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
+  the same three packages every six hours.
+
+The tray menu stays short — the list lives in the window:
 
 ```
 Globlin — 3 updates available
 ─────────────────────────────────────
-↑  @google/gemini-cli   0.53.1 → 0.54.4      ▸  Update · ☐ Ignore · Uninstall
-↑  @salesforce/cli      2.145.6 → 2.146.3    ▸  Update · ☐ Ignore · Uninstall
-↑  vercel               58.4.4 → 58.9.1      ▸  Update · ☐ Ignore · Uninstall
-─────────────────────────────────────
-✓  prettier             3.9.6                ▸  ☐ Ignore · Uninstall
-✓  typescript           7.0.2                ▸  ☐ Ignore · Uninstall
-·  npm                  12.0.2      (ignored) ▸ ☑ Ignore · Uninstall
-?  some-package         1.0.0   (not checked) ▸ ☐ Ignore · Uninstall
-─────────────────────────────────────
-Update all (3)
+Open Globlin
+Update all (2)
 Check now
 ☑ Run at startup
 Open last log
@@ -98,20 +140,30 @@ Globlin v0.2.3                        ▸  Update Globlin 0.2.3 → 0.3.0
 Quit
 ```
 
-- `↑` outdated · `✓` current · `·` ignored · `?` the registry hasn't answered yet (never treated as "fine").
-- Every row opens a submenu: **Update** runs `npm install -g <name>@latest` (or the bun equivalent) with
-  no console window, then re-checks. **Ignore** removes it from checks and from `Update all` without
-  touching the network — untick it and it's re-checked immediately.
-  **Uninstall** opens onto a single `Confirm — remove <name>` item and removes the package from your
-  machine with `npm uninstall -g <name>` (or `bun remove -g <name>`), then re-checks. The two steps are
-  the confirmation — there is no dialog, and the outer `Uninstall` entry does nothing on its own.
-- **Update all** updates every outdated package as a queue: the header shows a `[2/3]` counter, the
-  active row spins with a progress bar, finished rows show `✓ done` or `✗ failed`.
-- **Check now** re-checks immediately instead of waiting for the schedule (every 6 hours by default).
-- A package name suffixed `(bun)` means it's the bun copy — the same name can be installed under both
-  npm and bun and stay distinguishable.
-- A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
-  the same three packages every six hours.
+`Update all (2)` counts what Globlin can actually update — the third, a winget package, is reported but
+not actionable.
+
+## Sources
+
+| Source | Where the list comes from | Where `latest` comes from | Update |
+|---|---|---|---|
+| **npm** | `npm ls -g --json --depth=0` | registry.npmjs.org | `npm install -g <name>@latest` |
+| **bun** | the global `package.json` + `node_modules` | registry.npmjs.org | `bun add -g <name>@latest` |
+| **pnpm** | `pnpm ls -g --json --depth=0` | registry.npmjs.org | `pnpm add -g <name>@latest` |
+| **yarn** | `yarn global dir` + `node_modules` | registry.npmjs.org | `yarn global add <name>@latest` |
+| **winget** | `winget list` | winget's own `Available` column | read-only |
+| **choco** | `choco list -r` + `choco outdated -r` | choco's own report | read-only |
+
+npm, bun, pnpm and yarn are on by default; winget and choco are off, because both are slower to list and
+neither can be updated from an unelevated app. Turn them on from the window's sidebar, or in
+`globlin.json`. A source whose CLI isn't installed simply reports nothing — it is not an error, and one
+broken source never sinks the others.
+
+**yarn means yarn classic (v1).** Yarn 2+ removed `yarn global` entirely; on a Berry install the source
+reports zero packages and says so in the log.
+
+The same package can be installed under several managers and stays distinguishable: the window shows the
+source in its own column, and menu and notification text suffix it — `typescript (pnpm)`.
 
 ## Icon states
 
@@ -156,7 +208,14 @@ edits are never silently overwritten.
 ```json
 {
   "check_interval_hours": 6,
-  "sources": { "npm": true, "bun": true },
+  "sources": {
+    "npm": true,
+    "bun": true,
+    "pnpm": true,
+    "yarn": true,
+    "winget": false,
+    "choco": false
+  },
   "ignore": ["npm", "@anthropic-ai/claude-code"],
   "last_notified": [],
   "npm_cmd": null,
@@ -165,7 +224,9 @@ edits are never silently overwritten.
 }
 ```
 
-- **`ignore`** — listed packages still appear in the menu with their version, but are never checked,
+- **`sources`** — which package managers to check. Missing keys take their defaults, so an older config
+  file keeps working and simply gains the new sources. See [Sources](#sources).
+- **`ignore`** — listed packages still appear in the window with their version, but are never checked,
   flagged or notified about. `npm` is ignored by default because updating it on Windows means it rewrites
   its own shim mid-run; `@anthropic-ai/claude-code` because it self-updates. An explicit `[]` is respected.
 - **`last_notified`** — bookkeeping for the "only notify on change" rule. Clear it to force the next
@@ -184,7 +245,7 @@ edits are never silently overwritten.
 <br>
 
 In `%LOCALAPPDATA%\globlin\`: **`last-check.txt`** (every package from the most recent check with its
-state — look here first when the menu shows something surprising), **`last-run.log`** (stdout/stderr of
+state — look here first when the window shows something surprising), **`last-run.log`** (stdout/stderr of
 the most recent *failed* package update, reachable from *Open last log*), **`self-update.log`** (the
 error from the most recent *failed* self-update lookup, kept separate so an offline run doesn't overwrite
 the log *Open last log* reads), and **`app.ico`** (the notification artwork).

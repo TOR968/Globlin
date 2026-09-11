@@ -1,14 +1,13 @@
 use super::*;
 use crate::model::{SourceKind, Status};
-use semver::Version;
 
 fn behind(name: &str, current: &str, latest: &str, source: SourceKind) -> Package {
     Package {
         name: name.to_string(),
-        current: Version::parse(current).unwrap(),
+        current: current.to_string(),
         source,
         status: Status::Outdated {
-            latest: Version::parse(latest).unwrap(),
+            latest: latest.to_string(),
         },
     }
 }
@@ -16,7 +15,7 @@ fn behind(name: &str, current: &str, latest: &str, source: SourceKind) -> Packag
 fn current(name: &str) -> Package {
     Package {
         name: name.to_string(),
-        current: Version::parse("1.0.0").unwrap(),
+        current: "1.0.0".to_string(),
         source: SourceKind::Npm,
         status: Status::Current,
     }
@@ -40,7 +39,7 @@ fn a_first_sighting_is_announced() {
             body,
             stamps,
         } => {
-            assert_eq!(title, "1 npm global update");
+            assert_eq!(title, "1 global update");
             assert_eq!(body, "prettier  3.9.6 → 3.10.0");
             assert_eq!(stamps, vec!["npm:prettier@3.10.0".to_string()]);
         }
@@ -83,7 +82,7 @@ fn the_title_switches_to_plural_beyond_one_update() {
     ];
 
     match decide(&packages, &[]) {
-        Decision::Announce { title, .. } => assert_eq!(title, "2 npm global updates"),
+        Decision::Announce { title, .. } => assert_eq!(title, "2 global updates"),
         other => panic!("expected an announcement, got {other:?}"),
     }
 }

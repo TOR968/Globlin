@@ -16,12 +16,14 @@ mod selfupdate;
 mod source;
 mod tray;
 mod update;
+mod window;
 
 use std::time::Duration;
 
-use tao::event::{Event, StartCause};
+use tao::event::{Event, StartCause, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tray_icon::menu::MenuEvent;
+use tray_icon::TrayIconEvent;
 
 use app::{App, Control};
 use check::Report;
@@ -33,6 +35,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub enum Message {
     Menu(MenuEvent),
+    Tray(TrayIconEvent),
+    Ipc(String),
     Checked(Report),
     Step(Step),
     Updated(Outcome),
@@ -90,17 +94,26 @@ fn run() -> Result<()> {
     let event_loop = EventLoopBuilder::<Message>::with_user_event().build();
     let mut app = App::new(event_loop.create_proxy())?;
     forward_menu_events(event_loop.create_proxy());
+    forward_tray_events(event_loop.create_proxy());
 
-    event_loop.run(move |event, _, control_flow| {
+    event_loop.run(move |event, target, control_flow| {
         *control_flow = match event {
             Event::NewEvents(StartCause::Init | StartCause::ResumeTimeReached { .. }) => {
                 app.on_wake();
                 ControlFlow::WaitUntil(app.next_wake())
             }
-            Event::UserEvent(message) => match app.handle(message) {
+            Event::UserEvent(message) => match app.handle(message, target) {
                 Control::Exit => ControlFlow::Exit,
                 Control::Continue => ControlFlow::WaitUntil(app.next_wake()),
             },
+            Event::WindowEvent {
+                window_id,
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                app.close_window(window_id);
+                ControlFlow::WaitUntil(app.next_wake())
+            }
             _ => ControlFlow::WaitUntil(app.next_wake()),
         };
     })
@@ -109,6 +122,12 @@ fn run() -> Result<()> {
 fn forward_menu_events(proxy: EventLoopProxy<Message>) {
     MenuEvent::set_event_handler(Some(move |event| {
         proxy.send_event(Message::Menu(event)).ok();
+    }));
+}
+
+fn forward_tray_events(proxy: EventLoopProxy<Message>) {
+    TrayIconEvent::set_event_handler(Some(move |event| {
+        proxy.send_event(Message::Tray(event)).ok();
     }));
 }
 

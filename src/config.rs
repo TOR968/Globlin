@@ -5,6 +5,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::install;
+use crate::model::SourceKind;
 use crate::platform;
 use crate::Result;
 
@@ -24,9 +25,14 @@ pub struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Sources {
     pub npm: bool,
     pub bun: bool,
+    pub pnpm: bool,
+    pub yarn: bool,
+    pub winget: bool,
+    pub choco: bool,
 }
 
 impl Default for Config {
@@ -48,6 +54,10 @@ impl Default for Sources {
         Self {
             npm: true,
             bun: true,
+            pnpm: true,
+            yarn: true,
+            winget: false,
+            choco: false,
         }
     }
 }
@@ -93,6 +103,29 @@ impl Config {
 
     pub fn is_ignored(&self, name: &str) -> bool {
         self.ignore.iter().any(|ignored| ignored == name)
+    }
+
+    pub fn source_enabled(&self, kind: SourceKind) -> bool {
+        match kind {
+            SourceKind::Npm => self.sources.npm,
+            SourceKind::Bun => self.sources.bun,
+            SourceKind::Pnpm => self.sources.pnpm,
+            SourceKind::Yarn => self.sources.yarn,
+            SourceKind::Winget => self.sources.winget,
+            SourceKind::Choco => self.sources.choco,
+        }
+    }
+
+    pub fn set_source_enabled(&mut self, kind: SourceKind, enabled: bool) {
+        let slot = match kind {
+            SourceKind::Npm => &mut self.sources.npm,
+            SourceKind::Bun => &mut self.sources.bun,
+            SourceKind::Pnpm => &mut self.sources.pnpm,
+            SourceKind::Yarn => &mut self.sources.yarn,
+            SourceKind::Winget => &mut self.sources.winget,
+            SourceKind::Choco => &mut self.sources.choco,
+        };
+        *slot = enabled;
     }
 
     pub fn set_ignored(&mut self, name: &str, ignored: bool) {

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 212 tests (203 run, 9 ignored), no network, no side effects
+cargo test                     # 279 tests (266 run, 13 ignored), no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -20,9 +20,10 @@ special-cased: it does the same cast-heavy work with `try_from` instead of `as` 
 
 Run one test: `cargo test -- --exact check::tests::versions_compare_numerically_not_as_strings`
 
-Nine tests are `#[ignore]`d because they touch the real system (registry Run key, real toast, real
-`npm install -g` x2, an icon dump, a README-image dump, a site-image dump, and two that hit the real
-GitHub releases API).
+Thirteen tests are `#[ignore]`d because they touch the real system (registry Run key, real toast, real
+`npm install -g` x2, an icon dump, a README-image dump, a site-image dump, two that hit the real
+GitHub releases API, one that builds a real WebView2 window, and three that run the real `winget`,
+`choco` and `pnpm` to confirm their output still has the shape the parsers expect).
 They never run in CI. Each carries its exact invocation in its `#[ignore = "…"]` message —
 `grep -rn "#\[ignore" src/` — read it before running one; `updates_a_package_for_real` installs globally
 for real and is driven by `$env:UPDATE_TARGET`.
@@ -56,10 +57,38 @@ scheduled check. There is no timer thread and idle costs nothing.
 states, icon, tooltip); `Tray::animate` only re-texts the header item and swaps the icon, because
 rebuilding a 20-row menu 8×/second is visible. Animation frames must go through `animate`.
 
-**Menu identity is a string round-trip.** Rows carry ids like `update:npm:@salesforce/cli`, parsed back
-by `Action::from_id` (`src/tray/menu.rs:39`). Adding a menu action means adding the id constant, the
-build site, and the parse arm. `App` then resolves `Action::Update { name, source }` against
-`self.packages` — the id is a key, not a payload.
+**Menu identity is a string round-trip, and the window speaks the same language.** Rows carry ids like
+`update:npm:@salesforce/cli`, parsed back by `Action::from_key` (`src/tray/menu.rs`). Adding an action
+means adding the id constant, the build site, and the parse arm. `App` then resolves
+`Action::Update { name, source }` against `self.packages` — the id is a key, not a payload. The window
+posts those same id strings over IPC (`Message::Ipc`), so there is one action vocabulary, not two;
+`update-many:npm:a|pnpm:b` is the only id the tray menu never builds.
+
+**The window is a WebView2 view over `App`'s state, never a second copy of it.** `window.rs` turns a
+`tray::View` into a `Snapshot` (plain serde structs) and hands it to the page as
+`window.globlin.render(<json>)`; the page renders and posts ids back. Everything with branch-worthy logic
+— which rows exist, what each id is, what counts as read-only — is built in `window.rs` and unit-tested
+there; `window/ui.html` only filters, sorts and draws. `window/shell.rs` is the only file that touches
+`wry`, and `window/stub.rs` is its non-Windows counterpart. Animation frames go through `tick`, not
+`render`, so an 8 fps spinner does not rebuild a 200-row list.
+
+**The tray menu no longer lists packages.** It is the short entry point — status, Open Globlin, Update
+all, Check now, Run at startup, Open last log, the self-update block, Quit — plus the live batch rows
+while an update runs. The package list lives in the window only, so there is one place a row can be
+wrong.
+
+**Two catalogs, one read path.** `SourceKind::catalog` splits sources into `Catalog::Npm` (npm, bun,
+pnpm, yarn — their packages are npm packages, so `registry.rs` resolves `latest`) and
+`Catalog::SelfReported` (winget, choco — the CLI itself reports what is available, and `check.rs` must
+never send `Git.Git` to registry.npmjs.org). Self-reported sources fill `Installed.available`; the npm
+catalog leaves it `None` and `check.rs` compares versions with `semver` instead. That comparison is the
+only place `semver` touches package versions — the model stores them as `String`, because winget and
+choco emit `1.2.3.4` and `2024.01.15`, which are not semver and must still be displayable.
+
+**Read-only sources are read-only in the type system.** `PackageSource::update_command` and
+`uninstall_command` return `Option<Command>`; winget and choco return `None` because both need
+elevation, and `Package::update_target` returns `None` for them, so they can never enter a batch. They
+still show as `Outdated` — being told is the point.
 
 **Read path vs write path.** `check.rs` = sources → installed list → registry `dist-tags` →
 `Status` per package. `update.rs` = run the update command per target, announcing `Progress` between
@@ -67,9 +96,11 @@ each. `model.rs` holds the vocabulary both speak (`Package`, `Status`, `UpdateTa
 `Status::Unknown` (registry did not answer) is distinct from `Status::Current` everywhere and must stay
 that way — a network failure must never render as "everything is fine".
 
-**Sources are a trait.** `PackageSource` (`src/source/mod.rs:14`) = kind + installed list + update
-`Command`. `source::enabled` fails only when *no* source could be built; one broken source does not sink
-a working one.
+**Sources are a trait.** `PackageSource` (`src/source/mod.rs`) = kind + installed list + optional update
+and uninstall `Command`s. `source::enabled` walks `model::KINDS` in order, skips what the config turns
+off, and fails only when *no* source could be built; one broken source does not sink a working one.
+Adding a source means a `SourceKind` variant, a module, a `build` arm, and a `Sources` field — the
+`KINDS` array and the tests that iterate it will tell you what you missed.
 
 **The testability rule that shaped the module split:** anything with branch-worthy logic lives outside
 `App`, because `App` needs a running Win32 tray and cannot be constructed in a test. That is why
@@ -86,13 +117,16 @@ encoder in `src/icon/png.rs`. Regenerate them, never hand-edit them; see
 
 ## Conventions
 
-- **No comments anywhere in `src/`** — currently zero `//` and zero `///`. Rationale goes in docs instead:
+- **No comments anywhere in `src/`** — currently zero `//` and zero `///`. That includes
+  `src/window/ui.html`: no `<!-- -->`, no `/* */`, no `//` in its `<script>`. Rationale goes in docs instead:
   [README.md](README.md) is the short, user-facing front page; [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
   is unusually complete and carries the rest — the verified environment workarounds
   (`npm ls -g --json` exits non-zero on a healthy-enough tree; `bun pm ls -g` ignores `-g`), the full
   self-update swap/rollback mechanics, and the release machinery. Read the relevant one before changing
   behaviour it describes. The same rule extends to `site/` — no `<!-- -->`, no `/* */` — and the site
   holds that line today.
+- The window's markup, CSS and JavaScript live in one `include_str!`d file, `src/window/ui.html`, with no
+  build step and no bundler. External resources are not fetched at runtime — the page is the binary.
 - `Cargo.toml` declares the package at the repository root, so release-plz reads every commit in the
   repository, not just the ones that touch it — and by default *any* commit bumps the version, whatever
   its type. The commit type only picks the changelog section. Two settings in `release-plz.toml` carry

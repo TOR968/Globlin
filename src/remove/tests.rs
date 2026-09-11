@@ -31,6 +31,10 @@ fn removing_without_any_enabled_source_fails_instead_of_reporting_success() {
         sources: Sources {
             npm: false,
             bun: false,
+            pnpm: false,
+            yarn: false,
+            winget: false,
+            choco: false,
         },
         ..Default::default()
     };
@@ -47,6 +51,10 @@ fn a_source_that_cannot_be_started_fails_instead_of_reporting_success() {
         sources: Sources {
             npm: true,
             bun: false,
+            pnpm: false,
+            yarn: false,
+            winget: false,
+            choco: false,
         },
         ..Default::default()
     };

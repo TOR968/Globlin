@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Globlin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --edge: #dfe3e8;
+        --text: #1c2024;
+        --muted: #6b7280;
+        --accent: #2f6f4f;
+        --accent-soft: #e6f2ea;
+        --warn: #b45309;
+        --warn-soft: #fdf1e0;
+        --danger: #b42318;
+        --row: #ffffff;
+        --row-alt: #fafbfc;
+        --focus: #7aa8c9;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15181c;
+          --panel: #1c2026;
+          --edge: #2c323a;
+          --text: #e6e9ed;
+          --muted: #9aa3af;
+          --accent: #5fb98a;
+          --accent-soft: #1d2b24;
+          --warn: #e0a35c;
+          --warn-soft: #2c2318;
+          --danger: #f08a80;
+          --row: #1c2026;
+          --row-alt: #202630;
+          --focus: #4d7fa3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+        user-select: none;
+        overflow: hidden;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--edge);
+      }
+
+      #headline {
+        flex: 1;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      #search {
+        width: 220px;
+        padding: 6px 10px;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        background: var(--bg);
+        color: inherit;
+        font: inherit;
+      }
+
+      #search:focus {
+        outline: 2px solid var(--focus);
+        outline-offset: -1px;
+      }
+
+      button {
+        padding: 6px 11px;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        background: var(--bg);
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled) {
+        border-color: var(--focus);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      button.primary {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      button.link {
+        border: none;
+        background: none;
+        color: var(--muted);
+        padding: 4px 6px;
+      }
+
+      button.link:hover:not(:disabled) {
+        color: var(--text);
+      }
+
+      button.danger {
+        color: var(--danger);
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+
+      aside {
+        width: 210px;
+        flex: none;
+        padding: 12px 10px;
+        background: var(--panel);
+        border-right: 1px solid var(--edge);
+        overflow-y: auto;
+      }
+
+      .group {
+        margin-bottom: 18px;
+      }
+
+      .group h2 {
+        margin: 0 0 6px 6px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .filter {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 5px 8px;
+        border: none;
+        border-radius: 6px;
+        background: none;
+        text-align: left;
+      }
+
+      .filter:hover {
+        background: var(--bg);
+      }
+
+      .filter[aria-pressed="true"] {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .filter .count {
+        margin-left: auto;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .filter[aria-pressed="true"] .count {
+        color: inherit;
+      }
+
+      .source {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px;
+        border-radius: 6px;
+      }
+
+      .source:hover {
+        background: var(--bg);
+      }
+
+      .source label {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+
+      .source.off label {
+        color: var(--muted);
+      }
+
+      .source .count {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .source .badge {
+        font-size: 10px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      section {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #bulk {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--edge);
+        background: var(--panel);
+      }
+
+      #bulk .spacer {
+        flex: 1;
+      }
+
+      #list {
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 14px;
+        border-bottom: 1px solid var(--edge);
+        background: var(--row);
+      }
+
+      .row:nth-child(even) {
+        background: var(--row-alt);
+      }
+
+      .row .mark {
+        width: 14px;
+        text-align: center;
+        color: var(--muted);
+      }
+
+      .row.outdated .mark {
+        color: var(--warn);
+      }
+
+      .row.current .mark {
+        color: var(--accent);
+      }
+
+      .row .name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row.ignored .name {
+        color: var(--muted);
+        text-decoration: line-through;
+      }
+
+      .row .source-tag {
+        width: 58px;
+        flex: none;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .row .version {
+        width: 190px;
+        flex: none;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+      }
+
+      .row.outdated .version strong {
+        color: var(--warn);
+      }
+
+      .row .actions {
+        width: 210px;
+        flex: none;
+        display: flex;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+
+      #batch {
+        border-top: 1px solid var(--edge);
+        background: var(--panel);
+        padding: 8px 14px;
+        max-height: 160px;
+        overflow-y: auto;
+      }
+
+      #batch div {
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        padding: 2px 0;
+      }
+
+      #batch div.active {
+        color: var(--text);
+      }
+
+      #batch div.failed {
+        color: var(--danger);
+      }
+
+      #batch div.done {
+        color: var(--accent);
+      }
+
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: var(--panel);
+        border-top: 1px solid var(--edge);
+        color: var(--muted);
+      }
+
+      footer .spacer {
+        flex: 1;
+      }
+
+      footer label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+
+      .empty {
+        padding: 40px;
+        text-align: center;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div id="headline">Globlin</div>
+      <input id="search" type="search" placeholder="Search packages" autocomplete="off" />
+      <button id="check">Check now</button>
+    </header>
+
+    <main>
+      <aside>
+        <div class="group">
+          <h2>Status</h2>
+          <div id="statuses"></div>
+        </div>
+        <div class="group">
+          <h2>Sources</h2>
+          <div id="sources"></div>
+        </div>
+      </aside>
+
+      <section>
+        <div id="bulk">
+          <label><input id="select-all" type="checkbox" /> Select all shown</label>
+          <span class="spacer"></span>
+          <span id="selection-count"></span>
+          <button id="update-selected" class="primary" disabled>Update selected</button>
+          <button id="update-all">Update all</button>
+        </div>
+        <div id="list"></div>
+        <div id="batch" hidden></div>
+      </section>
+    </main>
+
+    <footer>
+      <span id="version"></span>
+      <span id="managed" hidden></span>
+      <button id="self-update" class="link" hidden></button>
+      <span class="spacer"></span>
+      <label><input id="autostart" type="checkbox" /> Run at startup</label>
+      <label><input id="auto-update" type="checkbox" /> Auto-update Globlin</label>
+      <button id="open-log" class="link">Open last log</button>
+    </footer>
+
+    <script>
+      const send = (id) => window.ipc.postMessage(id);
+
+      const STATUSES = [
+        { key: "all", label: "All" },
+        { key: "outdated", label: "Outdated" },
+        { key: "current", label: "Up to date" },
+        { key: "unknown", label: "Not checked" },
+        { key: "ignored", label: "Ignored" },
+      ];
+
+      const MARKS = {
+        outdated: "↑",
+        current: "✓",
+        unknown: "?",
+        ignored: "·",
+      };
+
+      const state = {
+        snapshot: null,
+        status: "all",
+        hidden: new Set(),
+        query: "",
+        selected: new Set(),
+        confirming: null,
+      };
+
+      const el = (id) => document.getElementById(id);
+
+      const visible = () => {
+        const snapshot = state.snapshot;
+        if (!snapshot) return [];
+        const query = state.query.trim().toLowerCase();
+        return snapshot.packages.filter((row) => {
+          if (state.status !== "all" && row.status !== state.status) return false;
+          if (state.hidden.has(row.source)) return false;
+          if (query && !row.name.toLowerCase().includes(query)) return false;
+          return true;
+        });
+      };
+
+      const statusCount = (key) => {
+        const snapshot = state.snapshot;
+        if (!snapshot) return 0;
+        const rows = snapshot.packages.filter((row) => !state.hidden.has(row.source));
+        return key === "all" ? rows.length : rows.filter((row) => row.status === key).length;
+      };
+
+      const selectable = (row) => row.status === "outdated" && !row.read_only;
+
+      const renderStatuses = () => {
+        const host = el("statuses");
+        host.replaceChildren();
+        for (const entry of STATUSES) {
+          const button = document.createElement("button");
+          button.className = "filter";
+          button.setAttribute("aria-pressed", String(state.status === entry.key));
+          button.onclick = () => {
+            state.status = entry.key;
+            draw();
+          };
+          const label = document.createElement("span");
+          label.textContent = entry.label;
+          const count = document.createElement("span");
+          count.className = "count";
+          count.textContent = statusCount(entry.key);
+          button.append(label, count);
+          host.append(button);
+        }
+      };
+
+      const renderSources = () => {
+        const host = el("sources");
+        host.replaceChildren();
+        for (const source of state.snapshot.sources) {
+          const line = document.createElement("div");
+          line.className = source.enabled ? "source" : "source off";
+
+          const label = document.createElement("label");
+          const box = document.createElement("input");
+          box.type = "checkbox";
+          box.checked = source.enabled && !state.hidden.has(source.label);
+          box.onchange = () => {
+            if (!source.enabled) {
+              box.checked = false;
+              return;
+            }
+            if (box.checked) state.hidden.delete(source.label);
+            else state.hidden.add(source.label);
+            draw();
+          };
+          const name = document.createElement("span");
+          name.textContent = source.label;
+          label.append(box, name);
+
+          const count = document.createElement("span");
+          count.className = "count";
+          count.textContent = source.outdated ? source.total + " · " + source.outdated + "↑" : source.total;
+
+          const toggle = document.createElement("button");
+          toggle.className = "link";
+          toggle.textContent = source.enabled ? "off" : "on";
+          toggle.disabled = state.snapshot.busy;
+          toggle.onclick = () => send(source.id);
+
+          line.append(label, count);
+          if (source.read_only && source.enabled) {
+            const badge = document.createElement("span");
+            badge.className = "badge";
+            badge.textContent = "read-only";
+            line.append(badge);
+          }
+          line.append(toggle);
+          host.append(line);
+        }
+      };
+
+      const versionCell = (row) => {
+        const cell = document.createElement("div");
+        cell.className = "version";
+        if (row.latest) {
+          const from = document.createElement("span");
+          from.textContent = row.current + " → ";
+          const to = document.createElement("strong");
+          to.textContent = row.latest;
+          cell.append(from, to);
+        } else {
+          cell.textContent = row.current;
+        }
+        return cell;
+      };
+
+      const actionCell = (row) => {
+        const cell = document.createElement("div");
+        cell.className = "actions";
+        const busy = state.snapshot.busy;
+
+        if (row.status === "outdated") {
+          const update = document.createElement("button");
+          update.textContent = row.read_only ? "read-only" : "Update";
+          update.disabled = busy || row.read_only;
+          update.onclick = () => send(row.update_id);
+          cell.append(update);
+        }
+
+        const ignore = document.createElement("button");
+        ignore.className = "link";
+        ignore.textContent = row.status === "ignored" ? "Unignore" : "Ignore";
+        ignore.disabled = busy;
+        ignore.onclick = () => send(row.ignore_id);
+        cell.append(ignore);
+
+        if (!row.read_only) {
+          const remove = document.createElement("button");
+          remove.className = "link danger";
+          const armed = state.confirming === row.key;
+          remove.textContent = armed ? "Confirm" : "Uninstall";
+          remove.disabled = busy;
+          remove.onclick = () => {
+            if (armed) {
+              state.confirming = null;
+              send(row.remove_id);
+            } else {
+              state.confirming = row.key;
+              draw();
+            }
+          };
+          cell.append(remove);
+        }
+        return cell;
+      };
+
+      const renderList = () => {
+        const host = el("list");
+        host.replaceChildren();
+        const rows = visible();
+        if (!rows.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = state.snapshot.packages.length
+            ? "Nothing matches these filters."
+            : "No packages found yet.";
+          host.append(empty);
+          return;
+        }
+        for (const row of rows) {
+          const line = document.createElement("div");
+          line.className = "row " + row.status;
+
+          const box = document.createElement("input");
+          box.type = "checkbox";
+          box.disabled = !selectable(row) || state.snapshot.busy;
+          box.checked = state.selected.has(row.key);
+          box.onchange = () => {
+            if (box.checked) state.selected.add(row.key);
+            else state.selected.delete(row.key);
+            renderBulk();
+          };
+
+          const mark = document.createElement("div");
+          mark.className = "mark";
+          mark.textContent = MARKS[row.status] || "";
+
+          const name = document.createElement("div");
+          name.className = "name";
+          name.textContent = row.name;
+
+          const tag = document.createElement("div");
+          tag.className = "source-tag";
+          tag.textContent = row.source;
+
+          line.append(box, mark, name, tag, versionCell(row), actionCell(row));
+          host.append(line);
+        }
+      };
+
+      const renderBulk = () => {
+        const rows = visible().filter(selectable);
+        const chosen = rows.filter((row) => state.selected.has(row.key));
+        el("selection-count").textContent = chosen.length ? chosen.length + " selected" : "";
+        el("update-selected").disabled = !chosen.length || state.snapshot.busy;
+        el("select-all").checked = rows.length > 0 && chosen.length === rows.length;
+        el("select-all").disabled = !rows.length || state.snapshot.busy;
+
+        const updatable = state.snapshot.packages.filter(selectable).length;
+        const all = el("update-all");
+        all.textContent = updatable ? "Update all (" + updatable + ")" : "Update all";
+        all.disabled = !updatable || state.snapshot.busy;
+      };
+
+      const renderBatch = () => {
+        const host = el("batch");
+        const rows = state.snapshot.batch;
+        host.hidden = !rows.length;
+        host.replaceChildren();
+        for (const entry of rows) {
+          const line = document.createElement("div");
+          line.className = entry.state;
+          line.textContent = entry.text;
+          host.append(line);
+        }
+      };
+
+      const renderFooter = () => {
+        const snapshot = state.snapshot;
+        el("version").textContent = "Globlin v" + snapshot.version;
+        el("autostart").checked = snapshot.autostart;
+        el("auto-update").checked = snapshot.auto_update;
+        el("auto-update").disabled = Boolean(snapshot.managed_by);
+        const managed = el("managed");
+        managed.hidden = !snapshot.managed_by;
+        if (snapshot.managed_by) {
+          managed.textContent = "installed with " + snapshot.managed_by;
+        }
+        const selfRow = el("self-update");
+        selfRow.hidden = !snapshot.self_update;
+        selfRow.disabled = snapshot.busy;
+        if (snapshot.self_update) {
+          selfRow.textContent = "Update Globlin → " + snapshot.self_update;
+        }
+        el("check").disabled = snapshot.busy;
+      };
+
+      const draw = () => {
+        if (!state.snapshot) return;
+        const known = new Set(state.snapshot.packages.map((row) => row.key));
+        for (const key of [...state.selected]) if (!known.has(key)) state.selected.delete(key);
+        el("headline").textContent = state.snapshot.headline;
+        renderStatuses();
+        renderSources();
+        renderList();
+        renderBulk();
+        renderBatch();
+        renderFooter();
+      };
+
+      el("search").oninput = (event) => {
+        state.query = event.target.value;
+        draw();
+      };
+      el("check").onclick = () => send("check-now");
+      el("update-all").onclick = () => send("update-all");
+      el("open-log").onclick = () => send("open-log");
+      el("autostart").onclick = () => send("autostart");
+      el("auto-update").onclick = () => send("auto-update");
+      el("self-update").onclick = () => send("update-self");
+      el("select-all").onchange = (event) => {
+        const rows = visible().filter(selectable);
+        for (const row of rows) {
+          if (event.target.checked) state.selected.add(row.key);
+          else state.selected.delete(row.key);
+        }
+        draw();
+      };
+      el("update-selected").onclick = () => {
+        const rows = visible().filter((row) => selectable(row) && state.selected.has(row.key));
+        if (!rows.length) return;
+        send("update-many:" + rows.map((row) => row.key).join("|"));
+        state.selected.clear();
+      };
+
+      window.globlin = {
+        render(snapshot) {
+          state.snapshot = snapshot;
+          state.confirming = null;
+          draw();
+        },
+        tick(update) {
+          if (!state.snapshot) return;
+          state.snapshot.headline = update.headline;
+          state.snapshot.busy = update.busy;
+          state.snapshot.batch = update.batch;
+          el("headline").textContent = update.headline;
+          renderBatch();
+        },
+      };
+
+      send("window-ready");
+    </script>
+  </body>
+</html>

@@ -1,15 +1,14 @@
 use super::*;
 use crate::config::Sources;
 use crate::model::SourceKind;
-use semver::Version;
 use std::sync::Mutex;
 
 fn target(name: &str) -> UpdateTarget {
     UpdateTarget {
         name: name.to_string(),
         source: SourceKind::Npm,
-        from: Version::parse("1.0.0").unwrap(),
-        to: Version::parse("2.0.0").unwrap(),
+        from: "1.0.0".to_string(),
+        to: "2.0.0".to_string(),
     }
 }
 
@@ -27,6 +26,10 @@ impl UnrunnableNpm {
                 sources: Sources {
                     npm: true,
                     bun: false,
+                    pnpm: false,
+                    yarn: false,
+                    winget: false,
+                    choco: false,
                 },
                 ..Default::default()
             },
@@ -93,8 +96,8 @@ fn a_start_carries_both_versions_so_the_menu_can_show_them() {
     let Step::Started { target, .. } = &seen[0] else {
         panic!("the first step should be a start: {:?}", seen[0]);
     };
-    assert_eq!(target.from, Version::parse("1.0.0").unwrap());
-    assert_eq!(target.to, Version::parse("2.0.0").unwrap());
+    assert_eq!(target.from, "1.0.0");
+    assert_eq!(target.to, "2.0.0");
 }
 
 #[test]
@@ -145,6 +148,10 @@ fn a_target_whose_source_is_disabled_is_reported_rather_than_skipped_silently() 
         sources: Sources {
             npm: true,
             bun: false,
+            pnpm: false,
+            yarn: false,
+            winget: false,
+            choco: false,
         },
         ..Default::default()
     };

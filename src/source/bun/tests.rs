@@ -4,20 +4,20 @@ use super::*;
 fn reads_dependency_names_from_the_global_manifest() {
     let raw = r#"{"dependencies":{"opencode-ai":"1.17.9","@scope/tool":"^2.0.0"}}"#;
     assert_eq!(
-        parse_manifest(raw).unwrap(),
+        manifest_names(raw).unwrap(),
         vec!["@scope/tool".to_string(), "opencode-ai".to_string()]
     );
 }
 
 #[test]
 fn an_empty_global_store_yields_no_packages() {
-    assert!(parse_manifest("{}").unwrap().is_empty());
-    assert!(parse_manifest(r#"{"dependencies":{}}"#).unwrap().is_empty());
+    assert!(manifest_names("{}").unwrap().is_empty());
+    assert!(manifest_names(r#"{"dependencies":{}}"#).unwrap().is_empty());
 }
 
 #[test]
 fn a_malformed_manifest_is_an_error() {
-    assert!(parse_manifest("not json").is_err());
+    assert!(manifest_names("not json").is_err());
 }
 
 fn scratch(label: &str) -> PathBuf {
@@ -167,7 +167,7 @@ fn a_dependency_missing_from_node_modules_drops_out_instead_of_failing_the_sourc
 
     assert_eq!(installed.len(), 1);
     assert_eq!(installed[0].name, "present");
-    assert_eq!(installed[0].version, Version::parse("1.4.2").unwrap());
+    assert_eq!(installed[0].version, "1.4.2");
     assert_eq!(installed[0].source, SourceKind::Bun);
 }
 
@@ -186,7 +186,7 @@ fn the_bun_uninstall_command_removes_the_package_globally() {
     };
 
     assert_eq!(
-        arguments(&bun.uninstall_command("@scope/tool")),
+        arguments(&bun.uninstall_command("@scope/tool").unwrap()),
         vec!["remove", "-g", "@scope/tool"]
     );
 }
