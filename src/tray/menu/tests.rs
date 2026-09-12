@@ -137,7 +137,7 @@ fn the_same_name_from_two_sources_gets_two_distinct_ids() {
 #[test]
 fn unknown_ids_are_ignored() {
     assert_eq!(Action::from_key("something-else"), None);
-    assert_eq!(Action::from_key("update:cargo:prettier"), None);
+    assert_eq!(Action::from_key("update:nonesuch:prettier"), None);
     assert_eq!(Action::from_key("update:npm"), None);
     assert_eq!(Action::from_key("update:npm:"), None);
 }
@@ -164,7 +164,7 @@ fn a_bulk_update_id_carries_every_target_it_names() {
 #[test]
 fn a_bulk_update_drops_targets_it_cannot_resolve_rather_than_the_whole_batch() {
     assert_eq!(
-        Action::from_key("update-many:cargo:thing|npm:prettier"),
+        Action::from_key("update-many:nonesuch:thing|npm:prettier"),
         Some(Action::UpdateMany {
             refs: vec![PackageRef {
                 name: "prettier".to_string(),
@@ -172,7 +172,7 @@ fn a_bulk_update_drops_targets_it_cannot_resolve_rather_than_the_whole_batch() {
             }]
         })
     );
-    assert_eq!(Action::from_key("update-many:cargo:thing"), None);
+    assert_eq!(Action::from_key("update-many:nonesuch:thing"), None);
 }
 
 #[test]
@@ -183,7 +183,7 @@ fn a_source_toggle_id_round_trips() {
             Some(Action::ToggleSource { kind })
         );
     }
-    assert_eq!(Action::from_key("source:cargo"), None);
+    assert_eq!(Action::from_key("source:nonesuch"), None);
 }
 
 #[test]
@@ -403,7 +403,7 @@ fn the_same_name_from_two_sources_gets_two_distinct_ignore_ids() {
 
 #[test]
 fn an_ignore_id_with_an_unknown_source_is_rejected() {
-    assert_eq!(Action::from_key("ignore:cargo:prettier"), None);
+    assert_eq!(Action::from_key("ignore:nonesuch:prettier"), None);
     assert_eq!(Action::from_key("ignore:prettier"), None);
 }
 
@@ -427,7 +427,7 @@ fn a_remove_id_round_trips_including_scoped_names() {
 
 #[test]
 fn a_remove_id_with_an_unknown_source_is_rejected() {
-    assert_eq!(Action::from_key("remove:cargo:prettier"), None);
+    assert_eq!(Action::from_key("remove:nonesuch:prettier"), None);
     assert_eq!(Action::from_key("remove:prettier"), None);
 }
 

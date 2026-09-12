@@ -3,8 +3,8 @@
 
   # Globlin
 
-  A tray icon that watches your global packages — npm, bun, pnpm, yarn, winget, choco — and tells you
-  when one falls behind.
+  A tray icon that watches your global packages — npm, bun, pnpm, yarn, pipx, uv, scoop, cargo, go,
+  dotnet, PowerShell Gallery, gem, winget, choco — and tells you when one falls behind.
 
   [![CI](https://github.com/TOR968/Globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/Globlin/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/TOR968/Globlin)](https://github.com/TOR968/Globlin/releases/latest)
@@ -97,6 +97,9 @@ Double-click the tray icon, or pick **Open Globlin** from its menu:
 │  ☑ bun     3 │                                                            │
 │  ☑ pnpm    2 │                                                            │
 │  ☐ yarn    0 │                                                            │
+│  ☑ pipx    2 │                                                            │
+│  ☑ scoop   4 │                                                            │
+│  ☑ cargo   3 │                                                            │
 │  ☑ winget 8·1│                                                            │
 ├──────────────┴────────────────────────────────────────────────────────────┤
 │ Globlin v0.3.0        ☑ Run at startup  ☐ Auto-update  Open last log       │
@@ -151,16 +154,39 @@ not actionable.
 | **bun** | the global `package.json` + `node_modules` | registry.npmjs.org | `bun add -g <name>@latest` |
 | **pnpm** | `pnpm ls -g --json --depth=0` | registry.npmjs.org | `pnpm add -g <name>@latest` |
 | **yarn** | `yarn global dir` + `node_modules` | registry.npmjs.org | `yarn global add <name>@latest` |
+| **pipx** | `pipx list --short` | the project's PyPI release feed | `pipx upgrade <name>` |
+| **uv** | `uv tool list` | `uv tool list --outdated` | `uv tool upgrade <name>` |
+| **scoop** | `apps\*\current\manifest.json` | the manifest in the app's local bucket | `scoop update <name>` |
+| **cargo** | `cargo install --list` | crates.io, one request for every crate | `cargo install <name>` |
+| **go** | `go version -m` over the Go bin directory | `go list -m <module>@latest` | `go install <package>@latest` |
+| **dotnet** | `dotnet tool list --global` | the NuGet flat-container index | `dotnet tool update --global <name>` |
+| **psgallery** | `Get-InstalledModule` | the PowerShell Gallery's package redirect | `Update-Module -Scope CurrentUser` |
+| **gem** | `gem list --local` | `gem outdated` | `gem update <name>` |
 | **winget** | `winget list` | winget's own `Available` column | read-only |
 | **choco** | `choco list -r` + `choco outdated -r` | choco's own report | read-only |
 
-npm, bun, pnpm and yarn are on by default; winget and choco are off, because both are slower to list and
-neither can be updated from an unelevated app. Turn them on from the window's sidebar, or in
-`globlin.json`. A source whose CLI isn't installed simply reports nothing — it is not an error, and one
-broken source never sinks the others.
+Everything except psgallery, winget and choco is on by default. A source whose CLI isn't installed simply
+reports nothing — it is not an error, and one broken source never sinks the others. psgallery is off
+because it has to start PowerShell on every check, which costs about a second; winget and choco are off
+because both are slower to list and neither can be updated from an unelevated app. Turn any of them on
+from the window's sidebar, or in `globlin.json`.
 
 **yarn means yarn classic (v1).** Yarn 2+ removed `yarn global` entirely; on a Berry install the source
 reports zero packages and says so in the log.
+
+**pipx and uv, not pip.** `pip list` reports every library in whichever interpreter happens to be first
+on `PATH` — mostly transitive dependencies, and often not the environment your shell is in. pipx and
+`uv tool` give each CLI its own venv, so their listings name exactly the tools you installed globally, and
+neither needs elevation to upgrade one. A PyPI, NuGet or Gallery version that is not a plain run of
+numbers (`1.0.0rc1`, `1.0.0.post1`) is reported as not checked rather than guessed at.
+
+**scoop is compared against your local buckets.** Globlin reads the same bucket manifests `scoop status`
+reads and never runs `scoop update` for you, so an app is only as current as your last bucket refresh.
+Apps installed with `scoop install -g` live under `C:\ProgramData\scoop` and are not listed.
+
+**cargo and go build from source.** Their **Update** runs a real compile, which can take minutes; the row
+keeps spinning until it finishes. Go has no uninstall command, so go rows offer no **Uninstall** —
+delete the binary from your Go bin directory yourself.
 
 The same package can be installed under several managers and stays distinguishable: the window shows the
 source in its own column, and menu and notification text suffix it — `typescript (pnpm)`.
@@ -213,6 +239,14 @@ edits are never silently overwritten.
     "bun": true,
     "pnpm": true,
     "yarn": true,
+    "pipx": true,
+    "uv": true,
+    "scoop": true,
+    "cargo": true,
+    "go": true,
+    "dotnet": true,
+    "psgallery": false,
+    "gem": true,
     "winget": false,
     "choco": false
   },

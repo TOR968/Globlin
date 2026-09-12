@@ -46,6 +46,14 @@ fn config() -> Config {
             bun: false,
             pnpm: false,
             yarn: false,
+            pipx: false,
+            uv: false,
+            scoop: false,
+            cargo: false,
+            go: false,
+            dotnet: false,
+            psgallery: false,
+            gem: false,
             winget: true,
             choco: false,
         },
@@ -109,7 +117,22 @@ fn every_source_gets_a_sidebar_row_even_when_it_is_switched_off() {
 
     assert_eq!(
         labels,
-        vec!["npm", "bun", "pnpm", "yarn", "winget", "choco"]
+        vec![
+            "npm",
+            "bun",
+            "pnpm",
+            "yarn",
+            "pipx",
+            "uv",
+            "scoop",
+            "cargo",
+            "go",
+            "dotnet",
+            "psgallery",
+            "gem",
+            "winget",
+            "choco"
+        ]
     );
 }
 
@@ -282,4 +305,31 @@ fn the_window_shell_starts_against_a_real_webview() {
     window.render(&snapshot(&view(&[], None), &config()));
     window.show();
     assert!(window.visible());
+}
+
+#[test]
+fn a_source_with_no_uninstall_of_its_own_offers_no_remove_button() {
+    let packages = vec![Package {
+        name: "golang.org/x/tools/gopls".to_string(),
+        current: "0.15.3".to_string(),
+        source: SourceKind::Go,
+        status: Status::Current,
+    }];
+    let snapshot = snapshot(&view(&packages, None), &config());
+
+    assert!(!snapshot.packages[0].removable);
+    assert!(!snapshot.packages[0].read_only);
+}
+
+#[test]
+fn a_source_globlin_can_uninstall_from_says_so() {
+    let packages = vec![Package {
+        name: "prettier".to_string(),
+        current: "3.9.6".to_string(),
+        source: SourceKind::Npm,
+        status: Status::Current,
+    }];
+    let snapshot = snapshot(&view(&packages, None), &config());
+
+    assert!(snapshot.packages[0].removable);
 }

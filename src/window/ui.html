@@ -331,9 +331,27 @@
 
       .row .actions {
         flex: none;
-        display: flex;
-        justify-content: flex-end;
+        display: grid;
+        grid-template-columns: 84px 70px 74px;
         gap: 4px;
+      }
+
+      .row .actions button {
+        width: 100%;
+        padding-left: 2px;
+        padding-right: 2px;
+      }
+
+      .row .actions .act-update {
+        grid-column: 1;
+      }
+
+      .row .actions .act-ignore {
+        grid-column: 2;
+      }
+
+      .row .actions .act-remove {
+        grid-column: 3;
       }
 
       #batch {
@@ -572,6 +590,7 @@
 
         if (row.status === "outdated") {
           const update = document.createElement("button");
+          update.className = "act-update";
           update.textContent = row.read_only ? "read-only" : "Update";
           update.disabled = busy || row.read_only;
           update.onclick = () => send(row.update_id);
@@ -579,15 +598,15 @@
         }
 
         const ignore = document.createElement("button");
-        ignore.className = "link";
+        ignore.className = "link act-ignore";
         ignore.textContent = row.status === "ignored" ? "Unignore" : "Ignore";
         ignore.disabled = busy;
         ignore.onclick = () => send(row.ignore_id);
         cell.append(ignore);
 
-        if (!row.read_only) {
+        if (row.removable) {
           const remove = document.createElement("button");
-          remove.className = "link danger";
+          remove.className = "link danger act-remove";
           const armed = state.confirming === row.key;
           remove.textContent = armed ? "Confirm" : "Uninstall";
           remove.disabled = busy;
