@@ -14,9 +14,9 @@ pipeline, and the self-update mechanics in full.
 | `update.rs` | the write path — runs updates, announces progress per package |
 | `notice.rs` | decides whether an update set is worth a notification, and what it should say |
 | `progress.rs` | the asymptotic creep, the batch's overall level and the 8-cell bar |
-| `registry.rs` | dist-tags over HTTP |
+| `registry.rs` | every remote catalog: npm dist-tags, PyPI feeds, crates.io, NuGet and the PowerShell Gallery |
 | `selfupdate.rs` | the app's own release lookup, download, verification and swap |
-| `source/` | `PackageSource` trait plus the npm, bun, pnpm, yarn, winget and choco adapters |
+| `source/` | `PackageSource` trait plus one adapter per package manager, fourteen in all |
 | `tray/` | `mod.rs` owns the tray handle; `menu.rs` builds the short menu, every label and every action id |
 | `window/` | the package list: `window.rs` builds the snapshot, `shell.rs` owns the WebView2 window, `ui.html` is the page |
 | `icon/` | `render.rs` draws the states, `ico.rs` writes the container |
@@ -31,24 +31,73 @@ The same rule is why `window.rs` builds a `Snapshot` of plain serde structs and 
 draws it: every decision the window makes about *what* a row is lands in a unit test, and the untestable
 part — creating a WebView2 — is confined to `window/shell.rs`.
 
-### Two catalogs
+### Seven catalogs
 
-`SourceKind::catalog` is the fork in the read path. `Catalog::Npm` (npm, bun, pnpm, yarn) means the
-packages are npm packages whatever installed them, so `registry.rs` resolves `latest` for the union of
-their names in one pass. `Catalog::SelfReported` (winget, choco) means the package manager already knows:
-`winget list` prints an `Available` column, `choco outdated -r` prints the upgrade, and those land in
-`Installed.available`. `check.rs` must never send a winget id to registry.npmjs.org — `Git.Git` is not a
-package there, and a 404 would read as `Unknown` forever.
+`SourceKind::catalog` is the fork in the read path. It answers one question per source: *where does the
+version to compare against come from, and what does its absence mean?*
+
+| Catalog | Sources | `latest` comes from | Compared with |
+|---|---|---|---|
+| `Npm` | npm, bun, pnpm, yarn | `registry::npm_latest`, dist-tags per name | `semver` |
+| `Crates` | cargo | `registry::crates_latest`, one `?ids[]=` request per 100 crates | `semver` |
+| `PyPi` | pipx | `registry::pypi_latest`, the RSS release feed | `registry::numeric_is_newer` |
+| `NuGet` | dotnet | `registry::nuget_latest`, the flat-container `index.json` | `registry::numeric_is_newer` |
+| `PsGallery` | psgallery | `registry::psgallery_latest`, the package endpoint's redirect | `registry::numeric_is_newer` |
+| `SelfResolved` | uv, scoop, go, gem | the source fills `Installed.available` | string equality |
+| `SelfReported` | winget, choco | the source fills `Installed.available` | presence |
+
+The first five are remote: the source reports only what is installed, and `check.rs` asks the registry
+for the union of names in that catalog. A name the registry did not answer for is `Unknown`, never
+`Current`. `check.rs` must never send a winget id to registry.npmjs.org — `Git.Git` is not a package there.
+
+**The last two differ only in what `None` means.** For `SelfReported`, `available: None` means the tool
+looked and found no upgrade — `winget list` simply has no `Available` cell for that row. For
+`SelfResolved`, the source always fills `available` with the version it compared against, the installed
+one included, so `None` can only mean it could not find out — and that reads `Unknown`. uv and gem are
+here rather than beside winget because `uv tool list --outdated` and `gem outdated` list *only* the
+outdated packages: a failed run and an up-to-date machine would otherwise print the same empty report.
+Both sources therefore run the plain listing and the outdated report separately, and a non-zero exit
+from the report leaves every package unresolved. scoop resolves against the local bucket manifest and go
+against `go list -m <module>@latest`; a missing manifest or an offline proxy is `None` for the same
+reason.
+
+**Why each remote endpoint is the one it is.** Every choice here is the smallest reply that still names
+the newest stable release, because the check runs every six hours in the background.
+
+- **PyPI**: `/rss/project/<name>/releases.xml`, about 10 KB, taking the newest entry that is a plain run
+  of numbers. The JSON API is the obvious choice and the wrong one: `/pypi/ruff/json` is roughly 6 MB.
+- **crates.io**: `/api/v1/crates?per_page=100&ids[]=a&ids[]=b`, about 1 KB per crate for *all* crates in
+  one request, returning `max_stable_version`. Two traps: the default page size is 10, so `per_page`
+  is not optional, and a request without a `User-Agent` is refused with 403, which is why the shared
+  agent sends `globlin/<version> (+https://github.com/TOR968/Globlin)`. A single-crate
+  `/api/v1/crates/<name>` is 90–440 KB, and `?include=` shrinks it but empties `max_stable_version`.
+- **NuGet**: `https://api.nuget.org/v3-flatcontainer/<id>/index.json`, a few hundred bytes, sorted
+  oldest first, so it is read from the end. The id must be lowercased; the mixed-case URL is a 404.
+- **PowerShell Gallery**: there is no small JSON — the v3 flat container answers 403 and the OData feed
+  is 48 KB of XML that ignores its own `IsLatestVersion` filter. But `/api/v2/package/<id>` answers 302
+  to `…/packages/<id>.<version>.nupkg`, so `registry::gallery_newest_release` sends one request with
+  `max_redirects(0)` and reads the version out of the `Location` header. No body is ever downloaded.
+
+`numeric_is_newer` compares dot-separated segments as numbers and answers `None` when either side has a
+non-numeric segment. PEP 440 and NuGet versions are not semver (`2025.9.5`, `1.2.3.4`), and a prerelease
+or post-release is reported as `Unknown` rather than guessed at.
 
 That fork is also why package versions are `String` in `model.rs` rather than `semver::Version`. winget
-and choco emit `1.2.3.4` and `2024.01.15`; neither parses as semver, and both must still render. Version
-*comparison* still goes through `semver`, but only in `check.rs::from_registry`, where both sides came
-from an npm-catalog source — and a version that fails to parse there yields `Unknown`, never `Current`.
+and choco emit `1.2.3.4` and `2024.01.15`; neither parses as semver, and both must still render.
 
-Winget and choco are read-only. Both need elevation to upgrade anything and Globlin runs unelevated, so
-`update_command` and `uninstall_command` return `None` for them, `Package::update_target` returns `None`,
-and they can never enter a batch. `model::outdated` still counts them — the icon should go amber when a
-winget package is behind — while `model::updatable` is what `Update all` and the menu count.
+### Read-only and removable
+
+`SourceKind::read_only` names winget and choco directly and is deliberately not derived from the
+catalog: scoop and gem resolve their own versions the way winget does, but both update unelevated.
+winget and choco need elevation, so `update_command` and `uninstall_command` return `None` for them,
+`Package::update_target` returns `None`, and they can never enter a batch. `model::outdated` still counts
+them — the icon should go amber when a winget package is behind — while `model::updatable` is what
+`Update all` and the menu count.
+
+`SourceKind::removable` is the second, separate question. go is updatable but has no uninstall command of
+its own, so `Go::uninstall_command` is `None` while `read_only` is `false`. The window's row carries
+`removable` next to `read_only`, and `ui.html` draws **Uninstall** from `removable` alone — before that
+flag existed, a go row offered an Uninstall button that could only fail.
 
 ### The window
 
@@ -265,6 +314,48 @@ Things about the environment the code has to work around, all verified rather th
   the source reports zero packages, and the log says why. `yarn global dir` also prints its own banner
   and a `Done in 0.2s.` line around the path, so the parser drops known chatter prefixes rather than
   taking the last line.
+- **`pipx list --short` is the whole listing.** It prints `<name> <version>` per line — the main
+  package of each venv, not its injected dependencies — which is exactly the set a tools manager should
+  watch. The "nothing has been installed with pipx" notice goes to stderr, so stdout stays clean and the
+  parser only has to drop any line that is not two columns. `--json` carries the same two fields under
+  four levels of nesting.
+- **`uv tool list --outdated` hides current tools.** It is not the listing with a `[latest: X]` suffix
+  added — it skips every tool that is not behind. So the source runs `uv tool list` for the set and
+  `--outdated` for the upgrades, and merges by name. Both print entrypoints as `- <name>` lines under each
+  tool; the name column is checked for a leading `-` because an entrypoint called `vim` would otherwise
+  parse as a tool named `-` at version `im`.
+- **scoop is read from disk, not from `scoop list`.** `scoop list` and `scoop status` are PowerShell
+  `Format-Table` output with ANSI colour codes, and `scoop status` prints nothing but a warning when the
+  buckets are stale. The same facts are plain JSON on disk: `apps\<name>\current\manifest.json` holds
+  the installed `version`, `current\install.json` names the `bucket`, and
+  `buckets\<bucket>\bucket\<name>.json` holds the version that bucket offers (older buckets keep
+  manifests at their root, so that path is tried second). `current` is a junction, which `fs` follows.
+  `apps\scoop` itself is a git checkout with no manifest and drops out on its own. The root is `$SCOOP`,
+  else `%USERPROFILE%\scoop`.
+- **`cargo install --list` marks git and path installs.** A registry crate prints `name vX.Y.Z:`; one
+  installed from git prints `name vX.Y.Z (https://…#rev):`. The second is dropped, because crates.io
+  would answer for an unrelated crate of the same name. The format was captured from the real cargo
+  without installing anything: `cargo install --list --root <dir>` reads `<dir>\.crates.toml`, so a
+  hand-written one is enough.
+- **go names a tool by its package, but versions belong to its module.** `go version -m <bin dir>` scans
+  the whole directory in one call and prints a `path` line (the package, what `go install` takes) and a
+  `mod` line (the module and its version) per binary. They differ for anything under `cmd/` —
+  `honnef.co/go/tools/cmd/staticcheck` is version `v0.4.7` of module `honnef.co/go/tools` — and only the
+  module can be asked for `@latest`. The source keeps both, names the row by the package, and queries by
+  the module. Binaries built locally report `(devel)` and are skipped.
+- **`dotnet tool list` grew JSON in SDK 9.** `--format json` wraps rows in `{"version":1,"data":[…]}`;
+  the serde structs accept camel and Pascal case because the SDK's serializer context decides which. An
+  older SDK rejects the flag, prints nothing on stdout, and the source falls back to the table, reading
+  rows after the dashed separator so the localised header is never a row.
+- **psgallery quotes module names.** Every name reaches PowerShell inside `-Command`, so `quoted` wraps it
+  in single quotes and doubles any quote inside. `Get-InstalledModule` lists only Gallery-installed
+  modules, which is the set `Update-Module` can act on; the update is pinned to `-Scope CurrentUser` so
+  it never needs elevation.
+- **gem uninstall must not prompt.** A gem with several installed versions makes `gem uninstall` ask
+  which to remove, and the process has no console to ask on, so it would wait forever. `--all
+  --executables` removes every version and its binstubs without asking. `gem list` puts `default: ` in
+  front of default gems and a platform label after native ones (`1.16.5 x64-mingw-ucrt`); both are
+  stripped from the version.
 - **`winget list` has no machine-readable output.** There is no `--json`; `winget export` omits anything
   without a manifest. So the fixed-width table is parsed: find the row of dashes, read column start
   offsets from the header line above it, and slice each row by those offsets. Column *positions* rather
@@ -404,11 +495,13 @@ do nothing.
 cargo test
 ```
 
-279 tests: 266 run by default (no network, no side effects), 13 `#[ignore]`d because they touch the real
+383 tests: 358 run by default (no network, no side effects), 25 `#[ignore]`d because they touch the real
 system — the HKCU Run key, a real toast, a real `npm install -g`, two icon/PNG dump tests, two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
-this machine), and three that run the real `winget`, `choco` and `pnpm`. Those last three exist because
+this machine), four that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index and the
+Gallery redirect), and eleven that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
+`cargo`, `go`, `dotnet`, PowerShell and `gem`. Those last eleven exist because
 the parsers below are pinned against captured output, and captured output cannot notice the day a tool
 changes its format — run them after a winget or Chocolatey upgrade. Each carries its own exact invocation
 in its

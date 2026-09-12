@@ -10,16 +10,32 @@ use crate::model::{Installed, SourceKind, KINDS};
 use crate::Result;
 
 mod bun;
+mod cargo;
 mod choco;
+mod dotnet;
+mod gem;
+mod golang;
 mod npm;
+mod pipx;
 mod pnpm;
+mod psgallery;
+mod scoop;
+mod uv;
 mod winget;
 mod yarn;
 
 pub use bun::Bun;
+pub use cargo::Cargo;
 pub use choco::Choco;
+pub use dotnet::Dotnet;
+pub use gem::Gem;
+pub use golang::Go;
 pub use npm::Npm;
+pub use pipx::Pipx;
 pub use pnpm::Pnpm;
+pub use psgallery::PsGallery;
+pub use scoop::Scoop;
+pub use uv::Uv;
 pub use winget::Winget;
 pub use yarn::Yarn;
 
@@ -63,6 +79,14 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
         SourceKind::Bun => Box::new(Bun::new()?),
         SourceKind::Pnpm => Box::new(Pnpm::new()?),
         SourceKind::Yarn => Box::new(Yarn::new()?),
+        SourceKind::Pipx => Box::new(Pipx::new()?),
+        SourceKind::Uv => Box::new(Uv::new()?),
+        SourceKind::Scoop => Box::new(Scoop::new()?),
+        SourceKind::Cargo => Box::new(Cargo::new()?),
+        SourceKind::Go => Box::new(Go::new()?),
+        SourceKind::Dotnet => Box::new(Dotnet::new()?),
+        SourceKind::PsGallery => Box::new(PsGallery::new()?),
+        SourceKind::Gem => Box::new(Gem::new()?),
         SourceKind::Winget => Box::new(Winget::new()?),
         SourceKind::Choco => Box::new(Choco::new()?),
     })

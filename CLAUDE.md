@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 279 tests (266 run, 13 ignored), no network, no side effects
+cargo test                     # 383 tests (358 run, 25 ignored), no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -20,10 +20,12 @@ special-cased: it does the same cast-heavy work with `try_from` instead of `as` 
 
 Run one test: `cargo test -- --exact check::tests::versions_compare_numerically_not_as_strings`
 
-Thirteen tests are `#[ignore]`d because they touch the real system (registry Run key, real toast, real
-`npm install -g` x2, an icon dump, a README-image dump, a site-image dump, two that hit the real
-GitHub releases API, one that builds a real WebView2 window, and three that run the real `winget`,
-`choco` and `pnpm` to confirm their output still has the shape the parsers expect).
+Twenty-five tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
+real `npm install -g` x2, an icon dump, a README-image dump, a site-image dump, two that hit the real
+GitHub releases API, four that hit a real remote catalog — PyPI, crates.io, NuGet, the PowerShell
+Gallery — one that builds a real WebView2 window, and eleven that run the real `winget`, `choco`, `pnpm`,
+`pipx`, `uv`, `scoop`, `cargo`, `go`, `dotnet`, PowerShell and `gem` to confirm their output still has
+the shape the parsers expect).
 They never run in CI. Each carries its exact invocation in its `#[ignore = "…"]` message —
 `grep -rn "#\[ignore" src/` — read it before running one; `updates_a_package_for_real` installs globally
 for real and is driven by `$env:UPDATE_TARGET`.
@@ -77,18 +79,29 @@ all, Check now, Run at startup, Open last log, the self-update block, Quit — p
 while an update runs. The package list lives in the window only, so there is one place a row can be
 wrong.
 
-**Two catalogs, one read path.** `SourceKind::catalog` splits sources into `Catalog::Npm` (npm, bun,
-pnpm, yarn — their packages are npm packages, so `registry.rs` resolves `latest`) and
-`Catalog::SelfReported` (winget, choco — the CLI itself reports what is available, and `check.rs` must
-never send `Git.Git` to registry.npmjs.org). Self-reported sources fill `Installed.available`; the npm
-catalog leaves it `None` and `check.rs` compares versions with `semver` instead. That comparison is the
-only place `semver` touches package versions — the model stores them as `String`, because winget and
-choco emit `1.2.3.4` and `2024.01.15`, which are not semver and must still be displayable.
+**Seven catalogs, one read path.** `SourceKind::catalog` says where the version to compare against comes
+from and what its absence means. Five are remote and resolved in `registry.rs` for the union of names:
+`Npm` (npm, bun, pnpm, yarn — dist-tags, compared with `semver`), `Crates` (cargo — one batched
+`?ids[]=` request, `semver`), `PyPi` (pipx — the RSS release feed, because the JSON API runs to
+megabytes), `NuGet` (dotnet — the flat-container index) and `PsGallery` (psgallery — the version read
+from the package endpoint's 302 `Location`, no body downloaded); the last three compare with
+`registry::numeric_is_newer`, because PEP 440 and NuGet are not semver. Two are filled by the source into
+`Installed.available`, and they differ only in what `None` means: `SelfReported` (winget, choco) —
+`None` is "no upgrade"; `SelfResolved` (uv, scoop, go, gem) — the source always fills the version it
+compared against, so `None` can only mean it could not find out, and reads `Unknown`. uv and gem are
+`SelfResolved` because their outdated reports list *only* outdated packages, so a failed report and an
+up-to-date machine would otherwise look identical. `check.rs` must never send `Git.Git` to
+registry.npmjs.org. A version that cannot be compared reads `Unknown`, never `Current`. The model stores
+versions as `String`, because winget and choco emit `1.2.3.4` and `2024.01.15`, which are not semver
+and must still be displayable. The full endpoint rationale is in `docs/DEVELOPMENT.md#seven-catalogs`.
 
 **Read-only sources are read-only in the type system.** `PackageSource::update_command` and
-`uninstall_command` return `Option<Command>`; winget and choco return `None` because both need
-elevation, and `Package::update_target` returns `None` for them, so they can never enter a batch. They
-still show as `Outdated` — being told is the point.
+`uninstall_command` return `Option<Command>`; winget and choco return `None` for both because both need
+elevation. `SourceKind::read_only` names those two directly and is deliberately not derived from the
+catalog, and `Package::update_target` returns `None` for them, so they can never enter a batch. They
+still show as `Outdated` — being told is the point. `SourceKind::removable` is a separate question: go
+updates fine but has no uninstall, so the window draws **Uninstall** from `removable`, not from
+`!read_only`.
 
 **Read path vs write path.** `check.rs` = sources → installed list → registry `dist-tags` →
 `Status` per package. `update.rs` = run the update command per target, announcing `Progress` between

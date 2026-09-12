@@ -173,6 +173,7 @@ fn a_read_only_package_still_stamps_so_it_can_be_announced_once() {
 #[test]
 fn the_npm_registry_and_the_self_reporting_sources_are_told_apart() {
     assert_eq!(SourceKind::Npm.catalog(), Catalog::Npm);
+    assert_eq!(SourceKind::Pipx.catalog(), Catalog::PyPi);
     assert_eq!(SourceKind::Pnpm.catalog(), Catalog::Npm);
     assert_eq!(SourceKind::Yarn.catalog(), Catalog::Npm);
     assert_eq!(SourceKind::Winget.catalog(), Catalog::SelfReported);
@@ -200,4 +201,24 @@ fn every_status_reports_a_distinct_label() {
     let unique: std::collections::HashSet<&&str> = labels.iter().collect();
 
     assert_eq!(unique.len(), labels.len());
+}
+
+#[test]
+fn a_source_that_reports_its_own_versions_is_not_automatically_read_only() {
+    let pipx = sourced("black", "24.9.0", SourceKind::Pipx, behind("24.10.0"));
+
+    assert_ne!(SourceKind::Pipx.catalog(), Catalog::Npm);
+    assert!(!SourceKind::Pipx.read_only());
+    assert_eq!(updatable(std::slice::from_ref(&pipx)).len(), 1);
+}
+
+#[test]
+fn only_the_sources_that_need_elevation_are_read_only() {
+    let read_only: Vec<&str> = KINDS
+        .iter()
+        .filter(|kind| kind.read_only())
+        .map(|kind| kind.label())
+        .collect();
+
+    assert_eq!(read_only, vec!["winget", "choco"]);
 }

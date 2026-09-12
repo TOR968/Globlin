@@ -4,6 +4,14 @@ pub enum SourceKind {
     Bun,
     Pnpm,
     Yarn,
+    Pipx,
+    Uv,
+    Scoop,
+    Cargo,
+    Go,
+    Dotnet,
+    PsGallery,
+    Gem,
     Winget,
     Choco,
 }
@@ -11,14 +19,27 @@ pub enum SourceKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Catalog {
     Npm,
+    PyPi,
+    NuGet,
+    PsGallery,
+    Crates,
+    SelfResolved,
     SelfReported,
 }
 
-pub const KINDS: [SourceKind; 6] = [
+pub const KINDS: [SourceKind; 14] = [
     SourceKind::Npm,
     SourceKind::Bun,
     SourceKind::Pnpm,
     SourceKind::Yarn,
+    SourceKind::Pipx,
+    SourceKind::Uv,
+    SourceKind::Scoop,
+    SourceKind::Cargo,
+    SourceKind::Go,
+    SourceKind::Dotnet,
+    SourceKind::PsGallery,
+    SourceKind::Gem,
     SourceKind::Winget,
     SourceKind::Choco,
 ];
@@ -30,6 +51,14 @@ impl SourceKind {
             Self::Bun => "bun",
             Self::Pnpm => "pnpm",
             Self::Yarn => "yarn",
+            Self::Pipx => "pipx",
+            Self::Uv => "uv",
+            Self::Scoop => "scoop",
+            Self::Cargo => "cargo",
+            Self::Go => "go",
+            Self::Dotnet => "dotnet",
+            Self::PsGallery => "psgallery",
+            Self::Gem => "gem",
             Self::Winget => "winget",
             Self::Choco => "choco",
         }
@@ -42,12 +71,21 @@ impl SourceKind {
     pub const fn catalog(self) -> Catalog {
         match self {
             Self::Npm | Self::Bun | Self::Pnpm | Self::Yarn => Catalog::Npm,
+            Self::Pipx => Catalog::PyPi,
+            Self::Dotnet => Catalog::NuGet,
+            Self::PsGallery => Catalog::PsGallery,
+            Self::Uv | Self::Scoop | Self::Go | Self::Gem => Catalog::SelfResolved,
+            Self::Cargo => Catalog::Crates,
             Self::Winget | Self::Choco => Catalog::SelfReported,
         }
     }
 
     pub const fn read_only(self) -> bool {
-        matches!(self.catalog(), Catalog::SelfReported)
+        matches!(self, Self::Winget | Self::Choco)
+    }
+
+    pub const fn removable(self) -> bool {
+        !matches!(self, Self::Go | Self::Winget | Self::Choco)
     }
 
     pub const fn suffix(self) -> &'static str {
@@ -56,6 +94,14 @@ impl SourceKind {
             Self::Bun => " (bun)",
             Self::Pnpm => " (pnpm)",
             Self::Yarn => " (yarn)",
+            Self::Pipx => " (pipx)",
+            Self::Uv => " (uv)",
+            Self::Scoop => " (scoop)",
+            Self::Cargo => " (cargo)",
+            Self::Go => " (go)",
+            Self::Dotnet => " (dotnet)",
+            Self::PsGallery => " (psgallery)",
+            Self::Gem => " (gem)",
             Self::Winget => " (winget)",
             Self::Choco => " (choco)",
         }
