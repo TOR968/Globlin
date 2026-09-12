@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2](https://github.com/TOR968/Globlin/compare/v0.3.1...v0.3.2) - 2026-09-12
+
+### Added
+
+- watch pipx, uv, scoop, cargo, go, dotnet, PowerShell Gallery and gem ([#38](https://github.com/TOR968/Globlin/pull/38))
+
 ## [0.3.1](https://github.com/TOR968/Globlin/compare/v0.3.0...v0.3.1) - 2026-09-12
 
 ### Fixed
