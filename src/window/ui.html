@@ -136,7 +136,7 @@
       }
 
       aside {
-        width: 210px;
+        width: 268px;
         flex: none;
         padding: 12px 10px;
         background: var(--panel);
@@ -181,6 +181,7 @@
 
       .filter .count {
         margin-left: auto;
+        white-space: nowrap;
         color: var(--muted);
         font-variant-numeric: tabular-nums;
       }
@@ -191,8 +192,9 @@
 
       .source {
         display: flex;
+        flex-wrap: nowrap;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         padding: 4px 8px;
         border-radius: 6px;
       }
@@ -203,10 +205,18 @@
 
       .source label {
         flex: 1;
+        min-width: 0;
         display: flex;
         align-items: center;
         gap: 8px;
         cursor: pointer;
+      }
+
+      .source .name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .source.off label {
@@ -214,13 +224,21 @@
       }
 
       .source .count {
+        flex: none;
+        white-space: nowrap;
         color: var(--muted);
         font-variant-numeric: tabular-nums;
       }
 
+      .source .link {
+        flex: none;
+      }
+
       .source .badge {
+        flex: none;
+        white-space: nowrap;
         font-size: 10px;
-        padding: 1px 5px;
+        padding: 1px 4px;
         border-radius: 4px;
         background: var(--warn-soft);
         color: var(--warn);
@@ -280,7 +298,7 @@
 
       .row .name {
         flex: 1;
-        min-width: 0;
+        min-width: 90px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -299,8 +317,9 @@
       }
 
       .row .version {
-        width: 190px;
         flex: none;
+        min-width: 190px;
+        white-space: nowrap;
         text-align: right;
         font-variant-numeric: tabular-nums;
         color: var(--muted);
@@ -311,7 +330,6 @@
       }
 
       .row .actions {
-        width: 210px;
         flex: none;
         display: flex;
         justify-content: flex-end;
@@ -506,6 +524,7 @@
             draw();
           };
           const name = document.createElement("span");
+          name.className = "name";
           name.textContent = source.label;
           label.append(box, name);
 
