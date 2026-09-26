@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3](https://github.com/TOR968/Globlin/compare/v0.3.2...v0.3.3) - 2026-09-26
+
+### Fixed
+
+- run a package's own install scripts when npm 12 blocks them ([#40](https://github.com/TOR968/Globlin/pull/40))
+
 ## [0.3.2](https://github.com/TOR968/Globlin/compare/v0.3.1...v0.3.2) - 2026-09-12
 
 ### Added
