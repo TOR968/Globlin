@@ -59,6 +59,24 @@ fn arguments(command: &std::process::Command) -> Vec<String> {
 }
 
 #[test]
+fn the_npm_update_runs_the_packages_own_install_scripts_and_fails_on_any_other_blocked_one() {
+    let npm = Npm {
+        command: PathBuf::from("npm"),
+    };
+
+    assert_eq!(
+        arguments(&npm.update_command("@anthropic-ai/claude-code").unwrap()),
+        vec![
+            "install",
+            "-g",
+            "@anthropic-ai/claude-code@latest",
+            "--allow-scripts=@anthropic-ai/claude-code",
+            "--strict-allow-scripts",
+        ]
+    );
+}
+
+#[test]
 fn the_npm_uninstall_command_removes_the_package_globally() {
     let npm = Npm {
         command: PathBuf::from("npm"),

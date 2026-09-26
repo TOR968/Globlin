@@ -286,6 +286,17 @@ Things about the environment the code has to work around, all verified rather th
 - **`npm ls -g --json` exits non-zero when the global tree has problems** (an orphaned directory in
   `node_modules` is enough). The exit code is therefore ignored and stdout is parsed anyway; entries with
   no usable `version` are skipped instead of failing the whole listing.
+- **npm 12 blocks install scripts by default and still exits 0.** A package missing from the
+  `allow-scripts` list has its `postinstall` skipped with only a warning. `@anthropic-ai/claude-code`
+  is the case that surfaced it: its `postinstall` copies the native binary over a 500-byte stub in
+  `bin/claude.exe`, so a "successful" update left a `claude` that Windows refuses to start. The update
+  command therefore passes `--allow-scripts=<name>`, which approves the scripts of the package the user
+  already chose to install, and `--strict-allow-scripts`, which turns any other blocked script (a
+  dependency's) into `ESTRICTALLOWSCRIPTS` and a non-zero exit. That check runs before the old version
+  is touched, so a refused update leaves the working install in place and reports as failed. A CLI
+  `--allow-scripts` replaces the `.npmrc` list rather than extending it, so a dependency approved only
+  in `.npmrc` now fails the update loudly instead of being silently skipped. npm older than 12 does not
+  know either flag and only warns.
 - **`bun pm ls -g` does not list global packages.** It ignores `-g` and prints the tree for whatever
   directory it is run from, so it will happily report a project's dependencies as if they were global. The
   bun source instead reads the global manifest directly — see below for where that manifest actually
@@ -495,7 +506,7 @@ do nothing.
 cargo test
 ```
 
-383 tests: 358 run by default (no network, no side effects), 25 `#[ignore]`d because they touch the real
+384 tests: 359 run by default (no network, no side effects), 25 `#[ignore]`d because they touch the real
 system — the HKCU Run key, a real toast, a real `npm install -g`, two icon/PNG dump tests, two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on

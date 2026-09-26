@@ -41,7 +41,13 @@ impl PackageSource for Npm {
 
     fn update_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
-        command.args(["install", "-g", &format!("{name}@latest")]);
+        command.args([
+            "install",
+            "-g",
+            &format!("{name}@latest"),
+            &format!("--allow-scripts={name}"),
+            "--strict-allow-scripts",
+        ]);
         Some(command)
     }
 
