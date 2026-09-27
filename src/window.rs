@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::config::Config;
-use crate::model::{Activity, Batch, Package, RowState, SourceKind, Status, KINDS};
+use crate::model::{Activity, Batch, Blocked, Package, RowState, SourceKind, Status, KINDS};
 use crate::tray::{self, SelfUpdate, View};
 
 #[cfg(windows)]
@@ -32,6 +32,7 @@ pub struct Snapshot {
     pub sources: Vec<SourceRow>,
     pub packages: Vec<Row>,
     pub batch: Vec<BatchRow>,
+    pub approvals: Vec<ApprovalRow>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -65,6 +66,23 @@ pub struct BatchRow {
     pub state: &'static str,
 }
 
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct ApprovalRow {
+    pub name: String,
+    pub source: &'static str,
+    pub from: String,
+    pub to: String,
+    pub scripts: Vec<ScriptRow>,
+    pub approve_id: String,
+    pub dismiss_id: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct ScriptRow {
+    pub package: String,
+    pub scripts: String,
+}
+
 pub fn snapshot(view: &View, config: &Config) -> Snapshot {
     let (self_update, auto_update, managed_by) = match view.self_update {
         SelfUpdate::Winget => (None, false, Some("winget")),
@@ -89,6 +107,7 @@ pub fn snapshot(view: &View, config: &Config) -> Snapshot {
         sources: source_rows(view.packages, config),
         packages: view.packages.iter().map(row).collect(),
         batch: batch_rows(view),
+        approvals: view.approvals.iter().map(approval_row).collect(),
     }
 }
 
@@ -145,6 +164,25 @@ fn batch_rows(view: &View) -> Vec<BatchRow> {
             })
         })
         .collect()
+}
+
+fn approval_row(blocked: &Blocked) -> ApprovalRow {
+    ApprovalRow {
+        name: blocked.target.name.clone(),
+        source: blocked.target.source.label(),
+        from: blocked.target.from.clone(),
+        to: blocked.target.to.clone(),
+        scripts: blocked
+            .scripts
+            .iter()
+            .map(|script| ScriptRow {
+                package: script.package(),
+                scripts: script.scripts.clone(),
+            })
+            .collect(),
+        approve_id: tray::approve_id(&blocked.target),
+        dismiss_id: tray::dismiss_id(&blocked.target),
+    }
 }
 
 fn state_label(batch: &Batch, position: usize) -> &'static str {

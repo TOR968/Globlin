@@ -6,7 +6,7 @@ use tray_icon::menu::{
 };
 
 use crate::model::{
-    self, Activity, Batch, Package, PackageRef, RowState, SourceKind, UpdateTarget,
+    self, Activity, Batch, Blocked, Package, PackageRef, RowState, SourceKind, UpdateTarget,
 };
 use crate::progress;
 use crate::selfupdate::Release;
@@ -74,6 +74,7 @@ pub enum SelfUpdate<'a> {
 pub struct View<'a> {
     pub packages: &'a [Package],
     pub activity: Option<&'a Activity>,
+    pub approvals: &'a [Blocked],
     pub autostart: bool,
     pub self_update: SelfUpdate<'a>,
     pub pending_restart: Option<&'a Version>,

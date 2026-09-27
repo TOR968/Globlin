@@ -25,6 +25,7 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>, frame: u32)
     View {
         packages,
         activity,
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: None,
@@ -41,6 +42,7 @@ fn updating_view(activity: &Activity, elapsed: Duration) -> View<'_> {
     View {
         packages: &[],
         activity: Some(activity),
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: None,
@@ -490,6 +492,7 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
     let self_view = View {
         packages: &[],
         activity: None,
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: Some(&release),
@@ -534,6 +537,7 @@ fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
     let winget_view = View {
         packages: &[],
         activity: None,
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Winget,
         pending_restart: None,

@@ -22,6 +22,7 @@ impl Tray {
         let view = View {
             packages: &[],
             activity: None,
+            approvals: &[],
             autostart: false,
             self_update: SelfUpdate::Own {
                 release: None,

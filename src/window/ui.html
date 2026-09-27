@@ -406,6 +406,79 @@
         text-align: center;
         color: var(--muted);
       }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(0, 0, 0, 0.4);
+      }
+
+      .overlay[hidden] {
+        display: none;
+      }
+
+      .dialog {
+        width: min(680px, 100%);
+        max-height: 100%;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 18px;
+        background: var(--panel);
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+      }
+
+      .approval h3 {
+        margin: 0 0 4px;
+        font-size: 14px;
+      }
+
+      .approval p {
+        margin: 0 0 10px;
+        color: var(--muted);
+      }
+
+      .approval ul {
+        margin: 0 0 12px;
+        padding: 0;
+        list-style: none;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+      }
+
+      .approval li {
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--edge);
+      }
+
+      .approval li:last-child {
+        border-bottom: none;
+      }
+
+      .approval .package {
+        font-weight: 600;
+      }
+
+      .approval code {
+        display: block;
+        color: var(--muted);
+        font: 12px/1.4 "Cascadia Mono", Consolas, monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        user-select: text;
+      }
+
+      .approval .buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
     </style>
   </head>
   <body>
@@ -449,6 +522,8 @@
       <label><input id="auto-update" type="checkbox" /> Auto-update Globlin</label>
       <button id="open-log" class="link">Open last log</button>
     </footer>
+
+    <div id="approvals" class="overlay" hidden></div>
 
     <script>
       const send = (id) => window.ipc.postMessage(id);
@@ -715,6 +790,61 @@
         el("check").disabled = snapshot.busy;
       };
 
+      const renderApprovals = () => {
+        const host = el("approvals");
+        const entries = state.snapshot.approvals;
+        host.hidden = !entries.length;
+        host.replaceChildren();
+        if (!entries.length) return;
+        const dialog = document.createElement("div");
+        dialog.className = "dialog";
+        dialog.setAttribute("role", "dialog");
+        dialog.setAttribute("aria-modal", "true");
+        for (const entry of entries) {
+          const card = document.createElement("div");
+          card.className = "approval";
+
+          const title = document.createElement("h3");
+          title.textContent = entry.name + " " + entry.from + " → " + entry.to;
+
+          const count = entry.scripts.length;
+          const note = document.createElement("p");
+          note.textContent =
+            "wants to run install scripts from " +
+            count +
+            (count === 1 ? " package" : " packages") +
+            ". Allowing adds these exact versions to allow-scripts in your user .npmrc.";
+
+          const list = document.createElement("ul");
+          for (const script of entry.scripts) {
+            const item = document.createElement("li");
+            const name = document.createElement("div");
+            name.className = "package";
+            name.textContent = script.package;
+            const body = document.createElement("code");
+            body.textContent = script.scripts;
+            item.append(name, body);
+            list.append(item);
+          }
+
+          const buttons = document.createElement("div");
+          buttons.className = "buttons";
+          const later = document.createElement("button");
+          later.textContent = "Not now";
+          later.onclick = () => send(entry.dismiss_id);
+          const allow = document.createElement("button");
+          allow.className = "primary";
+          allow.textContent = "Allow and update";
+          allow.disabled = state.snapshot.busy;
+          allow.onclick = () => send(entry.approve_id);
+          buttons.append(later, allow);
+
+          card.append(title, note, list, buttons);
+          dialog.append(card);
+        }
+        host.append(dialog);
+      };
+
       const draw = () => {
         if (!state.snapshot) return;
         const known = new Set(state.snapshot.packages.map((row) => row.key));
@@ -726,6 +856,7 @@
         renderBulk();
         renderBatch();
         renderFooter();
+        renderApprovals();
       };
 
       el("search").oninput = (event) => {
@@ -766,6 +897,9 @@
           state.snapshot.batch = update.batch;
           el("headline").textContent = update.headline;
           renderBatch();
+          for (const button of document.querySelectorAll("#approvals button.primary")) {
+            button.disabled = update.busy;
+          }
         },
       };
 

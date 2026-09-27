@@ -380,6 +380,7 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            &self.approvals,
             self.available_release.as_ref(),
             self.pending_restart.as_ref(),
             self.config.auto_update,
@@ -503,6 +504,7 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            &self.approvals,
             self.available_release.as_ref(),
             self.pending_restart.as_ref(),
             self.config.auto_update,
@@ -522,6 +524,7 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            &self.approvals,
             self.available_release.as_ref(),
             self.pending_restart.as_ref(),
             self.config.auto_update,
@@ -578,9 +581,11 @@ fn open_diagnostic(path: &Path, empty: &str) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn view_of<'a>(
     packages: &'a [Package],
     activity: Option<&'a Activity>,
+    approvals: &'a [Blocked],
     release: Option<&'a Release>,
     pending_restart: Option<&'a Version>,
     auto_update: bool,
@@ -590,6 +595,7 @@ fn view_of<'a>(
     View {
         packages,
         activity,
+        approvals,
         self_update: if install::winget_managed() {
             SelfUpdate::Winget
         } else {
