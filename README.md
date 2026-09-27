@@ -119,6 +119,10 @@ Double-click the tray icon, or pick **Open Globlin** from its menu:
   touching the network — untick it and it's re-checked immediately. **Uninstall** arms into a **Confirm**
   button and then removes the package with `npm uninstall -g <name>` (or the equivalent). The two clicks
   are the confirmation; there is no dialog.
+- If npm 12 refuses an update because a dependency wants to run install scripts you have not approved,
+  Globlin opens its window with the list of packages and the exact scripts. **Allow and update** adds
+  those exact versions to `allow-scripts` in your user `.npmrc` and runs the update again; **Not now**
+  leaves the old version in place.
 - **winget and choco rows are read-only.** Both need an elevated process to upgrade anything, and Globlin
   runs unelevated, so it reports them and leaves the doing to you. Their **Update** button says
   `read-only` and does nothing.

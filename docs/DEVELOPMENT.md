@@ -302,6 +302,19 @@ Things about the environment the code has to work around, all verified rather th
   refused update is to append the listed dependencies to the user-level list — npm's own hint,
   `npm config set allow-scripts=<deps> --location=user`, replaces the existing list, so keep the old
   entries in it. npm older than 12 does not know either flag and only warns.
+- **A refused npm update opens an approval dialog instead of just failing.** `ESTRICTALLOWSCRIPTS`
+  stderr is parsed by `npm::parse_blocked_scripts`: the lines `npm error   <name>@<version> (<event>:
+  <body>; …)` come from one place in npm (`@npmcli/arborist/lib/unreviewed-scripts.js`), and the
+  version is split at the last `@` so scoped names survive. The target lands in `Outcome.blocked`, not
+  `failed`, so there is no failure toast; `App` keeps it in `approvals` (memory only) and opens the
+  window, whose modal lists each package and its scripts. **Allow and update** posts
+  `approve:npm:<name>`; the worker reads `npm config get allow-scripts --location=user` — the user level
+  only, so project or global entries are never copied into the user file — appends pinned
+  `name@version` entries (npm's own `approve-scripts` default), runs `npm config set … --location=user`
+  and reruns the update. A retry that hits new dependencies comes back as blocked again. A failed
+  `config set` fails the update without running it. Unparseable output falls back to a plain failure.
+  The pinned name is the one npm prints (self-reported); for an alias dependency npm matches on the
+  resolved identity, so that approval would not take and the dialog would show again.
 - **`bun pm ls -g` does not list global packages.** It ignores `-g` and prints the tree for whatever
   directory it is run from, so it will happily report a project's dependencies as if they were global. The
   bun source instead reads the global manifest directly — see below for where that manifest actually
@@ -511,8 +524,9 @@ do nothing.
 cargo test
 ```
 
-386 tests: 361 run by default (no network, no side effects), 25 `#[ignore]`d because they touch the real
-system — the HKCU Run key, a real toast, a real `npm install -g`, two icon/PNG dump tests, two that hit
+405 tests: 379 run by default (no network, no side effects), 26 `#[ignore]`d because they touch the real
+system — the HKCU Run key, a real toast, a real `npm install -g`, one that runs the real `npm config
+get/set` against a temporary userconfig, two icon/PNG dump tests, two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
 this machine), four that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index and the

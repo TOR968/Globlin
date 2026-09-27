@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 386 tests (361 run, 25 ignored), no network, no side effects
+cargo test                     # 405 tests (379 run, 26 ignored), no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -20,12 +20,12 @@ special-cased: it does the same cast-heavy work with `try_from` instead of `as` 
 
 Run one test: `cargo test -- --exact check::tests::versions_compare_numerically_not_as_strings`
 
-Twenty-five tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
-real `npm install -g` x2, an icon dump, a README-image dump, a site-image dump, two that hit the real
-GitHub releases API, four that hit a real remote catalog — PyPI, crates.io, NuGet, the PowerShell
-Gallery — one that builds a real WebView2 window, and eleven that run the real `winget`, `choco`, `pnpm`,
-`pipx`, `uv`, `scoop`, `cargo`, `go`, `dotnet`, PowerShell and `gem` to confirm their output still has
-the shape the parsers expect).
+Twenty-six tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
+real `npm install -g` x2, one that runs the real `npm config get/set` against a temporary userconfig,
+an icon dump, a README-image dump, a site-image dump, two that hit the real GitHub releases API, four
+that hit a real remote catalog — PyPI, crates.io, NuGet, the PowerShell Gallery — one that builds a real
+WebView2 window, and eleven that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`, `cargo`,
+`go`, `dotnet`, PowerShell and `gem` to confirm their output still has the shape the parsers expect).
 They never run in CI. Each carries its exact invocation in its `#[ignore = "…"]` message —
 `grep -rn "#\[ignore" src/` — read it before running one; `updates_a_package_for_real` installs globally
 for real and is driven by `$env:UPDATE_TARGET`.
@@ -107,7 +107,9 @@ updates fine but has no uninstall, so the window draws **Uninstall** from `remov
 `Status` per package. `update.rs` = run the update command per target, announcing `Progress` between
 each. `model.rs` holds the vocabulary both speak (`Package`, `Status`, `UpdateTarget`, `Activity`).
 `Status::Unknown` (registry did not answer) is distinct from `Status::Current` everywhere and must stay
-that way — a network failure must never render as "everything is fine".
+that way — a network failure must never render as "everything is fine". An npm update refused with
+`ESTRICTALLOWSCRIPTS` is `Outcome.blocked`, not `failed`; `App.approvals` holds it until the window's
+approval dialog approves (`approve:` id, persisted to the user `.npmrc`) or dismisses (`dismiss:`) it.
 
 **Sources are a trait.** `PackageSource` (`src/source/mod.rs`) = kind + installed list + optional update
 and uninstall `Command`s. `source::enabled` walks `model::KINDS` in order, skips what the config turns
