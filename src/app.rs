@@ -11,7 +11,8 @@ use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
 use crate::install;
 use crate::model::{
-    self, Activity, Batch, Package, PackageRef, RemoveTarget, SourceKind, Status, UpdateTarget,
+    self, Activity, Batch, Blocked, Package, PackageRef, RemoveTarget, SourceKind, Status,
+    UpdateTarget,
 };
 use crate::remove;
 use crate::selfupdate::{self, Release};
@@ -35,6 +36,7 @@ pub struct App {
     blocked_self: Option<Version>,
     pending_restart: Option<Version>,
     activity: Option<Activity>,
+    approvals: Vec<Blocked>,
     window: Option<Window>,
     failed: bool,
     frame: u32,
@@ -55,6 +57,7 @@ impl App {
             blocked_self: None,
             pending_restart: None,
             activity: None,
+            approvals: Vec::new(),
             window: None,
             failed: false,
             frame: 0,
@@ -89,7 +92,7 @@ impl App {
             Message::Tray(event) => self.on_tray(&event, target),
             Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
-            Message::Updated(outcome) => self.on_updated(&outcome),
+            Message::Updated(outcome) => self.on_updated(&outcome, target),
             Message::Removed { target, ok } => self.on_removed(&target, ok),
             Message::Replaced(result) => return self.on_replaced(result),
         }
@@ -128,15 +131,15 @@ impl App {
             Action::ToggleSource { kind } => self.toggle_source(kind),
             Action::UpdateMany { refs } => {
                 let targets = self.targets_for(&refs);
-                self.start_update(targets);
+                self.start_update(targets, Vec::new());
             }
             Action::UpdateAll => {
                 let targets = self.every_outdated_target();
-                self.start_update(targets);
+                self.start_update(targets, Vec::new());
             }
             Action::Update { name, source } => {
                 if let Some(target) = self.find(&name, source).and_then(Package::update_target) {
-                    self.start_update(vec![target]);
+                    self.start_update(vec![target], Vec::new());
                 }
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
@@ -144,6 +147,12 @@ impl App {
                 if self.find(&name, source).is_some() {
                     self.start_remove(RemoveTarget { name, source });
                 }
+            }
+            Action::Approve { name, source } => self.start_approved(&name, source),
+            Action::Dismiss { name, source } => {
+                self.approvals
+                    .retain(|entry| !entry.target.is(&name, source));
+                self.render();
             }
             Action::ToggleAutostart => self.toggle_autostart(),
             Action::UpdateSelf => {
@@ -240,7 +249,7 @@ impl App {
         });
     }
 
-    fn start_update(&mut self, targets: Vec<UpdateTarget>) {
+    fn start_update(&mut self, targets: Vec<UpdateTarget>, approvals: Vec<Blocked>) {
         if targets.is_empty() || self.activity.is_some() {
             return;
         }
@@ -254,9 +263,24 @@ impl App {
             let announce = |step| {
                 proxy.send_event(Message::Step(step)).ok();
             };
-            let outcome = update::run(&config, &targets, &[], announce);
+            let outcome = update::run(&config, &targets, &approvals, announce);
             proxy.send_event(Message::Updated(outcome)).ok();
         });
+    }
+
+    fn start_approved(&mut self, name: &str, source: SourceKind) {
+        if self.activity.is_some() {
+            return;
+        }
+        let Some(index) = self
+            .approvals
+            .iter()
+            .position(|entry| entry.target.is(name, source))
+        else {
+            return;
+        };
+        let blocked = self.approvals.remove(index);
+        self.start_update(vec![blocked.target.clone()], vec![blocked]);
     }
 
     fn start_remove(&mut self, target: RemoveTarget) {
@@ -428,8 +452,9 @@ impl App {
         self.config.save().ok();
     }
 
-    fn on_updated(&mut self, outcome: &Outcome) {
+    fn on_updated(&mut self, outcome: &Outcome, target: &EventLoopWindowTarget<Message>) {
         self.activity = None;
+        update::settle(&mut self.approvals, outcome);
         if !outcome.failed.is_empty() {
             platform::notify(
                 "Globlin — update failed",
@@ -438,6 +463,9 @@ impl App {
             .ok();
         } else if !outcome.updated.is_empty() {
             platform::notify("Globlin — updated", &outcome.updated.join("\n")).ok();
+        }
+        if !outcome.blocked.is_empty() {
+            self.open_window(target);
         }
         self.start_check();
     }

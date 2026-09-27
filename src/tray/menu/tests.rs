@@ -605,3 +605,36 @@ fn removing_and_checking_never_share_a_headline() {
         headline(&view(&[], Some(&Activity::Checking), 0))
     );
 }
+
+#[test]
+fn approval_ids_round_trip_including_scoped_names() {
+    let target = UpdateTarget {
+        name: "@deepseek-ai/dsh".to_string(),
+        source: SourceKind::Npm,
+        from: "0.1.5-rc.3".to_string(),
+        to: "0.1.7-rc.2".to_string(),
+    };
+
+    assert_eq!(approve_id(&target), "approve:npm:@deepseek-ai/dsh");
+    assert_eq!(dismiss_id(&target), "dismiss:npm:@deepseek-ai/dsh");
+    assert_eq!(
+        Action::from_key(&approve_id(&target)),
+        Some(Action::Approve {
+            name: "@deepseek-ai/dsh".to_string(),
+            source: SourceKind::Npm,
+        })
+    );
+    assert_eq!(
+        Action::from_key(&dismiss_id(&target)),
+        Some(Action::Dismiss {
+            name: "@deepseek-ai/dsh".to_string(),
+            source: SourceKind::Npm,
+        })
+    );
+}
+
+#[test]
+fn an_approval_id_without_a_package_name_is_ignored() {
+    assert_eq!(Action::from_key("approve:npm:"), None);
+    assert_eq!(Action::from_key("dismiss:nosuch:thing"), None);
+}
