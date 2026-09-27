@@ -483,7 +483,11 @@ impl App {
                 .ok();
             }
         }
-        self.start_check();
+        if outcome.changed_packages() {
+            self.start_check();
+        } else {
+            self.render();
+        }
     }
 
     fn on_removed(&mut self, target: &RemoveTarget, ok: bool) {

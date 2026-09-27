@@ -10,6 +10,12 @@ pub struct Outcome {
     pub blocked: Vec<Blocked>,
 }
 
+impl Outcome {
+    pub fn changed_packages(&self) -> bool {
+        !self.updated.is_empty() || !self.failed.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Step {
     Started {

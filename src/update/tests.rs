@@ -431,3 +431,29 @@ fn a_failure_report_names_both_versions_and_the_source() {
     assert!(report.contains("--- stdout ---"), "{report}");
     assert!(report.contains("--- stderr ---"), "{report}");
 }
+
+#[test]
+fn a_batch_where_every_target_was_blocked_changed_nothing_worth_rechecking() {
+    let outcome = Outcome {
+        blocked: vec![blocked("alpha", SourceKind::Npm)],
+        ..Outcome::default()
+    };
+
+    assert!(!outcome.changed_packages());
+}
+
+#[test]
+fn a_batch_with_an_updated_or_failed_target_changed_packages() {
+    let updated = Outcome {
+        updated: vec!["alpha".to_string()],
+        blocked: vec![blocked("beta", SourceKind::Npm)],
+        ..Outcome::default()
+    };
+    let failed = Outcome {
+        failed: vec!["alpha".to_string()],
+        ..Outcome::default()
+    };
+
+    assert!(updated.changed_packages());
+    assert!(failed.changed_packages());
+}

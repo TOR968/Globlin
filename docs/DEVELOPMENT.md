@@ -313,7 +313,9 @@ Things about the environment the code has to work around, all verified rather th
   (`@npmcli/arborist/lib/unreviewed-scripts.js`), and the version is split at the last `@` so scoped
   names survive. The target lands in `Outcome.blocked`, not `failed`, so there is no failure toast;
   `App` keeps it in `approvals` (memory only) and opens the window, whose modal lists each package and
-  its scripts. **Allow and update** posts `approve:npm:<name>`; the worker reads
+  its scripts. A batch in which every target was blocked changed nothing, so it skips the usual
+  post-update check (`Outcome::changed_packages`); otherwise **Allow and update** would sit disabled
+  behind a full check of every source. **Allow and update** posts `approve:npm:<name>`; the worker reads
   `npm config get allow-scripts -g`, which is the list a global install actually applies (user + global,
   never the project layer — `--location=user` does not restrict what `config get` reads, verified on
   npm 12.1.0) — appends pinned `name@version` entries (npm's own `approve-scripts` default; npm older
@@ -533,7 +535,7 @@ do nothing.
 cargo test
 ```
 
-413 tests: 387 run by default (no network, no side effects), 26 `#[ignore]`d because they touch the real
+415 tests: 389 run by default (no network, no side effects), 26 `#[ignore]`d because they touch the real
 system — the HKCU Run key, a real toast, a real `npm install -g`, one that runs the real `npm config
 get/set` against a temporary userconfig, two icon/PNG dump tests, two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
