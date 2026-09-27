@@ -194,6 +194,35 @@ pub struct UpdateTarget {
     pub to: String,
 }
 
+impl UpdateTarget {
+    pub fn is(&self, name: &str, source: SourceKind) -> bool {
+        self.name == name && self.source == source
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockedScript {
+    pub name: String,
+    pub version: String,
+    pub scripts: String,
+}
+
+impl BlockedScript {
+    pub fn package(&self) -> String {
+        if self.version.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}@{}", self.name, self.version)
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Blocked {
+    pub target: UpdateTarget,
+    pub scripts: Vec<BlockedScript>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageRef {
     pub name: String,

@@ -5,7 +5,7 @@ use std::process::Command;
 use serde::Deserialize;
 
 use super::{find_on_path, hidden_command, PackageSource};
-use crate::model::{Installed, SourceKind};
+use crate::model::{BlockedScript, Installed, SourceKind};
 use crate::Result;
 
 #[cfg(windows)]
@@ -13,6 +13,9 @@ const EXECUTABLE: &str = "npm.cmd";
 
 #[cfg(not(windows))]
 const EXECUTABLE: &str = "npm";
+
+const STRICT_REFUSAL_CODE: &str = "ESTRICTALLOWSCRIPTS";
+const BLOCKED_LINE_PREFIX: &str = "npm error   ";
 
 pub struct Npm {
     command: PathBuf,
@@ -41,7 +44,7 @@ impl PackageSource for Npm {
 
     fn update_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
-        command.args(install_arguments(name, &self.configured_allow_scripts()));
+        command.args(install_arguments(name, &self.allow_scripts_config(&[])));
         Some(command)
     }
 
@@ -50,12 +53,40 @@ impl PackageSource for Npm {
         command.args(["uninstall", "-g", name]);
         Some(command)
     }
+
+    fn blocked_scripts(&self, stderr: &str) -> Option<Vec<BlockedScript>> {
+        parse_blocked_scripts(stderr)
+    }
+
+    fn approve_scripts(&self, scripts: &[BlockedScript]) -> Result<()> {
+        let merged = merge_allow_list(
+            &self.allow_scripts_config(&["--location=user"]),
+            scripts.iter().map(BlockedScript::package),
+        );
+        let output = hidden_command(&self.command)
+            .args([
+                "config",
+                "set",
+                &format!("allow-scripts={merged}"),
+                "--location=user",
+            ])
+            .output()?;
+        if output.status.success() {
+            return Ok(());
+        }
+        Err(format!(
+            "npm config set allow-scripts failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+        .into())
+    }
 }
 
 impl Npm {
-    fn configured_allow_scripts(&self) -> String {
+    fn allow_scripts_config(&self, scope: &[&str]) -> String {
         hidden_command(&self.command)
             .args(["config", "get", "allow-scripts"])
+            .args(scope)
             .output()
             .ok()
             .filter(|output| output.status.success())
@@ -71,21 +102,47 @@ fn install_arguments(name: &str, configured_allow_scripts: &str) -> Vec<String> 
         format!("{name}@latest"),
         format!(
             "--allow-scripts={}",
-            allow_list(name, configured_allow_scripts)
+            merge_allow_list(configured_allow_scripts, [name.to_owned()])
         ),
         "--strict-allow-scripts".to_owned(),
     ]
 }
 
-fn allow_list(name: &str, configured: &str) -> String {
-    let mut names: Vec<&str> = configured
+fn merge_allow_list(configured: &str, additions: impl IntoIterator<Item = String>) -> String {
+    let mut entries: Vec<String> = configured
         .split(|character: char| character == ',' || character.is_whitespace())
         .filter(|entry| !entry.is_empty())
+        .map(str::to_owned)
         .collect();
-    if !names.contains(&name) {
-        names.push(name);
+    for addition in additions {
+        if !entries.contains(&addition) {
+            entries.push(addition);
+        }
     }
-    names.join(",")
+    entries.join(",")
+}
+
+fn parse_blocked_scripts(stderr: &str) -> Option<Vec<BlockedScript>> {
+    if !stderr.contains(STRICT_REFUSAL_CODE) {
+        return None;
+    }
+    let blocked: Vec<BlockedScript> = stderr.lines().filter_map(blocked_line).collect();
+    (!blocked.is_empty()).then_some(blocked)
+}
+
+fn blocked_line(line: &str) -> Option<BlockedScript> {
+    let entry = line.trim_end().strip_prefix(BLOCKED_LINE_PREFIX)?;
+    let (label, rest) = entry.split_once(" (")?;
+    let scripts = rest.strip_suffix(')')?;
+    let (name, version) = match label.rfind('@') {
+        Some(at) if at > 0 => (&label[..at], &label[at + 1..]),
+        _ => (label, ""),
+    };
+    Some(BlockedScript {
+        name: name.to_owned(),
+        version: version.to_owned(),
+        scripts: scripts.to_owned(),
+    })
 }
 
 fn resolve(configured: Option<&Path>) -> Option<PathBuf> {

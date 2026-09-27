@@ -213,6 +213,42 @@ fn a_source_that_reports_its_own_versions_is_not_automatically_read_only() {
 }
 
 #[test]
+fn a_blocked_script_is_approved_pinned_to_the_version_npm_reported() {
+    let script = BlockedScript {
+        name: "@google/genai".to_string(),
+        version: "1.52.0".to_string(),
+        scripts: "preinstall: echo 'preinstall: no-op'".to_string(),
+    };
+
+    assert_eq!(script.package(), "@google/genai@1.52.0");
+}
+
+#[test]
+fn a_blocked_script_without_a_version_is_approved_by_name() {
+    let script = BlockedScript {
+        name: "koffi".to_string(),
+        version: String::new(),
+        scripts: "install: node ./cnoke.cjs".to_string(),
+    };
+
+    assert_eq!(script.package(), "koffi");
+}
+
+#[test]
+fn an_update_target_is_identified_by_name_and_source_together() {
+    let target = UpdateTarget {
+        name: "vite".to_string(),
+        source: SourceKind::Npm,
+        from: "1.0.0".to_string(),
+        to: "2.0.0".to_string(),
+    };
+
+    assert!(target.is("vite", SourceKind::Npm));
+    assert!(!target.is("vite", SourceKind::Pnpm));
+    assert!(!target.is("vitest", SourceKind::Npm));
+}
+
+#[test]
 fn only_the_sources_that_need_elevation_are_read_only() {
     let read_only: Vec<&str> = KINDS
         .iter()
