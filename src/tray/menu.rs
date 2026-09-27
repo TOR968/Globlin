@@ -6,7 +6,7 @@ use tray_icon::menu::{
 };
 
 use crate::model::{
-    self, Activity, Batch, Package, PackageRef, RowState, SourceKind, UpdateTarget,
+    self, Activity, Batch, Blocked, Package, PackageRef, RowState, SourceKind, UpdateTarget,
 };
 use crate::progress;
 use crate::selfupdate::Release;
@@ -27,6 +27,8 @@ const UPDATE_MANY_PREFIX: &str = "update-many:";
 const IGNORE_PREFIX: &str = "ignore:";
 const REMOVE_PREFIX: &str = "remove:";
 const SOURCE_PREFIX: &str = "source:";
+const APPROVE_PREFIX: &str = "approve:";
+const DISMISS_PREFIX: &str = "dismiss:";
 const REF_SEPARATOR: char = '|';
 
 const DOT_CYCLE: u32 = 4;
@@ -39,6 +41,8 @@ pub enum Action {
     ToggleIgnore { name: String },
     Remove { name: String, source: SourceKind },
     ToggleSource { kind: SourceKind },
+    Approve { name: String, source: SourceKind },
+    Dismiss { name: String, source: SourceKind },
     UpdateAll,
     CheckNow,
     OpenWindow,
@@ -70,6 +74,7 @@ pub enum SelfUpdate<'a> {
 pub struct View<'a> {
     pub packages: &'a [Package],
     pub activity: Option<&'a Activity>,
+    pub approvals: &'a [Blocked],
     pub autostart: bool,
     pub self_update: SelfUpdate<'a>,
     pub pending_restart: Option<&'a Version>,
@@ -98,7 +103,9 @@ impl Action {
                 .or_else(|| Self::parse_update_many(other))
                 .or_else(|| Self::parse_ignore(other))
                 .or_else(|| Self::parse_remove(other))
-                .or_else(|| Self::parse_source(other)),
+                .or_else(|| Self::parse_source(other))
+                .or_else(|| Self::parse_approve(other))
+                .or_else(|| Self::parse_dismiss(other)),
         }
     }
 
@@ -137,6 +144,22 @@ impl Action {
     fn parse_source(key: &str) -> Option<Self> {
         Some(Self::ToggleSource {
             kind: SourceKind::from_label(key.strip_prefix(SOURCE_PREFIX)?)?,
+        })
+    }
+
+    fn parse_approve(key: &str) -> Option<Self> {
+        let reference = package_ref(key.strip_prefix(APPROVE_PREFIX)?)?;
+        Some(Self::Approve {
+            name: reference.name,
+            source: reference.source,
+        })
+    }
+
+    fn parse_dismiss(key: &str) -> Option<Self> {
+        let reference = package_ref(key.strip_prefix(DISMISS_PREFIX)?)?;
+        Some(Self::Dismiss {
+            name: reference.name,
+            source: reference.source,
         })
     }
 }
@@ -391,6 +414,18 @@ pub fn source_id(kind: SourceKind) -> String {
 
 pub fn key_of(package: &Package) -> String {
     format!("{}:{}", package.source.label(), package.name)
+}
+
+pub fn approve_id(target: &UpdateTarget) -> String {
+    format!("{APPROVE_PREFIX}{}", target_key(target))
+}
+
+pub fn dismiss_id(target: &UpdateTarget) -> String {
+    format!("{DISMISS_PREFIX}{}", target_key(target))
+}
+
+fn target_key(target: &UpdateTarget) -> String {
+    format!("{}:{}", target.source.label(), target.name)
 }
 
 const fn spinner_tick(frame: u32) -> char {

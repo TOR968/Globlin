@@ -7,8 +7,8 @@ use crate::Result;
 mod menu;
 
 pub use menu::{
-    batch_row_text, headline, ignore_id, key_of, remove_id, source_id, update_id, Action,
-    SelfUpdate, View,
+    approve_id, batch_row_text, dismiss_id, headline, ignore_id, key_of, remove_id, source_id,
+    update_id, Action, SelfUpdate, View,
 };
 
 pub struct Tray {
@@ -22,6 +22,7 @@ impl Tray {
         let view = View {
             packages: &[],
             activity: None,
+            approvals: &[],
             autostart: false,
             self_update: SelfUpdate::Own {
                 release: None,

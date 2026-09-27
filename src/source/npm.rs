@@ -5,7 +5,7 @@ use std::process::Command;
 use serde::Deserialize;
 
 use super::{find_on_path, hidden_command, PackageSource};
-use crate::model::{Installed, SourceKind};
+use crate::model::{BlockedScript, Installed, SourceKind};
 use crate::Result;
 
 #[cfg(windows)]
@@ -13,6 +13,12 @@ const EXECUTABLE: &str = "npm.cmd";
 
 #[cfg(not(windows))]
 const EXECUTABLE: &str = "npm";
+
+const STRICT_REFUSAL_CODE: &str = "ESTRICTALLOWSCRIPTS";
+const BLOCKED_LINE_PREFIX: &str = "npm error   ";
+const HEADER_PREFIX: &str = "npm error --strict-allow-scripts: ";
+const HEADER_SUFFIX: &str = " package(s) have install scripts not covered by allowScripts:";
+const REMEDIATION_PREFIX: &str = "npm error Allow them with";
 
 pub struct Npm {
     command: PathBuf,
@@ -40,14 +46,9 @@ impl PackageSource for Npm {
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        let configured = self.allow_scripts_config().unwrap_or_default();
         let mut command = hidden_command(&self.command);
-        command.args([
-            "install",
-            "-g",
-            &format!("{name}@latest"),
-            &format!("--allow-scripts={name}"),
-            "--strict-allow-scripts",
-        ]);
+        command.args(install_arguments(name, &configured));
         Some(command)
     }
 
@@ -56,6 +57,118 @@ impl PackageSource for Npm {
         command.args(["uninstall", "-g", name]);
         Some(command)
     }
+
+    fn blocked_scripts(&self, stderr: &str) -> Option<Vec<BlockedScript>> {
+        parse_blocked_scripts(stderr)
+    }
+
+    fn approve_scripts(&self, scripts: &[BlockedScript]) -> Result<()> {
+        let configured = self.allow_scripts_config()?;
+        let merged = merge_allow_list(&configured, scripts.iter().map(BlockedScript::package));
+        let output = hidden_command(&self.command)
+            .args([
+                "config",
+                "set",
+                &format!("allow-scripts={merged}"),
+                "--location=user",
+            ])
+            .output()?;
+        if output.status.success() {
+            return Ok(());
+        }
+        Err(format!(
+            "npm config set allow-scripts failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+        .into())
+    }
+}
+
+impl Npm {
+    fn allow_scripts_config(&self) -> Result<String> {
+        let output = hidden_command(&self.command)
+            .args(["config", "get", "allow-scripts", "-g"])
+            .output()?;
+        if !output.status.success() {
+            return Err(format!(
+                "npm config get allow-scripts failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )
+            .into());
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+}
+
+fn install_arguments(name: &str, configured_allow_scripts: &str) -> Vec<String> {
+    vec![
+        "install".to_owned(),
+        "-g".to_owned(),
+        format!("{name}@latest"),
+        format!(
+            "--allow-scripts={}",
+            merge_allow_list(configured_allow_scripts, [name.to_owned()])
+        ),
+        "--strict-allow-scripts".to_owned(),
+    ]
+}
+
+fn merge_allow_list(configured: &str, additions: impl IntoIterator<Item = String>) -> String {
+    let mut entries: Vec<String> = configured
+        .split(|character: char| character == ',' || character.is_whitespace())
+        .filter(|entry| !entry.is_empty() && *entry != "undefined" && *entry != "null")
+        .map(str::to_owned)
+        .collect();
+    for addition in additions {
+        if !entries.contains(&addition) {
+            entries.push(addition);
+        }
+    }
+    entries.join(",")
+}
+
+fn parse_blocked_scripts(stderr: &str) -> Option<Vec<BlockedScript>> {
+    if !stderr.contains(STRICT_REFUSAL_CODE) {
+        return None;
+    }
+    let mut lines = stderr.lines().map(str::trim_end);
+    let expected = lines.by_ref().find_map(header_count)?;
+    let blocked: Vec<BlockedScript> = lines
+        .take_while(|line| !line.starts_with(REMEDIATION_PREFIX))
+        .map(blocked_line)
+        .collect::<Option<_>>()?;
+    if blocked.is_empty() || blocked.len() != expected || has_duplicate_name(&blocked) {
+        return None;
+    }
+    Some(blocked)
+}
+
+fn header_count(line: &str) -> Option<usize> {
+    line.strip_prefix(HEADER_PREFIX)?
+        .strip_suffix(HEADER_SUFFIX)?
+        .parse()
+        .ok()
+}
+
+fn has_duplicate_name(blocked: &[BlockedScript]) -> bool {
+    let mut names: Vec<&str> = blocked.iter().map(|entry| entry.name.as_str()).collect();
+    names.sort_unstable();
+    names.windows(2).any(|pair| pair[0] == pair[1])
+}
+
+fn blocked_line(line: &str) -> Option<BlockedScript> {
+    let entry = line.strip_prefix(BLOCKED_LINE_PREFIX)?;
+    let (label, rest) = entry.split_once(" (")?;
+    let scripts = rest.strip_suffix(')')?;
+    let (name, version) = match label.rfind('@') {
+        Some(at) if at > 0 => (&label[..at], &label[at + 1..]),
+        _ => (label, ""),
+    };
+    Some(BlockedScript {
+        name: name.to_owned(),
+        version: version.to_owned(),
+        scripts: scripts.to_owned(),
+    })
 }
 
 fn resolve(configured: Option<&Path>) -> Option<PathBuf> {

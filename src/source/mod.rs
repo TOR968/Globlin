@@ -6,7 +6,7 @@ use std::process::Command;
 use serde::Deserialize;
 
 use crate::config::Config;
-use crate::model::{Installed, SourceKind, KINDS};
+use crate::model::{BlockedScript, Installed, SourceKind, KINDS};
 use crate::Result;
 
 mod bun;
@@ -47,6 +47,14 @@ pub trait PackageSource {
     fn update_command(&self, name: &str) -> Option<Command>;
 
     fn uninstall_command(&self, name: &str) -> Option<Command>;
+
+    fn blocked_scripts(&self, _stderr: &str) -> Option<Vec<BlockedScript>> {
+        None
+    }
+
+    fn approve_scripts(&self, _scripts: &[BlockedScript]) -> Result<()> {
+        Err(format!("{} does not gate install scripts", self.kind().label()).into())
+    }
 }
 
 pub fn enabled(config: &Config) -> Result<Vec<Box<dyn PackageSource>>> {

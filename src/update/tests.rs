@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::Sources;
-use crate::model::SourceKind;
+use crate::model::{BlockedScript, Installed, SourceKind};
 use std::sync::Mutex;
 
 fn target(name: &str) -> UpdateTarget {
@@ -56,7 +56,7 @@ impl Drop for UnrunnableNpm {
 #[test]
 fn an_empty_target_list_does_nothing_and_announces_nothing() {
     let seen = Mutex::new(Vec::new());
-    let outcome = run(&Config::default(), &[], |step| {
+    let outcome = run(&Config::default(), &[], &[], |step| {
         seen.lock().unwrap().push(step);
     });
 
@@ -77,7 +77,7 @@ fn every_target_announces_a_start_and_a_finish() {
     let targets = vec![target("alpha"), target("beta"), target("gamma")];
     let seen = Mutex::new(Vec::new());
 
-    run(&fake.config, &targets, |step| {
+    run(&fake.config, &targets, &[], |step| {
         seen.lock().unwrap().push(step);
     });
 
@@ -96,7 +96,7 @@ fn a_start_carries_both_versions_so_the_menu_can_show_them() {
     let fake = UnrunnableNpm::new("versions");
     let seen = Mutex::new(Vec::new());
 
-    run(&fake.config, &[target("alpha")], |step| {
+    run(&fake.config, &[target("alpha")], &[], |step| {
         seen.lock().unwrap().push(step);
     });
 
@@ -113,7 +113,7 @@ fn a_target_that_cannot_be_started_finishes_with_ok_false() {
     let fake = UnrunnableNpm::new("finishes-false");
     let seen = Mutex::new(Vec::new());
 
-    run(&fake.config, &[target("alpha")], |step| {
+    run(&fake.config, &[target("alpha")], &[], |step| {
         seen.lock().unwrap().push(step);
     });
 
@@ -131,7 +131,7 @@ fn a_target_that_cannot_be_started_finishes_with_ok_false() {
 fn a_target_that_cannot_be_started_is_reported_as_failed() {
     let fake = UnrunnableNpm::new("unstartable");
 
-    let outcome = run(&fake.config, &[target("alpha")], |_| {});
+    let outcome = run(&fake.config, &[target("alpha")], &[], |_| {});
 
     assert_eq!(outcome.failed, vec!["alpha".to_string()]);
     assert!(outcome.updated.is_empty());
@@ -142,7 +142,7 @@ fn a_failing_target_does_not_stop_the_ones_behind_it() {
     let fake = UnrunnableNpm::new("continues");
     let targets = vec![target("alpha"), target("beta")];
 
-    let outcome = run(&fake.config, &targets, |_| {});
+    let outcome = run(&fake.config, &targets, &[], |_| {});
 
     assert_eq!(
         outcome.failed,
@@ -176,7 +176,7 @@ fn a_target_whose_source_is_disabled_is_reported_rather_than_skipped_silently() 
         ..target("opencode-ai")
     };
 
-    let outcome = run(&config, &[bun_target], |_| {});
+    let outcome = run(&config, &[bun_target], &[], |_| {});
 
     assert_eq!(outcome.failed, vec!["opencode-ai".to_string()]);
 }
@@ -188,7 +188,7 @@ fn updates_a_package_for_real() {
         .expect("set UPDATE_TARGET to the package to install at @latest");
     let targets = vec![target(&name)];
 
-    let outcome = run(&Config::default(), &targets, |_| {});
+    let outcome = run(&Config::default(), &targets, &[], |_| {});
 
     assert!(outcome.failed.is_empty(), "failed: {:?}", outcome.failed);
     assert_eq!(outcome.updated, vec![name]);
@@ -199,7 +199,7 @@ fn updates_a_package_for_real() {
 fn a_real_npm_failure_lands_in_the_log() {
     let name = "globlin-no-such-package-9d3f".to_string();
 
-    let outcome = run(&Config::default(), &[target(&name)], |_| {});
+    let outcome = run(&Config::default(), &[target(&name)], &[], |_| {});
 
     assert_eq!(outcome.failed, vec![name.clone()]);
     assert!(outcome.updated.is_empty());
@@ -209,6 +209,211 @@ fn a_real_npm_failure_lands_in_the_log() {
         log.contains(&name),
         "log did not mention the package: {log}"
     );
+}
+
+fn blocked(name: &str, source: SourceKind) -> Blocked {
+    Blocked {
+        target: UpdateTarget {
+            source,
+            ..target(name)
+        },
+        scripts: vec![BlockedScript {
+            name: "koffi".to_string(),
+            version: "3.3.2".to_string(),
+            scripts: "install: node ./cnoke.cjs".to_string(),
+        }],
+    }
+}
+
+#[cfg(windows)]
+struct FakeNpmRun {
+    config: Config,
+}
+
+#[cfg(windows)]
+impl FakeNpmRun {
+    fn new(label: &str, script: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("globlin-fake-npm-run-{label}.cmd"));
+        std::fs::write(&path, script).unwrap();
+        Self {
+            config: Config {
+                npm_cmd: Some(path),
+                sources: Sources {
+                    npm: true,
+                    bun: false,
+                    pnpm: false,
+                    yarn: false,
+                    pipx: false,
+                    uv: false,
+                    scoop: false,
+                    cargo: false,
+                    go: false,
+                    dotnet: false,
+                    psgallery: false,
+                    gem: false,
+                    winget: false,
+                    choco: false,
+                },
+                ..Default::default()
+            },
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for FakeNpmRun {
+    fn drop(&mut self) {
+        if let Some(path) = &self.config.npm_cmd {
+            std::fs::remove_file(path).ok();
+        }
+    }
+}
+
+#[cfg(windows)]
+const STRICT_REFUSAL_SCRIPT: &str = "@echo off\r\n\
+if \"%1\"==\"config\" goto config\r\n\
+if \"%1\"==\"install\" goto install\r\n\
+exit /b 1\r\n\
+:config\r\n\
+echo.\r\n\
+exit /b 0\r\n\
+:install\r\n\
+echo npm error code ESTRICTALLOWSCRIPTS 1>&2\r\n\
+echo npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts: 1>&2\r\n\
+echo npm error   koffi@3.3.2 (install: node ./cnoke.cjs) 1>&2\r\n\
+exit /b 1\r\n";
+
+#[cfg(windows)]
+#[test]
+fn a_strict_refusal_lands_the_target_in_blocked_not_failed() {
+    let fake = FakeNpmRun::new("blocked", STRICT_REFUSAL_SCRIPT);
+
+    let outcome = run(&fake.config, &[target("koffi")], &[], |_| {});
+
+    assert!(outcome.failed.is_empty(), "failed: {:?}", outcome.failed);
+    assert_eq!(outcome.blocked.len(), 1);
+    assert_eq!(outcome.blocked[0].target.name, "koffi");
+    assert_eq!(outcome.blocked[0].scripts[0].name, "koffi");
+    assert_eq!(outcome.blocked[0].scripts[0].version, "3.3.2");
+}
+
+#[cfg(windows)]
+const MIXED_BLOCKED_AND_FAILED_SCRIPT: &str = "@echo off\r\n\
+if \"%1\"==\"config\" goto config\r\n\
+if \"%1\"==\"install\" goto install\r\n\
+exit /b 1\r\n\
+:config\r\n\
+echo.\r\n\
+exit /b 0\r\n\
+:install\r\n\
+echo %3 | findstr /I \"koffi\" >nul\r\n\
+if %errorlevel%==0 goto blocked\r\n\
+echo npm error code E404 1>&2\r\n\
+echo npm error 404 Not Found 1>&2\r\n\
+exit /b 1\r\n\
+:blocked\r\n\
+echo npm error code ESTRICTALLOWSCRIPTS 1>&2\r\n\
+echo npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts: 1>&2\r\n\
+echo npm error   koffi@3.3.2 (install: node ./cnoke.cjs) 1>&2\r\n\
+exit /b 1\r\n";
+
+#[cfg(windows)]
+#[test]
+fn a_batch_can_mix_a_blocked_target_and_a_failed_one() {
+    let fake = FakeNpmRun::new("mixed", MIXED_BLOCKED_AND_FAILED_SCRIPT);
+    let targets = vec![target("koffi"), target("beta")];
+
+    let outcome = run(&fake.config, &targets, &[], |_| {});
+
+    assert_eq!(outcome.failed, vec!["beta".to_string()]);
+    assert_eq!(outcome.blocked.len(), 1);
+    assert_eq!(outcome.blocked[0].target.name, "koffi");
+}
+
+struct NoScriptsSource;
+
+impl PackageSource for NoScriptsSource {
+    fn kind(&self) -> SourceKind {
+        SourceKind::Cargo
+    }
+
+    fn installed(&self) -> crate::Result<Vec<Installed>> {
+        Ok(Vec::new())
+    }
+
+    fn update_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn uninstall_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+}
+
+#[test]
+fn a_source_without_its_own_policy_reports_no_blocked_scripts_by_default() {
+    assert_eq!(NoScriptsSource.blocked_scripts(""), None);
+}
+
+#[test]
+fn an_approval_that_cannot_be_saved_fails_every_target_without_running_it() {
+    let fake = UnrunnableNpm::new("approval");
+    let seen = Mutex::new(Vec::new());
+
+    let outcome = run(
+        &fake.config,
+        &[target("alpha")],
+        &[blocked("alpha", SourceKind::Npm)],
+        |step| seen.lock().unwrap().push(step),
+    );
+
+    assert_eq!(outcome.failed, vec!["alpha".to_string()]);
+    assert!(outcome.blocked.is_empty());
+    assert!(seen.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_package_blocked_again_replaces_its_older_approval_entry() {
+    let mut approvals = vec![
+        blocked("alpha", SourceKind::Npm),
+        blocked("beta", SourceKind::Npm),
+    ];
+    let mut fresh = blocked("alpha", SourceKind::Npm);
+    fresh.scripts[0].version = "3.4.0".to_string();
+    let outcome = Outcome {
+        blocked: vec![fresh.clone()],
+        ..Outcome::default()
+    };
+
+    settle(&mut approvals, &outcome);
+
+    assert_eq!(approvals, vec![blocked("beta", SourceKind::Npm), fresh]);
+}
+
+#[test]
+fn a_package_that_updated_leaves_the_approvals() {
+    let mut approvals = vec![blocked("alpha", SourceKind::Npm)];
+    let outcome = Outcome {
+        updated: vec!["alpha".to_string()],
+        ..Outcome::default()
+    };
+
+    settle(&mut approvals, &outcome);
+
+    assert!(approvals.is_empty());
+}
+
+#[test]
+fn a_package_that_failed_for_another_reason_keeps_its_approval_entry() {
+    let mut approvals = vec![blocked("alpha", SourceKind::Npm)];
+    let outcome = Outcome {
+        failed: vec!["alpha".to_string()],
+        ..Outcome::default()
+    };
+
+    settle(&mut approvals, &outcome);
+
+    assert_eq!(approvals, vec![blocked("alpha", SourceKind::Npm)]);
 }
 
 #[test]
@@ -225,4 +430,30 @@ fn a_failure_report_names_both_versions_and_the_source() {
     );
     assert!(report.contains("--- stdout ---"), "{report}");
     assert!(report.contains("--- stderr ---"), "{report}");
+}
+
+#[test]
+fn a_batch_where_every_target_was_blocked_changed_nothing_worth_rechecking() {
+    let outcome = Outcome {
+        blocked: vec![blocked("alpha", SourceKind::Npm)],
+        ..Outcome::default()
+    };
+
+    assert!(!outcome.changed_packages());
+}
+
+#[test]
+fn a_batch_with_an_updated_or_failed_target_changed_packages() {
+    let updated = Outcome {
+        updated: vec!["alpha".to_string()],
+        blocked: vec![blocked("beta", SourceKind::Npm)],
+        ..Outcome::default()
+    };
+    let failed = Outcome {
+        failed: vec!["alpha".to_string()],
+        ..Outcome::default()
+    };
+
+    assert!(updated.changed_packages());
+    assert!(failed.changed_packages());
 }

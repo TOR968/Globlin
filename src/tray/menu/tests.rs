@@ -25,6 +25,7 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>, frame: u32)
     View {
         packages,
         activity,
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: None,
@@ -41,6 +42,7 @@ fn updating_view(activity: &Activity, elapsed: Duration) -> View<'_> {
     View {
         packages: &[],
         activity: Some(activity),
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: None,
@@ -490,6 +492,7 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
     let self_view = View {
         packages: &[],
         activity: None,
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: Some(&release),
@@ -534,6 +537,7 @@ fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
     let winget_view = View {
         packages: &[],
         activity: None,
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Winget,
         pending_restart: None,
@@ -604,4 +608,37 @@ fn removing_and_checking_never_share_a_headline() {
         headline(&view(&[], Some(&activity), 0)),
         headline(&view(&[], Some(&Activity::Checking), 0))
     );
+}
+
+#[test]
+fn approval_ids_round_trip_including_scoped_names() {
+    let target = UpdateTarget {
+        name: "@deepseek-ai/dsh".to_string(),
+        source: SourceKind::Npm,
+        from: "0.1.5-rc.3".to_string(),
+        to: "0.1.7-rc.2".to_string(),
+    };
+
+    assert_eq!(approve_id(&target), "approve:npm:@deepseek-ai/dsh");
+    assert_eq!(dismiss_id(&target), "dismiss:npm:@deepseek-ai/dsh");
+    assert_eq!(
+        Action::from_key(&approve_id(&target)),
+        Some(Action::Approve {
+            name: "@deepseek-ai/dsh".to_string(),
+            source: SourceKind::Npm,
+        })
+    );
+    assert_eq!(
+        Action::from_key(&dismiss_id(&target)),
+        Some(Action::Dismiss {
+            name: "@deepseek-ai/dsh".to_string(),
+            source: SourceKind::Npm,
+        })
+    );
+}
+
+#[test]
+fn an_approval_id_without_a_package_name_is_ignored() {
+    assert_eq!(Action::from_key("approve:npm:"), None);
+    assert_eq!(Action::from_key("dismiss:nosuch:thing"), None);
 }

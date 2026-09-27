@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::*;
 use crate::config::Sources;
-use crate::model::{Batch, UpdateTarget};
+use crate::model::{Batch, Blocked, BlockedScript, UpdateTarget};
 
 fn package(name: &str, source: SourceKind, status: Status) -> Package {
     Package {
@@ -27,6 +27,7 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>) -> View<'a>
     View {
         packages,
         activity,
+        approvals: &[],
         autostart: true,
         self_update: SelfUpdate::Own {
             release: None,
@@ -237,6 +238,7 @@ fn a_winget_managed_install_tells_the_window_not_to_offer_self_updates() {
     let managed = View {
         packages: &[],
         activity: None,
+        approvals: &[],
         autostart: false,
         self_update: SelfUpdate::Winget,
         pending_restart: None,
@@ -319,6 +321,51 @@ fn a_source_with_no_uninstall_of_its_own_offers_no_remove_button() {
 
     assert!(!snapshot.packages[0].removable);
     assert!(!snapshot.packages[0].read_only);
+}
+
+#[test]
+fn a_blocked_update_reaches_the_window_with_its_scripts_and_ids() {
+    let approvals = vec![Blocked {
+        target: UpdateTarget {
+            name: "@deepseek-ai/dsh".to_string(),
+            source: SourceKind::Npm,
+            from: "0.1.5-rc.3".to_string(),
+            to: "0.1.7-rc.2".to_string(),
+        },
+        scripts: vec![BlockedScript {
+            name: "koffi".to_string(),
+            version: "3.3.2".to_string(),
+            scripts: "install: node ./cnoke.cjs".to_string(),
+        }],
+    }];
+    let view = View {
+        approvals: &approvals,
+        ..view(&[], None)
+    };
+
+    let snapshot = snapshot(&view, &config());
+    let row = &snapshot.approvals[0];
+
+    assert_eq!(row.name, "@deepseek-ai/dsh");
+    assert_eq!(row.source, "npm");
+    assert_eq!(row.from, "0.1.5-rc.3");
+    assert_eq!(row.to, "0.1.7-rc.2");
+    assert_eq!(row.approve_id, "approve:npm:@deepseek-ai/dsh");
+    assert_eq!(row.dismiss_id, "dismiss:npm:@deepseek-ai/dsh");
+    assert_eq!(
+        row.scripts,
+        vec![ScriptRow {
+            package: "koffi@3.3.2".to_string(),
+            scripts: "install: node ./cnoke.cjs".to_string(),
+        }]
+    );
+}
+
+#[test]
+fn a_window_with_nothing_blocked_has_no_approvals() {
+    let snapshot = snapshot(&view(&[], None), &config());
+
+    assert!(snapshot.approvals.is_empty());
 }
 
 #[test]
