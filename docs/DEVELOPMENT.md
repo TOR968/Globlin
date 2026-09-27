@@ -305,8 +305,10 @@ Things about the environment the code has to work around, all verified rather th
 - **A refused npm update opens an approval dialog instead of just failing.** `ESTRICTALLOWSCRIPTS`
   stderr is parsed by `npm::parse_blocked_scripts`: the header line `npm error --strict-allow-scripts:
   <N> package(s) have install scripts not covered by allowScripts:` names how many package lines to
-  expect, and parsing only succeeds when exactly `N` lines parse and no name repeats, so a forged or
-  truncated block falls back to a plain failure rather than an incomplete approval. The lines
+  expect, and every line between it and `npm error Allow them with…` must parse, number exactly `N`,
+  and name no package twice. npm prints script bodies raw, so a body containing a newline spills onto
+  an unindented line inside the block; that line fails to parse and the whole refusal falls back to a
+  plain failure rather than a dialog that shows only the first half of a script. The lines
   `npm error   <name>@<version> (<event>: <body>; …)` come from one place in npm
   (`@npmcli/arborist/lib/unreviewed-scripts.js`), and the version is split at the last `@` so scoped
   names survive. The target lands in `Outcome.blocked`, not `failed`, so there is no failure toast;
@@ -531,7 +533,7 @@ do nothing.
 cargo test
 ```
 
-405 tests: 379 run by default (no network, no side effects), 26 `#[ignore]`d because they touch the real
+413 tests: 387 run by default (no network, no side effects), 26 `#[ignore]`d because they touch the real
 system — the HKCU Run key, a real toast, a real `npm install -g`, one that runs the real `npm config
 get/set` against a temporary userconfig, two icon/PNG dump tests, two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window

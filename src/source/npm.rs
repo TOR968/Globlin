@@ -18,6 +18,7 @@ const STRICT_REFUSAL_CODE: &str = "ESTRICTALLOWSCRIPTS";
 const BLOCKED_LINE_PREFIX: &str = "npm error   ";
 const HEADER_PREFIX: &str = "npm error --strict-allow-scripts: ";
 const HEADER_SUFFIX: &str = " package(s) have install scripts not covered by allowScripts:";
+const REMEDIATION_PREFIX: &str = "npm error Allow them with";
 
 pub struct Npm {
     command: PathBuf,
@@ -127,25 +128,26 @@ fn merge_allow_list(configured: &str, additions: impl IntoIterator<Item = String
 }
 
 fn parse_blocked_scripts(stderr: &str) -> Option<Vec<BlockedScript>> {
-    let expected = header_count(stderr)?;
-    let blocked: Vec<BlockedScript> = stderr.lines().filter_map(blocked_line).collect();
+    if !stderr.contains(STRICT_REFUSAL_CODE) {
+        return None;
+    }
+    let mut lines = stderr.lines().map(str::trim_end);
+    let expected = lines.by_ref().find_map(header_count)?;
+    let blocked: Vec<BlockedScript> = lines
+        .take_while(|line| !line.starts_with(REMEDIATION_PREFIX))
+        .map(blocked_line)
+        .collect::<Option<_>>()?;
     if blocked.is_empty() || blocked.len() != expected || has_duplicate_name(&blocked) {
         return None;
     }
     Some(blocked)
 }
 
-fn header_count(stderr: &str) -> Option<usize> {
-    if !stderr.contains(STRICT_REFUSAL_CODE) {
-        return None;
-    }
-    stderr.lines().find_map(|line| {
-        line.trim_end()
-            .strip_prefix(HEADER_PREFIX)?
-            .strip_suffix(HEADER_SUFFIX)?
-            .parse()
-            .ok()
-    })
+fn header_count(line: &str) -> Option<usize> {
+    line.strip_prefix(HEADER_PREFIX)?
+        .strip_suffix(HEADER_SUFFIX)?
+        .parse()
+        .ok()
 }
 
 fn has_duplicate_name(blocked: &[BlockedScript]) -> bool {
@@ -155,7 +157,7 @@ fn has_duplicate_name(blocked: &[BlockedScript]) -> bool {
 }
 
 fn blocked_line(line: &str) -> Option<BlockedScript> {
-    let entry = line.trim_end().strip_prefix(BLOCKED_LINE_PREFIX)?;
+    let entry = line.strip_prefix(BLOCKED_LINE_PREFIX)?;
     let (label, rest) = entry.split_once(" (")?;
     let scripts = rest.strip_suffix(')')?;
     let (name, version) = match label.rfind('@') {
