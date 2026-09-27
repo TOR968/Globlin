@@ -41,13 +41,7 @@ impl PackageSource for Npm {
 
     fn update_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
-        command.args([
-            "install",
-            "-g",
-            &format!("{name}@latest"),
-            &format!("--allow-scripts={name}"),
-            "--strict-allow-scripts",
-        ]);
+        command.args(install_arguments(name, &self.configured_allow_scripts()));
         Some(command)
     }
 
@@ -56,6 +50,42 @@ impl PackageSource for Npm {
         command.args(["uninstall", "-g", name]);
         Some(command)
     }
+}
+
+impl Npm {
+    fn configured_allow_scripts(&self) -> String {
+        hidden_command(&self.command)
+            .args(["config", "get", "allow-scripts"])
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default()
+    }
+}
+
+fn install_arguments(name: &str, configured_allow_scripts: &str) -> Vec<String> {
+    vec![
+        "install".to_owned(),
+        "-g".to_owned(),
+        format!("{name}@latest"),
+        format!(
+            "--allow-scripts={}",
+            allow_list(name, configured_allow_scripts)
+        ),
+        "--strict-allow-scripts".to_owned(),
+    ]
+}
+
+fn allow_list(name: &str, configured: &str) -> String {
+    let mut names: Vec<&str> = configured
+        .split(|character: char| character == ',' || character.is_whitespace())
+        .filter(|entry| !entry.is_empty())
+        .collect();
+    if !names.contains(&name) {
+        names.push(name);
+    }
+    names.join(",")
 }
 
 fn resolve(configured: Option<&Path>) -> Option<PathBuf> {

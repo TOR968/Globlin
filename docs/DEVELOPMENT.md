@@ -294,9 +294,14 @@ Things about the environment the code has to work around, all verified rather th
   already chose to install, and `--strict-allow-scripts`, which turns any other blocked script (a
   dependency's) into `ESTRICTALLOWSCRIPTS` and a non-zero exit. That check runs before the old version
   is touched, so a refused update leaves the working install in place and reports as failed. A CLI
-  `--allow-scripts` replaces the `.npmrc` list rather than extending it, so a dependency approved only
-  in `.npmrc` now fails the update loudly instead of being silently skipped. npm older than 12 does not
-  know either flag and only warns.
+  `--allow-scripts` replaces the `.npmrc` list rather than extending it (npm warns
+  `.npmrc allow-scripts setting is being ignored`), so the update first reads
+  `npm config get allow-scripts` and passes that list with the package name appended. Without that
+  merge a dependency the user approved in `.npmrc` could never be approved at all:
+  `@deepseek-ai/dsh` needs `koffi`, `node-pty` and `protobufjs`, and failed every time. The fix for a
+  refused update is to append the listed dependencies to the user-level list — npm's own hint,
+  `npm config set allow-scripts=<deps> --location=user`, replaces the existing list, so keep the old
+  entries in it. npm older than 12 does not know either flag and only warns.
 - **`bun pm ls -g` does not list global packages.** It ignores `-g` and prints the tree for whatever
   directory it is run from, so it will happily report a project's dependencies as if they were global. The
   bun source instead reads the global manifest directly — see below for where that manifest actually
@@ -506,7 +511,7 @@ do nothing.
 cargo test
 ```
 
-384 tests: 359 run by default (no network, no side effects), 25 `#[ignore]`d because they touch the real
+386 tests: 361 run by default (no network, no side effects), 25 `#[ignore]`d because they touch the real
 system — the HKCU Run key, a real toast, a real `npm install -g`, two icon/PNG dump tests, two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on

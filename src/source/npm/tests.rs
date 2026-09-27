@@ -60,12 +60,8 @@ fn arguments(command: &std::process::Command) -> Vec<String> {
 
 #[test]
 fn the_npm_update_runs_the_packages_own_install_scripts_and_fails_on_any_other_blocked_one() {
-    let npm = Npm {
-        command: PathBuf::from("npm"),
-    };
-
     assert_eq!(
-        arguments(&npm.update_command("@anthropic-ai/claude-code").unwrap()),
+        install_arguments("@anthropic-ai/claude-code", ""),
         vec![
             "install",
             "-g",
@@ -73,6 +69,35 @@ fn the_npm_update_runs_the_packages_own_install_scripts_and_fails_on_any_other_b
             "--allow-scripts=@anthropic-ai/claude-code",
             "--strict-allow-scripts",
         ]
+    );
+}
+
+#[test]
+fn the_npm_update_keeps_the_scripts_the_user_already_approved_in_npmrc() {
+    assert_eq!(
+        install_arguments(
+            "@deepseek-ai/dsh",
+            "@stripe/cli,koffi,node-pty
+"
+        ),
+        vec![
+            "install",
+            "-g",
+            "@deepseek-ai/dsh@latest",
+            "--allow-scripts=@stripe/cli,koffi,node-pty,@deepseek-ai/dsh",
+            "--strict-allow-scripts",
+        ]
+    );
+}
+
+#[test]
+fn a_package_already_approved_in_npmrc_is_not_listed_twice() {
+    assert_eq!(
+        allow_list(
+            "@anthropic-ai/claude-code",
+            "@stripe/cli,@anthropic-ai/claude-code"
+        ),
+        "@stripe/cli,@anthropic-ai/claude-code"
     );
 }
 
