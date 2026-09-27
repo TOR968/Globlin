@@ -467,6 +467,21 @@ impl App {
         }
         if !outcome.blocked.is_empty() {
             self.open_window(target);
+            if self.window.is_none() {
+                let names: Vec<&str> = outcome
+                    .blocked
+                    .iter()
+                    .map(|blocked| blocked.target.name.as_str())
+                    .collect();
+                platform::notify(
+                    "Globlin — approval needed",
+                    &format!(
+                        "{} need install-script approval (see Open last log)",
+                        names.join(", ")
+                    ),
+                )
+                .ok();
+            }
         }
         self.start_check();
     }

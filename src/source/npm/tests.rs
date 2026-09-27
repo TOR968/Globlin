@@ -114,6 +114,15 @@ fn a_package_already_approved_in_npmrc_is_not_listed_twice() {
 }
 
 #[test]
+fn npm_older_than_12_printing_undefined_or_null_is_not_kept_as_an_entry() {
+    assert_eq!(
+        merge_allow_list("undefined", ["koffi".to_string()]),
+        "koffi"
+    );
+    assert_eq!(merge_allow_list("null", ["koffi".to_string()]), "koffi");
+}
+
+#[test]
 fn approvals_are_appended_after_the_entries_already_in_npmrc() {
     assert_eq!(
         merge_allow_list(
@@ -156,12 +165,39 @@ fn a_scoped_blocked_package_splits_at_the_version_not_the_scope() {
 #[test]
 fn a_blocked_package_npm_printed_without_a_version_keeps_an_empty_version() {
     let blocked = parse_blocked_scripts(
-        "npm error code ESTRICTALLOWSCRIPTS\nnpm error   linked-thing (postinstall: node x.js)\n",
+        "npm error code ESTRICTALLOWSCRIPTS\n\
+         npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts:\n\
+         npm error   linked-thing (postinstall: node x.js)\n",
     )
     .unwrap();
 
     assert_eq!(blocked[0].name, "linked-thing");
     assert_eq!(blocked[0].version, "");
+}
+
+#[test]
+fn a_header_count_that_does_not_match_the_parsed_lines_is_not_blocked() {
+    assert_eq!(
+        parse_blocked_scripts(
+            "npm error code ESTRICTALLOWSCRIPTS\n\
+             npm error --strict-allow-scripts: 2 package(s) have install scripts not covered by allowScripts:\n\
+             npm error   koffi@3.3.2 (install: node ./cnoke.cjs)\n"
+        ),
+        None
+    );
+}
+
+#[test]
+fn a_forged_duplicate_package_line_is_not_blocked() {
+    assert_eq!(
+        parse_blocked_scripts(
+            "npm error code ESTRICTALLOWSCRIPTS\n\
+             npm error --strict-allow-scripts: 2 package(s) have install scripts not covered by allowScripts:\n\
+             npm error   koffi@3.3.2 (install: node ./cnoke.cjs)\n\
+             npm error   koffi@3.3.2 (install: node ./cnoke.cjs)\n"
+        ),
+        None
+    );
 }
 
 #[test]
@@ -191,6 +227,63 @@ fn the_npm_source_reports_a_strict_refusal_as_blocked() {
         npm.blocked_scripts(STRICT_REFUSAL).map(|found| found.len()),
         Some(5)
     );
+}
+
+#[cfg(windows)]
+struct FakeNpmScript {
+    path: PathBuf,
+}
+
+#[cfg(windows)]
+impl FakeNpmScript {
+    fn new(label: &str, script: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("globlin-fake-npm-{label}.cmd"));
+        std::fs::write(&path, script).unwrap();
+        Self { path }
+    }
+
+    fn npm(&self) -> Npm {
+        Npm {
+            command: self.path.clone(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for FakeNpmScript {
+    fn drop(&mut self) {
+        std::fs::remove_file(&self.path).ok();
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn a_failed_read_does_not_turn_into_an_overwrite_of_the_users_allow_scripts_list() {
+    let marker = std::env::temp_dir().join("globlin-fake-npm-failing-get-marker");
+    std::fs::remove_file(&marker).ok();
+    let fake = FakeNpmScript::new(
+        "failing-get",
+        &format!(
+            "@echo off\r\n\
+             if \"%1\"==\"config\" if \"%2\"==\"get\" exit /b 1\r\n\
+             if \"%1\"==\"config\" if \"%2\"==\"set\" goto write\r\n\
+             exit /b 1\r\n\
+             :write\r\n\
+             echo written> \"{}\"\r\n\
+             exit /b 0\r\n",
+            marker.display()
+        ),
+    );
+
+    let result = fake.npm().approve_scripts(&[BlockedScript {
+        name: "koffi".to_string(),
+        version: "3.3.2".to_string(),
+        scripts: "install: node ./cnoke.cjs".to_string(),
+    }]);
+
+    assert!(result.is_err(), "{result:?}");
+    assert!(!marker.exists());
+    std::fs::remove_file(&marker).ok();
 }
 
 #[test]

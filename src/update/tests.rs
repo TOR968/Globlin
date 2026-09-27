@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::Sources;
-use crate::model::{BlockedScript, SourceKind};
+use crate::model::{BlockedScript, Installed, SourceKind};
 use std::sync::Mutex;
 
 fn target(name: &str) -> UpdateTarget {
@@ -223,6 +223,136 @@ fn blocked(name: &str, source: SourceKind) -> Blocked {
             scripts: "install: node ./cnoke.cjs".to_string(),
         }],
     }
+}
+
+#[cfg(windows)]
+struct FakeNpmRun {
+    config: Config,
+}
+
+#[cfg(windows)]
+impl FakeNpmRun {
+    fn new(label: &str, script: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("globlin-fake-npm-run-{label}.cmd"));
+        std::fs::write(&path, script).unwrap();
+        Self {
+            config: Config {
+                npm_cmd: Some(path),
+                sources: Sources {
+                    npm: true,
+                    bun: false,
+                    pnpm: false,
+                    yarn: false,
+                    pipx: false,
+                    uv: false,
+                    scoop: false,
+                    cargo: false,
+                    go: false,
+                    dotnet: false,
+                    psgallery: false,
+                    gem: false,
+                    winget: false,
+                    choco: false,
+                },
+                ..Default::default()
+            },
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for FakeNpmRun {
+    fn drop(&mut self) {
+        if let Some(path) = &self.config.npm_cmd {
+            std::fs::remove_file(path).ok();
+        }
+    }
+}
+
+#[cfg(windows)]
+const STRICT_REFUSAL_SCRIPT: &str = "@echo off\r\n\
+if \"%1\"==\"config\" goto config\r\n\
+if \"%1\"==\"install\" goto install\r\n\
+exit /b 1\r\n\
+:config\r\n\
+echo.\r\n\
+exit /b 0\r\n\
+:install\r\n\
+echo npm error code ESTRICTALLOWSCRIPTS 1>&2\r\n\
+echo npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts: 1>&2\r\n\
+echo npm error   koffi@3.3.2 (install: node ./cnoke.cjs) 1>&2\r\n\
+exit /b 1\r\n";
+
+#[cfg(windows)]
+#[test]
+fn a_strict_refusal_lands_the_target_in_blocked_not_failed() {
+    let fake = FakeNpmRun::new("blocked", STRICT_REFUSAL_SCRIPT);
+
+    let outcome = run(&fake.config, &[target("koffi")], &[], |_| {});
+
+    assert!(outcome.failed.is_empty(), "failed: {:?}", outcome.failed);
+    assert_eq!(outcome.blocked.len(), 1);
+    assert_eq!(outcome.blocked[0].target.name, "koffi");
+    assert_eq!(outcome.blocked[0].scripts[0].name, "koffi");
+    assert_eq!(outcome.blocked[0].scripts[0].version, "3.3.2");
+}
+
+#[cfg(windows)]
+const MIXED_BLOCKED_AND_FAILED_SCRIPT: &str = "@echo off\r\n\
+if \"%1\"==\"config\" goto config\r\n\
+if \"%1\"==\"install\" goto install\r\n\
+exit /b 1\r\n\
+:config\r\n\
+echo.\r\n\
+exit /b 0\r\n\
+:install\r\n\
+echo %3 | findstr /I \"koffi\" >nul\r\n\
+if %errorlevel%==0 goto blocked\r\n\
+echo npm error code E404 1>&2\r\n\
+echo npm error 404 Not Found 1>&2\r\n\
+exit /b 1\r\n\
+:blocked\r\n\
+echo npm error code ESTRICTALLOWSCRIPTS 1>&2\r\n\
+echo npm error --strict-allow-scripts: 1 package(s) have install scripts not covered by allowScripts: 1>&2\r\n\
+echo npm error   koffi@3.3.2 (install: node ./cnoke.cjs) 1>&2\r\n\
+exit /b 1\r\n";
+
+#[cfg(windows)]
+#[test]
+fn a_batch_can_mix_a_blocked_target_and_a_failed_one() {
+    let fake = FakeNpmRun::new("mixed", MIXED_BLOCKED_AND_FAILED_SCRIPT);
+    let targets = vec![target("koffi"), target("beta")];
+
+    let outcome = run(&fake.config, &targets, &[], |_| {});
+
+    assert_eq!(outcome.failed, vec!["beta".to_string()]);
+    assert_eq!(outcome.blocked.len(), 1);
+    assert_eq!(outcome.blocked[0].target.name, "koffi");
+}
+
+struct NoScriptsSource;
+
+impl PackageSource for NoScriptsSource {
+    fn kind(&self) -> SourceKind {
+        SourceKind::Cargo
+    }
+
+    fn installed(&self) -> crate::Result<Vec<Installed>> {
+        Ok(Vec::new())
+    }
+
+    fn update_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn uninstall_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+}
+
+#[test]
+fn a_source_without_its_own_policy_reports_no_blocked_scripts_by_default() {
+    assert_eq!(NoScriptsSource.blocked_scripts(""), None);
 }
 
 #[test]

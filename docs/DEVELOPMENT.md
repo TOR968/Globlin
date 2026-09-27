@@ -293,28 +293,35 @@ Things about the environment the code has to work around, all verified rather th
   command therefore passes `--allow-scripts=<name>`, which approves the scripts of the package the user
   already chose to install, and `--strict-allow-scripts`, which turns any other blocked script (a
   dependency's) into `ESTRICTALLOWSCRIPTS` and a non-zero exit. That check runs before the old version
-  is touched, so a refused update leaves the working install in place and reports as failed. A CLI
-  `--allow-scripts` replaces the `.npmrc` list rather than extending it (npm warns
+  is touched, so a refused update leaves the working install in place and reports as blocked (see the
+  next bullet). A CLI `--allow-scripts` replaces the `.npmrc` list rather than extending it (npm warns
   `.npmrc allow-scripts setting is being ignored`), so the update first reads
-  `npm config get allow-scripts` and passes that list with the package name appended. Without that
+  `npm config get allow-scripts -g` and passes that list with the package name appended. Without that
   merge a dependency the user approved in `.npmrc` could never be approved at all:
   `@deepseek-ai/dsh` needs `koffi`, `node-pty` and `protobufjs`, and failed every time. The fix for a
   refused update is to append the listed dependencies to the user-level list — npm's own hint,
   `npm config set allow-scripts=<deps> --location=user`, replaces the existing list, so keep the old
   entries in it. npm older than 12 does not know either flag and only warns.
 - **A refused npm update opens an approval dialog instead of just failing.** `ESTRICTALLOWSCRIPTS`
-  stderr is parsed by `npm::parse_blocked_scripts`: the lines `npm error   <name>@<version> (<event>:
-  <body>; …)` come from one place in npm (`@npmcli/arborist/lib/unreviewed-scripts.js`), and the
-  version is split at the last `@` so scoped names survive. The target lands in `Outcome.blocked`, not
-  `failed`, so there is no failure toast; `App` keeps it in `approvals` (memory only) and opens the
-  window, whose modal lists each package and its scripts. **Allow and update** posts
-  `approve:npm:<name>`; the worker reads `npm config get allow-scripts --location=user` — the user level
-  only, so project or global entries are never copied into the user file — appends pinned
-  `name@version` entries (npm's own `approve-scripts` default), runs `npm config set … --location=user`
-  and reruns the update. A retry that hits new dependencies comes back as blocked again. A failed
-  `config set` fails the update without running it. Unparseable output falls back to a plain failure.
-  The pinned name is the one npm prints (self-reported); for an alias dependency npm matches on the
-  resolved identity, so that approval would not take and the dialog would show again.
+  stderr is parsed by `npm::parse_blocked_scripts`: the header line `npm error --strict-allow-scripts:
+  <N> package(s) have install scripts not covered by allowScripts:` names how many package lines to
+  expect, and parsing only succeeds when exactly `N` lines parse and no name repeats, so a forged or
+  truncated block falls back to a plain failure rather than an incomplete approval. The lines
+  `npm error   <name>@<version> (<event>: <body>; …)` come from one place in npm
+  (`@npmcli/arborist/lib/unreviewed-scripts.js`), and the version is split at the last `@` so scoped
+  names survive. The target lands in `Outcome.blocked`, not `failed`, so there is no failure toast;
+  `App` keeps it in `approvals` (memory only) and opens the window, whose modal lists each package and
+  its scripts. **Allow and update** posts `approve:npm:<name>`; the worker reads
+  `npm config get allow-scripts -g`, which is the list a global install actually applies (user + global,
+  never the project layer — `--location=user` does not restrict what `config get` reads, verified on
+  npm 12.1.0) — appends pinned `name@version` entries (npm's own `approve-scripts` default; npm older
+  than 12 prints the bare tokens `undefined` or `null` here, which the merge drops instead of keeping as
+  an entry), and runs `npm config set … --location=user`, so only the write is pinned to the user file.
+  A failed read fails the approval instead of turning into an overwrite of the existing list. A retry
+  that hits new dependencies comes back as blocked again. A failed `config set` fails the update without
+  running it. Unparseable output falls back to a plain failure. The pinned name is the one npm prints
+  (self-reported); for an alias dependency npm matches on the resolved identity, so that approval would
+  not take and the dialog would show again.
 - **`bun pm ls -g` does not list global packages.** It ignores `-g` and prints the tree for whatever
   directory it is run from, so it will happily report a project's dependencies as if they were global. The
   bun source instead reads the global manifest directly — see below for where that manifest actually

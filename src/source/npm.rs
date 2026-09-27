@@ -16,6 +16,8 @@ const EXECUTABLE: &str = "npm";
 
 const STRICT_REFUSAL_CODE: &str = "ESTRICTALLOWSCRIPTS";
 const BLOCKED_LINE_PREFIX: &str = "npm error   ";
+const HEADER_PREFIX: &str = "npm error --strict-allow-scripts: ";
+const HEADER_SUFFIX: &str = " package(s) have install scripts not covered by allowScripts:";
 
 pub struct Npm {
     command: PathBuf,
@@ -43,8 +45,9 @@ impl PackageSource for Npm {
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        let configured = self.allow_scripts_config().unwrap_or_default();
         let mut command = hidden_command(&self.command);
-        command.args(install_arguments(name, &self.allow_scripts_config(&[])));
+        command.args(install_arguments(name, &configured));
         Some(command)
     }
 
@@ -59,10 +62,8 @@ impl PackageSource for Npm {
     }
 
     fn approve_scripts(&self, scripts: &[BlockedScript]) -> Result<()> {
-        let merged = merge_allow_list(
-            &self.allow_scripts_config(&["--location=user"]),
-            scripts.iter().map(BlockedScript::package),
-        );
+        let configured = self.allow_scripts_config()?;
+        let merged = merge_allow_list(&configured, scripts.iter().map(BlockedScript::package));
         let output = hidden_command(&self.command)
             .args([
                 "config",
@@ -83,15 +84,18 @@ impl PackageSource for Npm {
 }
 
 impl Npm {
-    fn allow_scripts_config(&self, scope: &[&str]) -> String {
-        hidden_command(&self.command)
-            .args(["config", "get", "allow-scripts"])
-            .args(scope)
-            .output()
-            .ok()
-            .filter(|output| output.status.success())
-            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
-            .unwrap_or_default()
+    fn allow_scripts_config(&self) -> Result<String> {
+        let output = hidden_command(&self.command)
+            .args(["config", "get", "allow-scripts", "-g"])
+            .output()?;
+        if !output.status.success() {
+            return Err(format!(
+                "npm config get allow-scripts failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )
+            .into());
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 }
 
@@ -111,7 +115,7 @@ fn install_arguments(name: &str, configured_allow_scripts: &str) -> Vec<String> 
 fn merge_allow_list(configured: &str, additions: impl IntoIterator<Item = String>) -> String {
     let mut entries: Vec<String> = configured
         .split(|character: char| character == ',' || character.is_whitespace())
-        .filter(|entry| !entry.is_empty())
+        .filter(|entry| !entry.is_empty() && *entry != "undefined" && *entry != "null")
         .map(str::to_owned)
         .collect();
     for addition in additions {
@@ -123,11 +127,31 @@ fn merge_allow_list(configured: &str, additions: impl IntoIterator<Item = String
 }
 
 fn parse_blocked_scripts(stderr: &str) -> Option<Vec<BlockedScript>> {
+    let expected = header_count(stderr)?;
+    let blocked: Vec<BlockedScript> = stderr.lines().filter_map(blocked_line).collect();
+    if blocked.is_empty() || blocked.len() != expected || has_duplicate_name(&blocked) {
+        return None;
+    }
+    Some(blocked)
+}
+
+fn header_count(stderr: &str) -> Option<usize> {
     if !stderr.contains(STRICT_REFUSAL_CODE) {
         return None;
     }
-    let blocked: Vec<BlockedScript> = stderr.lines().filter_map(blocked_line).collect();
-    (!blocked.is_empty()).then_some(blocked)
+    stderr.lines().find_map(|line| {
+        line.trim_end()
+            .strip_prefix(HEADER_PREFIX)?
+            .strip_suffix(HEADER_SUFFIX)?
+            .parse()
+            .ok()
+    })
+}
+
+fn has_duplicate_name(blocked: &[BlockedScript]) -> bool {
+    let mut names: Vec<&str> = blocked.iter().map(|entry| entry.name.as_str()).collect();
+    names.sort_unstable();
+    names.windows(2).any(|pair| pair[0] == pair[1])
 }
 
 fn blocked_line(line: &str) -> Option<BlockedScript> {
