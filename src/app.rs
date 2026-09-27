@@ -254,7 +254,7 @@ impl App {
             let announce = |step| {
                 proxy.send_event(Message::Step(step)).ok();
             };
-            let outcome = update::run(&config, &targets, announce);
+            let outcome = update::run(&config, &targets, &[], announce);
             proxy.send_event(Message::Updated(outcome)).ok();
         });
     }
