@@ -520,6 +520,7 @@
       <span class="spacer"></span>
       <label><input id="autostart" type="checkbox" /> Run at startup</label>
       <label><input id="auto-update" type="checkbox" /> Auto-update Globlin</label>
+      <label title="Runs every install script npm asks about without showing them first"><input id="auto-approve" type="checkbox" /> Auto-approve npm scripts</label>
       <button id="open-log" class="link">Open last log</button>
     </footer>
 
@@ -776,6 +777,7 @@
         el("autostart").checked = snapshot.autostart;
         el("auto-update").checked = snapshot.auto_update;
         el("auto-update").disabled = Boolean(snapshot.managed_by);
+        el("auto-approve").checked = snapshot.auto_approve;
         const managed = el("managed");
         managed.hidden = !snapshot.managed_by;
         if (snapshot.managed_by) {
@@ -868,6 +870,7 @@
       el("open-log").onclick = () => send("open-log");
       el("autostart").onclick = () => send("autostart");
       el("auto-update").onclick = () => send("auto-update");
+      el("auto-approve").onclick = () => send("auto-approve");
       el("self-update").onclick = () => send("update-self");
       el("select-all").onchange = (event) => {
         const rows = visible().filter(selectable);

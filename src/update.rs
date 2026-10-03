@@ -8,6 +8,7 @@ pub struct Outcome {
     pub updated: Vec<String>,
     pub failed: Vec<String>,
     pub blocked: Vec<Blocked>,
+    pub retried: bool,
 }
 
 impl Outcome {
@@ -65,7 +66,10 @@ pub fn run(
         return fail_all(targets, &details);
     }
 
-    let mut outcome = Outcome::default();
+    let mut outcome = Outcome {
+        retried: !approvals.is_empty(),
+        ..Outcome::default()
+    };
     let mut report = String::new();
 
     for (index, target) in targets.iter().enumerate() {
@@ -109,6 +113,14 @@ pub fn settle(approvals: &mut Vec<Blocked>, outcome: &Outcome) {
                 .any(|fresh| fresh.target.is(&entry.target.name, entry.target.source))
     });
     approvals.extend(outcome.blocked.iter().cloned());
+}
+
+pub fn auto_approvals(outcome: &Outcome, enabled: bool) -> Vec<Blocked> {
+    if enabled && !outcome.retried {
+        outcome.blocked.clone()
+    } else {
+        Vec::new()
+    }
 }
 
 fn fail_all(targets: &[UpdateTarget], report: &str) -> Outcome {

@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+
 use serde::Serialize;
 
 use crate::config::Config;
@@ -21,12 +23,14 @@ pub const HEIGHT: f64 = 640.0;
 const UI: &str = include_str!("window/ui.html");
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Snapshot {
     pub headline: String,
     pub busy: bool,
     pub version: &'static str,
     pub autostart: bool,
     pub auto_update: bool,
+    pub auto_approve: bool,
     pub self_update: Option<String>,
     pub managed_by: Option<&'static str>,
     pub sources: Vec<SourceRow>,
@@ -96,19 +100,34 @@ pub fn snapshot(view: &View, config: &Config) -> Snapshot {
             None,
         ),
     };
+    let sources = source_rows(view.packages, config);
     Snapshot {
         headline: tray::headline(view),
         busy: view.activity.is_some(),
         version: env!("CARGO_PKG_VERSION"),
         autostart: view.autostart,
         auto_update,
+        auto_approve: config.auto_approve_scripts,
         self_update,
         managed_by,
-        sources: source_rows(view.packages, config),
-        packages: view.packages.iter().map(row).collect(),
+        packages: package_rows(view.packages, &sources),
+        sources,
         batch: batch_rows(view),
         approvals: view.approvals.iter().map(approval_row).collect(),
     }
+}
+
+fn package_rows(packages: &[Package], sources: &[SourceRow]) -> Vec<Row> {
+    let mut ordered: Vec<&Package> = packages.iter().collect();
+    ordered.sort_by_key(|package| {
+        (
+            sources
+                .iter()
+                .position(|source| source.label == package.source.label()),
+            !matches!(package.status, Status::Outdated { .. }),
+        )
+    });
+    ordered.into_iter().map(row).collect()
 }
 
 fn row(package: &Package) -> Row {
@@ -128,10 +147,19 @@ fn row(package: &Package) -> Row {
 }
 
 fn source_rows(packages: &[Package], config: &Config) -> Vec<SourceRow> {
-    KINDS
+    let mut rows: Vec<SourceRow> = KINDS
         .into_iter()
         .map(|kind| source_row(kind, packages, config))
-        .collect()
+        .collect();
+    rows.sort_by_key(|row| {
+        (
+            !row.enabled,
+            row.total == 0,
+            Reverse(row.outdated),
+            Reverse(row.total),
+        )
+    });
+    rows
 }
 
 fn source_row(kind: SourceKind, packages: &[Package], config: &Config) -> SourceRow {
