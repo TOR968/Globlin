@@ -114,25 +114,56 @@ fn a_package_that_is_not_checked_is_never_reported_as_current() {
 #[test]
 fn every_source_gets_a_sidebar_row_even_when_it_is_switched_off() {
     let snapshot = snapshot(&view(&[], None), &config());
+    let mut labels: Vec<&str> = snapshot.sources.iter().map(|row| row.label).collect();
+    let mut expected: Vec<&str> = KINDS.iter().map(|kind| kind.label()).collect();
+    labels.sort_unstable();
+    expected.sort_unstable();
+
+    assert_eq!(labels, expected);
+}
+
+#[test]
+fn the_sidebar_lists_busy_sources_first_and_switched_off_ones_last() {
+    let mut config = config();
+    config.sources.pnpm = true;
+    config.sources.scoop = true;
+    let packages = vec![
+        package("typescript", SourceKind::Npm, Status::Current),
+        package("eslint", SourceKind::Npm, Status::Current),
+        outdated("Git.Git", SourceKind::Winget, "2.47.1"),
+        package("7zip", SourceKind::Scoop, Status::Current),
+    ];
+    let snapshot = snapshot(&view(&packages, None), &config);
     let labels: Vec<&str> = snapshot.sources.iter().map(|row| row.label).collect();
 
+    assert_eq!(&labels[..5], ["winget", "npm", "scoop", "pnpm", "bun"]);
+    assert_eq!(labels.last(), Some(&"choco"));
+}
+
+#[test]
+fn packages_follow_the_sidebar_order_with_outdated_ones_first_in_each_source() {
+    let packages = vec![
+        package("eslint", SourceKind::Npm, Status::Current),
+        outdated("prettier", SourceKind::Npm, "2.0.0"),
+        package("typescript", SourceKind::Npm, Status::Unknown),
+        outdated("Git.Git", SourceKind::Winget, "2.47.1"),
+        outdated("Node.js", SourceKind::Winget, "22.0.0"),
+    ];
+    let snapshot = snapshot(&view(&packages, None), &config());
+    let keys: Vec<&str> = snapshot
+        .packages
+        .iter()
+        .map(|row| row.key.as_str())
+        .collect();
+
     assert_eq!(
-        labels,
+        keys,
         vec![
-            "npm",
-            "bun",
-            "pnpm",
-            "yarn",
-            "pipx",
-            "uv",
-            "scoop",
-            "cargo",
-            "go",
-            "dotnet",
-            "psgallery",
-            "gem",
-            "winget",
-            "choco"
+            "winget:Git.Git",
+            "winget:Node.js",
+            "npm:prettier",
+            "npm:eslint",
+            "npm:typescript"
         ]
     );
 }
@@ -379,4 +410,14 @@ fn a_source_globlin_can_uninstall_from_says_so() {
     let snapshot = snapshot(&view(&packages, None), &config());
 
     assert!(snapshot.packages[0].removable);
+}
+
+#[test]
+fn the_auto_approve_setting_reaches_the_window_from_the_config() {
+    let mut config = config();
+    assert!(!snapshot(&view(&[], None), &config).auto_approve);
+
+    config.auto_approve_scripts = true;
+
+    assert!(snapshot(&view(&[], None), &config).auto_approve);
 }

@@ -114,8 +114,10 @@ noticeable, so `App::advance_animation` sends `window.globlin.tick(...)` with ju
 batch rows, mirroring the `Tray::render` / `Tray::animate` split exactly.
 
 `src/window/ui.html` is one file with no build step, no bundler and no CDN — it is `include_str!`d into
-the binary. Everything it needs arrives in the snapshot; it owns filtering, sorting, search and the
-two-click uninstall confirmation, and nothing else. The no-comments rule covers it: no `<!-- -->`, no
+the binary. Everything it needs arrives in the snapshot, already in display order: `window.rs` puts enabled sources
+that found packages first (most outdated, then most packages), empty ones next and switched-off ones
+last, and orders the package list by that same source order with outdated packages first inside each
+source. The page owns filtering, search and the two-click uninstall confirmation, and nothing else. The no-comments rule covers it: no `<!-- -->`, no
 `/* */`, no `//`.
 
 ### The icon
@@ -326,6 +328,12 @@ Things about the environment the code has to work around, all verified rather th
   running it. Unparseable output falls back to a plain failure. The pinned name is the one npm prints
   (self-reported); for an alias dependency npm matches on the resolved identity, so that approval would
   not take and the dialog would show again.
+- **`auto_approve_scripts` (off by default) skips the dialog, once.** When it is on, `App::on_updated`
+  takes `update::auto_approvals(outcome, …)` and starts the approval run itself, for every blocked target
+  in one batch, without opening the window. `update::run` marks any run that carried approvals as
+  `Outcome.retried`, and `auto_approvals` returns nothing for a retried run. So a retry that is refused
+  again (new dependencies, or the alias case above) lands in the dialog instead of approving in a loop.
+  The decision lives in `update.rs` and not in `App` so that it can be tested.
 - **`bun pm ls -g` does not list global packages.** It ignores `-g` and prints the tree for whatever
   directory it is run from, so it will happily report a project's dependencies as if they were global. The
   bun source instead reads the global manifest directly — see below for where that manifest actually

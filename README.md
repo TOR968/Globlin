@@ -122,7 +122,9 @@ Double-click the tray icon, or pick **Open Globlin** from its menu:
 - If npm 12 refuses an update because a dependency wants to run install scripts you have not approved,
   Globlin opens its window with the list of packages and the exact scripts. **Allow and update** adds
   those exact versions to `allow-scripts` in your user `.npmrc` and runs the update again; **Not now**
-  leaves the old version in place.
+  leaves the old version in place. **Auto-approve npm scripts** in the footer skips the dialog and
+  allows them straight away. It is off by default, because with it on any dependency's install scripts
+  run without you seeing them. If the retry is refused again, the dialog opens as usual.
 - **winget and choco rows are read-only.** Both need an elevated process to upgrade anything, and Globlin
   runs unelevated, so it reports them and leaves the doing to you. Their **Update** button says
   `read-only` and does nothing.

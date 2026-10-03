@@ -160,6 +160,7 @@ impl App {
                 self.start_self_update();
             }
             Action::ToggleAutoUpdate => self.toggle_auto_update(),
+            Action::ToggleAutoApprove => self.toggle_auto_approve(),
             Action::OpenLog => open_log(),
             Action::OpenSelfLog => open_self_log(),
         }
@@ -269,18 +270,22 @@ impl App {
     }
 
     fn start_approved(&mut self, name: &str, source: SourceKind) {
-        if self.activity.is_some() {
-            return;
-        }
-        let Some(index) = self
+        let chosen = self
             .approvals
             .iter()
-            .position(|entry| entry.target.is(name, source))
-        else {
+            .filter(|entry| entry.target.is(name, source))
+            .cloned()
+            .collect();
+        self.start_approvals(chosen);
+    }
+
+    fn start_approvals(&mut self, chosen: Vec<Blocked>) {
+        if chosen.is_empty() || self.activity.is_some() {
             return;
-        };
-        let blocked = self.approvals.remove(index);
-        self.start_update(vec![blocked.target.clone()], vec![blocked]);
+        }
+        self.approvals.retain(|entry| !chosen.contains(entry));
+        let targets = chosen.iter().map(|entry| entry.target.clone()).collect();
+        self.start_update(targets, chosen);
     }
 
     fn start_remove(&mut self, target: RemoveTarget) {
@@ -318,6 +323,15 @@ impl App {
 
     fn toggle_auto_update(&mut self) {
         self.config.auto_update = !self.config.auto_update;
+        self.save_setting();
+    }
+
+    fn toggle_auto_approve(&mut self) {
+        self.config.auto_approve_scripts = !self.config.auto_approve_scripts;
+        self.save_setting();
+    }
+
+    fn save_setting(&mut self) {
         if let Err(error) = self.config.save() {
             platform::notify("Globlin", &format!("Could not save the setting: {error}")).ok();
         }
@@ -456,6 +470,7 @@ impl App {
     fn on_updated(&mut self, outcome: &Outcome, target: &EventLoopWindowTarget<Message>) {
         self.activity = None;
         update::settle(&mut self.approvals, outcome);
+        let approved = update::auto_approvals(outcome, self.config.auto_approve_scripts);
         if !outcome.failed.is_empty() {
             platform::notify(
                 "Globlin — update failed",
@@ -464,6 +479,10 @@ impl App {
             .ok();
         } else if !outcome.updated.is_empty() {
             platform::notify("Globlin — updated", &outcome.updated.join("\n")).ok();
+        }
+        if !approved.is_empty() {
+            self.start_approvals(approved);
+            return;
         }
         if !outcome.blocked.is_empty() {
             self.open_window(target);

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 415 tests (389 run, 26 ignored), no network, no side effects
+cargo test                     # 422 tests (396 run, 26 ignored), no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -70,7 +70,8 @@ posts those same id strings over IPC (`Message::Ipc`), so there is one action vo
 `tray::View` into a `Snapshot` (plain serde structs) and hands it to the page as
 `window.globlin.render(<json>)`; the page renders and posts ids back. Everything with branch-worthy logic
 — which rows exist, what each id is, what counts as read-only — is built in `window.rs` and unit-tested
-there; `window/ui.html` only filters, sorts and draws. `window/shell.rs` is the only file that touches
+there; `window/ui.html` only filters and draws — the snapshot
+arrives already in display order. `window/shell.rs` is the only file that touches
 `wry`, and `window/stub.rs` is its non-Windows counterpart. Animation frames go through `tick`, not
 `render`, so an 8 fps spinner does not rebuild a 200-row list.
 

@@ -642,3 +642,11 @@ fn an_approval_id_without_a_package_name_is_ignored() {
     assert_eq!(Action::from_key("approve:npm:"), None);
     assert_eq!(Action::from_key("dismiss:nosuch:thing"), None);
 }
+
+#[test]
+fn the_auto_approve_id_parses_back_to_its_action() {
+    assert_eq!(
+        Action::from_key(ID_AUTO_APPROVE),
+        Some(Action::ToggleAutoApprove)
+    );
+}

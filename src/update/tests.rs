@@ -457,3 +457,37 @@ fn a_batch_with_an_updated_or_failed_target_changed_packages() {
     assert!(updated.changed_packages());
     assert!(failed.changed_packages());
 }
+
+#[test]
+fn auto_approval_retries_every_blocked_target_when_the_setting_is_on() {
+    let outcome = Outcome {
+        blocked: vec![
+            blocked("alpha", SourceKind::Npm),
+            blocked("beta", SourceKind::Npm),
+        ],
+        ..Outcome::default()
+    };
+
+    assert_eq!(auto_approvals(&outcome, true), outcome.blocked);
+}
+
+#[test]
+fn auto_approval_leaves_blocked_targets_for_the_dialog_when_the_setting_is_off() {
+    let outcome = Outcome {
+        blocked: vec![blocked("alpha", SourceKind::Npm)],
+        ..Outcome::default()
+    };
+
+    assert!(auto_approvals(&outcome, false).is_empty());
+}
+
+#[test]
+fn a_retry_that_is_blocked_again_goes_to_the_dialog_instead_of_looping() {
+    let outcome = Outcome {
+        blocked: vec![blocked("alpha", SourceKind::Npm)],
+        retried: true,
+        ..Outcome::default()
+    };
+
+    assert!(auto_approvals(&outcome, true).is_empty());
+}

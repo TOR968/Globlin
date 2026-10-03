@@ -20,6 +20,7 @@ pub struct Config {
     pub last_notified: Vec<String>,
     pub npm_cmd: Option<PathBuf>,
     pub auto_update: bool,
+    pub auto_approve_scripts: bool,
     pub last_self_notice: Option<String>,
 }
 
@@ -52,6 +53,7 @@ impl Default for Config {
             last_notified: Vec::new(),
             npm_cmd: None,
             auto_update: false,
+            auto_approve_scripts: false,
             last_self_notice: None,
         }
     }
