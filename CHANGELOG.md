@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5](https://github.com/TOR968/Globlin/compare/v0.3.4...v0.3.5) - 2026-10-03
+
+### Added
+
+- *(window)* order sources by activity and add an auto-approve setting for npm scripts ([#44](https://github.com/TOR968/Globlin/pull/44))
+
 ## [0.3.4](https://github.com/TOR968/Globlin/compare/v0.3.3...v0.3.4) - 2026-09-27
 
 ### Added
