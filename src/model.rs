@@ -12,6 +12,7 @@ pub enum SourceKind {
     Dotnet,
     PsGallery,
     Gem,
+    Brew,
     Winget,
     Choco,
 }
@@ -27,7 +28,7 @@ pub enum Catalog {
     SelfReported,
 }
 
-pub const KINDS: [SourceKind; 14] = [
+pub const KINDS: [SourceKind; 15] = [
     SourceKind::Npm,
     SourceKind::Bun,
     SourceKind::Pnpm,
@@ -40,6 +41,7 @@ pub const KINDS: [SourceKind; 14] = [
     SourceKind::Dotnet,
     SourceKind::PsGallery,
     SourceKind::Gem,
+    SourceKind::Brew,
     SourceKind::Winget,
     SourceKind::Choco,
 ];
@@ -59,6 +61,7 @@ impl SourceKind {
             Self::Dotnet => "dotnet",
             Self::PsGallery => "psgallery",
             Self::Gem => "gem",
+            Self::Brew => "brew",
             Self::Winget => "winget",
             Self::Choco => "choco",
         }
@@ -74,7 +77,7 @@ impl SourceKind {
             Self::Pipx => Catalog::PyPi,
             Self::Dotnet => Catalog::NuGet,
             Self::PsGallery => Catalog::PsGallery,
-            Self::Uv | Self::Scoop | Self::Go | Self::Gem => Catalog::SelfResolved,
+            Self::Uv | Self::Scoop | Self::Go | Self::Gem | Self::Brew => Catalog::SelfResolved,
             Self::Cargo => Catalog::Crates,
             Self::Winget | Self::Choco => Catalog::SelfReported,
         }
@@ -110,6 +113,7 @@ impl SourceKind {
             Self::Dotnet => " (dotnet)",
             Self::PsGallery => " (psgallery)",
             Self::Gem => " (gem)",
+            Self::Brew => " (brew)",
             Self::Winget => " (winget)",
             Self::Choco => " (choco)",
         }

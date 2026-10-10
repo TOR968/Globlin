@@ -65,9 +65,41 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  build-macos:
+    name: Build Globlin.app
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test
+        run: cargo test
+
+      - name: Build the release binary
+        run: cargo build --release
+
+      - name: Bundle, sign ad hoc and zip
+        run: |
+          bash .github/bundle-macos.sh target/release/globlin dist
+          cd dist
+          for file in globlin-macos-arm64 Globlin-macos-arm64.zip; do
+            shasum -a 256 "$file" > "$file.sha256"
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: |
+            dist/globlin-macos-arm64
+            dist/globlin-macos-arm64.sha256
+            dist/Globlin-macos-arm64.zip
+            dist/Globlin-macos-arm64.zip.sha256
+          if-no-files-found: error
+
   publish:
     name: Publish the release
-    needs: build
+    needs: [build, build-macos]
     runs-on: windows-latest
 
     steps:
@@ -145,5 +177,9 @@ jobs:
           dist/globlin-setup-x64.exe.sha256
           dist/globlin-setup-arm64.exe
           dist/globlin-setup-arm64.exe.sha256
+          dist/Globlin-macos-arm64.zip
+          dist/Globlin-macos-arm64.zip.sha256
+          dist/globlin-macos-arm64
+          dist/globlin-macos-arm64.sha256
           --title "Globlin ${{ github.ref_name }}"
           --notes-file dist/notes.md

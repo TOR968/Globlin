@@ -9,6 +9,10 @@ entries; or download the portable `globlin.exe` (or `globlin-arm64.exe`) and run
 keeps its config in a `globlin.json` next to itself, so it can live on a USB stick or in any folder you
 like. Enable *Run at startup* from the tray menu if you want it to come back after a reboot.
 
+**macOS (experimental, Apple Silicon):** unzip `Globlin-macos-arm64.zip`, move Globlin.app to
+Applications, and allow it once under *System Settings → Privacy & Security → Open Anyway* — it is signed
+ad hoc, not notarised. `globlin-macos-arm64` is the bare binary the Mac app updates itself from.
+
 ## Verify the download
 
 ```powershell

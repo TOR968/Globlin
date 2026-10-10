@@ -4,7 +4,7 @@
   # Globlin
 
   A tray icon that watches your global packages — npm, bun, pnpm, yarn, pipx, uv, scoop, cargo, go,
-  dotnet, PowerShell Gallery, gem, winget, choco — and tells you when one falls behind.
+  dotnet, PowerShell Gallery, gem, Homebrew, winget, choco — and tells you when one falls behind.
 
   [![CI](https://github.com/TOR968/Globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/Globlin/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/TOR968/Globlin)](https://github.com/TOR968/Globlin/releases/latest)
@@ -40,6 +40,17 @@ Windows on ARM (Snapdragon and other ARM64 laptops):
 
 Both update themselves the same way. Right-click the tray icon and tick **Run at startup** if you want it
 running every time you log in.
+
+### macOS (experimental)
+
+Apple Silicon only. Download `Globlin-macos-arm64.zip`, unzip it, and move **Globlin.app** to
+*Applications*. The app is signed ad hoc, not notarised, so the first launch is blocked: open
+*System Settings → Privacy & Security* and choose **Open Anyway**, or run
+`xattr -dr com.apple.quarantine /Applications/Globlin.app` once. After that it lives in the menu bar — no
+Dock icon — and updates itself like the Windows builds. Its settings and logs are in
+`~/Library/Application Support/globlin/`; *Run at startup* writes
+`~/Library/LaunchAgents/dev.globlin.app.plist`. It is new and tested on one Mac so far — please
+[open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
 <details>
 <summary><strong>If Windows Defender flags the download</strong> —
@@ -174,6 +185,7 @@ not actionable.
 | **dotnet** | `dotnet tool list --global` | the NuGet flat-container index | `dotnet tool update --global <name>` |
 | **psgallery** | `Get-InstalledModule` | the PowerShell Gallery's package redirect | `Update-Module -Scope CurrentUser` |
 | **gem** | `gem list --local` | `gem outdated` | `gem update <name>` |
+| **brew** | `brew info --json=v2 --installed` (formulae and casks) | the same reply — brew's `outdated` flag | `brew upgrade <name>` |
 | **winget** | `winget list` | winget's own `Available` column | read-only |
 | **choco** | `choco list -r` + `choco outdated -r` | choco's own report | read-only |
 
@@ -195,6 +207,10 @@ numbers (`1.0.0rc1`, `1.0.0.post1`) is reported as not checked rather than guess
 **scoop is compared against your local buckets.** Globlin reads the same bucket manifests `scoop status`
 reads and never runs `scoop update` for you, so an app is only as current as your last bucket refresh.
 Apps installed with `scoop install -g` live under `C:\ProgramData\scoop` and are not listed.
+
+**brew is compared against your local taps**, like scoop against its buckets: Globlin never runs
+`brew update`, so a formula is only as current as your last `brew update` (which brew runs on its own
+before most installs). Both formulae and casks are listed.
 
 **cargo and go build from source.** Their **Update** runs a real compile, which can take minutes; the row
 keeps spinning until it finishes. Go has no uninstall command, so go rows offer no **Uninstall** —

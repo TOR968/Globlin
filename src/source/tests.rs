@@ -16,6 +16,7 @@ fn only(kinds: &[SourceKind]) -> Config {
             dotnet: false,
             psgallery: false,
             gem: false,
+            brew: false,
             winget: false,
             choco: false,
         },

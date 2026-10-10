@@ -9,6 +9,7 @@ use crate::config::Config;
 use crate::model::{BlockedScript, Installed, SourceKind, KINDS};
 use crate::Result;
 
+mod brew;
 mod bun;
 mod cargo;
 mod choco;
@@ -24,6 +25,7 @@ mod uv;
 mod winget;
 mod yarn;
 
+pub use brew::Brew;
 pub use bun::Bun;
 pub use cargo::Cargo;
 pub use choco::Choco;
@@ -95,6 +97,7 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
         SourceKind::Dotnet => Box::new(Dotnet::new()?),
         SourceKind::PsGallery => Box::new(PsGallery::new()?),
         SourceKind::Gem => Box::new(Gem::new()?),
+        SourceKind::Brew => Box::new(Brew::new()?),
         SourceKind::Winget => Box::new(Winget::new()?),
         SourceKind::Choco => Box::new(Choco::new()?),
     })
