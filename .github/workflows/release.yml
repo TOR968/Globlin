@@ -45,6 +45,9 @@ jobs:
           $hash = (Get-FileHash dist/${{ matrix.asset }} -Algorithm SHA256).Hash.ToLower()
           "$hash  ${{ matrix.asset }}" | Set-Content dist/${{ matrix.asset }}.sha256
           "sha256=$hash" | Add-Content $env:GITHUB_OUTPUT
+          $icon = Get-ChildItem target/release/build -Recurse -Filter app.ico |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          Copy-Item $icon.FullName dist/${{ matrix.asset }}.ico
           Get-ChildItem dist | Select-Object Name, Length
 
       - name: Scan the build with VirusTotal
@@ -62,9 +65,41 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  build-macos:
+    name: Build Globlin.app
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test
+        run: cargo test
+
+      - name: Build the release binary
+        run: cargo build --release
+
+      - name: Bundle, sign ad hoc and zip
+        run: |
+          bash .github/bundle-macos.sh target/release/globlin dist
+          cd dist
+          for file in globlin-macos-arm64 Globlin-macos-arm64.zip; do
+            shasum -a 256 "$file" > "$file.sha256"
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: |
+            dist/globlin-macos-arm64
+            dist/globlin-macos-arm64.sha256
+            dist/Globlin-macos-arm64.zip
+            dist/Globlin-macos-arm64.zip.sha256
+          if-no-files-found: error
+
   publish:
     name: Publish the release
-    needs: build
+    needs: [build, build-macos]
     runs-on: windows-latest
 
     steps:
@@ -86,6 +121,29 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Build the installers
+        shell: pwsh
+        run: |
+          foreach ($build in @(@{ Exe = 'globlin.exe'; Arch = 'x64' }, @{ Exe = 'globlin-arm64.exe'; Arch = 'arm64' })) {
+            $setup = & ./.github/build-installer.ps1 -Exe "dist/$($build.Exe)" -Arch $build.Arch -Icon "dist/$($build.Exe).ico" -OutDir dist
+            $name = Split-Path $setup -Leaf
+            $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+            "$hash  $name" | Set-Content "dist/$name.sha256"
+          }
+          Get-ChildItem dist | Select-Object Name, Length
+
+      - name: Scan the installers with VirusTotal
+        continue-on-error: true
+        shell: pwsh
+        env:
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        run: |
+          foreach ($name in 'globlin-setup-x64.exe', 'globlin-setup-arm64.exe') {
+            $hash = (Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLower()
+            $section = & ./.github/virustotal-scan.ps1 -Path "dist/$name" -Sha256 $hash
+            if ($section) { $section | Set-Content "dist/$name.virustotal.md" -Encoding utf8 }
+          }
+
       - name: Assemble the release notes
         shell: pwsh
         run: |
@@ -98,7 +156,7 @@ jobs:
             "no CHANGELOG.md section found for $version; using the static notes only"
           }
           $parts += (Get-Content .github/release-notes.md -Raw).Trim()
-          foreach ($asset in 'globlin.exe', 'globlin-arm64.exe') {
+          foreach ($asset in 'globlin-setup-x64.exe', 'globlin-setup-arm64.exe', 'globlin.exe', 'globlin-arm64.exe') {
             $scan = "dist/$asset.virustotal.md"
             if (Test-Path $scan) {
               $parts += (Get-Content $scan -Raw).Trim()
@@ -115,5 +173,13 @@ jobs:
           dist/globlin.exe.sha256
           dist/globlin-arm64.exe
           dist/globlin-arm64.exe.sha256
+          dist/globlin-setup-x64.exe
+          dist/globlin-setup-x64.exe.sha256
+          dist/globlin-setup-arm64.exe
+          dist/globlin-setup-arm64.exe.sha256
+          dist/Globlin-macos-arm64.zip
+          dist/Globlin-macos-arm64.zip.sha256
+          dist/globlin-macos-arm64
+          dist/globlin-macos-arm64.sha256
           --title "Globlin ${{ github.ref_name }}"
           --notes-file dist/notes.md

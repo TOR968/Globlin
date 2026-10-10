@@ -3,7 +3,10 @@ use std::path::{Path, PathBuf};
 
 use crate::Result;
 
-const NOT_IMPLEMENTED: &str = "this build only implements the Windows platform arm; see README.md";
+const NOT_IMPLEMENTED: &str =
+    "this build does not implement the Linux platform arm yet; see README.md";
+
+pub const fn prepare_environment() {}
 
 pub fn claim_single_instance() -> bool {
     true
@@ -27,13 +30,19 @@ pub fn notify(_title: &str, _body: &str) -> Result<()> {
     Err(NOT_IMPLEMENTED.into())
 }
 
-pub fn on_notification_click(_handler: impl Fn() + Send + Sync + 'static) {}
-
 pub fn autostart_enabled() -> bool {
     false
 }
 
 pub fn set_autostart(_enabled: bool) -> Result<()> {
+    Err(NOT_IMPLEMENTED.into())
+}
+
+pub fn setup_install_location() -> Option<PathBuf> {
+    None
+}
+
+pub fn record_installed_version(_version: &str) -> Result<()> {
     Err(NOT_IMPLEMENTED.into())
 }
 

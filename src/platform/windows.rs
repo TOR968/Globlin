@@ -1,10 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::OnceLock;
 
 use tauri_winrt_notification::{Duration as ToastDuration, Toast};
-use winreg::enums::HKEY_CURRENT_USER;
+use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
 use winreg::RegKey;
 
 use crate::icon;
@@ -14,8 +13,9 @@ const APP_USER_MODEL_ID: &str = "Globlin.Tray";
 const DISPLAY_NAME: &str = "Globlin";
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "globlin";
+const SETUP_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}_is1";
 
-static NOTIFICATION_CLICK: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
+pub const fn prepare_environment() {}
 
 pub fn claim_single_instance() -> bool {
     use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};
@@ -56,10 +56,6 @@ pub fn notify(title: &str, body: &str) -> Result<()> {
     }
 }
 
-pub fn on_notification_click(handler: impl Fn() + Send + Sync + 'static) {
-    NOTIFICATION_CLICK.set(Box::new(handler)).ok();
-}
-
 pub fn autostart_enabled() -> bool {
     RegKey::predef(HKEY_CURRENT_USER)
         .open_subkey(RUN_KEY)
@@ -75,6 +71,20 @@ pub fn set_autostart(enabled: bool) -> Result<()> {
     } else if key.get_value::<String, _>(RUN_VALUE).is_ok() {
         key.delete_value(RUN_VALUE)?;
     }
+    Ok(())
+}
+
+pub fn setup_install_location() -> Option<PathBuf> {
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(SETUP_KEY)
+        .and_then(|key| key.get_value::<String, _>("InstallLocation"))
+        .ok()
+        .map(PathBuf::from)
+}
+
+pub fn record_installed_version(version: &str) -> Result<()> {
+    let key = RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(SETUP_KEY, KEY_SET_VALUE)?;
+    key.set_value("DisplayVersion", &version.to_string())?;
     Ok(())
 }
 
@@ -103,9 +113,7 @@ fn show_toast(app_id: &str, title: &str, body: &str) -> Result<()> {
         .text1(body)
         .duration(ToastDuration::Short)
         .on_activated(|_| {
-            if let Some(handler) = NOTIFICATION_CLICK.get() {
-                handler();
-            }
+            super::notification_clicked();
             Ok(())
         })
         .show()

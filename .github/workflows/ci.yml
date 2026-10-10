@@ -78,6 +78,19 @@ jobs:
       - name: Test
         run: cargo test
 
+      - name: Bundle Globlin.app and verify its signature
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --release
+          bash .github/bundle-macos.sh target/release/globlin macos-out
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with:
+          name: Globlin-macos-arm64-${{ github.sha }}
+          path: macos-out/Globlin-macos-arm64.zip
+          if-no-files-found: error
+
       - name: Build the release binary
         if: matrix.asset
         run: cargo build --release
@@ -88,6 +101,15 @@ jobs:
         run: |
           $exe = Get-Item target/release/globlin.exe
           "{0:N0} bytes ({1:N2} MB)" -f $exe.Length, ($exe.Length / 1MB)
+
+      - name: Build the installer and run it through an install and an uninstall
+        if: matrix.asset == 'globlin.exe'
+        shell: pwsh
+        run: |
+          $icon = Get-ChildItem target/release/build -Recurse -Filter app.ico |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $setup = & ./.github/build-installer.ps1 -Exe target/release/globlin.exe -Arch x64 -Icon $icon.FullName -OutDir installer-out
+          & ./.github/installer-smoke.ps1 -Setup $setup
 
       - uses: actions/upload-artifact@v7
         if: matrix.asset

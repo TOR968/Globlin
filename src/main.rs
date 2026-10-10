@@ -21,7 +21,7 @@ mod window;
 use std::time::Duration;
 
 use tao::event::{Event, StartCause, WindowEvent};
-use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
+use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use tray_icon::menu::MenuEvent;
 use tray_icon::TrayIconEvent;
 
@@ -49,6 +49,7 @@ const CLAIM_ATTEMPTS: u32 = 50;
 const CLAIM_PAUSE: Duration = Duration::from_millis(200);
 
 fn main() {
+    platform::prepare_environment();
     let replaced = was_replaced(std::env::args().collect::<Vec<String>>().iter());
     if !claim(replaced) {
         return;
@@ -61,9 +62,7 @@ fn main() {
         )
         .ok();
     }
-    if let Err(error) = run() {
-        platform::notify("Globlin could not start", &error.to_string()).ok();
-    }
+    run();
 }
 
 fn was_replaced<S: AsRef<str>>(mut args: impl Iterator<Item = S>) -> bool {
@@ -91,14 +90,29 @@ fn claim(replaced: bool) -> bool {
     false
 }
 
-fn run() -> Result<()> {
-    let event_loop = EventLoopBuilder::<Message>::with_user_event().build();
-    let mut app = App::new(event_loop.create_proxy())?;
+fn run() -> ! {
+    let mut event_loop = EventLoopBuilder::<Message>::with_user_event().build();
+    hide_from_dock(&mut event_loop);
+    let proxy = event_loop.create_proxy();
     forward_menu_events(event_loop.create_proxy());
     forward_tray_events(event_loop.create_proxy());
     forward_notification_clicks(event_loop.create_proxy());
+    let mut app: Option<App> = None;
 
     event_loop.run(move |event, target, control_flow| {
+        if matches!(event, Event::NewEvents(StartCause::Init)) {
+            match App::new(proxy.clone()) {
+                Ok(started) => app = Some(started),
+                Err(error) => {
+                    platform::notify("Globlin could not start", &error.to_string()).ok();
+                    *control_flow = ControlFlow::Exit;
+                    return;
+                }
+            }
+        }
+        let Some(app) = app.as_mut() else {
+            return;
+        };
         *control_flow = match event {
             Event::NewEvents(StartCause::Init | StartCause::ResumeTimeReached { .. }) => {
                 app.on_wake();
@@ -120,6 +134,16 @@ fn run() -> Result<()> {
         };
     })
 }
+
+#[cfg(target_os = "macos")]
+fn hide_from_dock(event_loop: &mut EventLoop<Message>) {
+    use tao::platform::macos::{ActivationPolicy, EventLoopExtMacOS};
+
+    event_loop.set_activation_policy(ActivationPolicy::Accessory);
+}
+
+#[cfg(not(target_os = "macos"))]
+const fn hide_from_dock(_event_loop: &mut EventLoop<Message>) {}
 
 fn forward_menu_events(proxy: EventLoopProxy<Message>) {
     MenuEvent::set_event_handler(Some(move |event| {

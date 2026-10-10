@@ -8,10 +8,11 @@ use std::time::Duration;
 
 use ureq::Agent;
 
-use crate::Result;
+use crate::{diagnostics, install, platform, Result};
 
 const X64_ASSET: &str = "globlin.exe";
 const ARM64_ASSET: &str = "globlin-arm64.exe";
+const MACOS_ARM64_ASSET: &str = "globlin-macos-arm64";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
@@ -60,10 +61,11 @@ fn asset_url(assets: &[ApiAsset], name: &str) -> Option<String> {
         .map(|asset| asset.browser_download_url.clone())
 }
 
-fn asset_for(arch: &str) -> Option<&'static str> {
-    match arch {
-        "x86_64" => Some(X64_ASSET),
-        "aarch64" => Some(ARM64_ASSET),
+fn asset_for(os: &str, arch: &str) -> Option<&'static str> {
+    match (os, arch) {
+        ("windows", "x86_64") => Some(X64_ASSET),
+        ("windows", "aarch64") => Some(ARM64_ASSET),
+        ("macos", "aarch64") => Some(MACOS_ARM64_ASSET),
         _ => None,
     }
 }
@@ -73,8 +75,8 @@ fn checksum_asset(asset: &str) -> String {
 }
 
 fn running_asset() -> Result<&'static str> {
-    let arch = std::env::consts::ARCH;
-    asset_for(arch).ok_or_else(|| format!("no build is published for {arch}").into())
+    let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
+    asset_for(os, arch).ok_or_else(|| format!("no build is published for {os} {arch}").into())
 }
 
 fn published_hash(body: &str, asset: &str) -> Option<String> {
@@ -176,14 +178,33 @@ pub fn apply(release: &Release) -> Result<Version> {
     let current = std::env::current_exe()?;
     let staged = staged_path(&current);
     fs::write(&staged, &binary)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&staged, fs::Permissions::from_mode(0o755))?;
+    }
     match swap(&current, &staged) {
-        Ok(()) => Ok(release.version.clone()),
+        Ok(()) => {
+            record_installed_version(&release.version);
+            Ok(release.version.clone())
+        }
         Err(error) => {
             if should_discard_staged(&current) {
                 fs::remove_file(&staged).ok();
             }
             Err(error)
         }
+    }
+}
+
+fn record_installed_version(version: &Version) {
+    if !install::setup_managed() {
+        return;
+    }
+    if let Err(error) = platform::record_installed_version(&version.to_string()) {
+        diagnostics::record_self_update_failure(&format!(
+            "could not record {version} as the installed version: {error}\n"
+        ));
     }
 }
 
