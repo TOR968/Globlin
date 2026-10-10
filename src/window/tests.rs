@@ -272,7 +272,7 @@ fn a_winget_managed_install_tells_the_window_not_to_offer_self_updates() {
         activity: None,
         approvals: &[],
         autostart: false,
-        self_update: SelfUpdate::Winget,
+        self_update: SelfUpdate::Managed(crate::install::Manager::Winget),
         pending_restart: None,
         frame: 0,
         elapsed: Duration::ZERO,

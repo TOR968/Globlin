@@ -28,12 +28,12 @@ impl Window {
             .with_window_icon(app_icon())
             .with_visible(false)
             .build(target)?;
-        let webview = WebViewBuilder::new()
+        let builder = WebViewBuilder::new()
             .with_html(UI)
             .with_ipc_handler(move |request| {
                 proxy.send_event(Message::Ipc(request.into_body())).ok();
-            })
-            .build(&host)?;
+            });
+        let webview = attach(builder, &host)?;
         Ok(Self { host, webview })
     }
 
@@ -61,6 +61,22 @@ impl Window {
     pub fn tick(&self, tick: &Tick) {
         self.webview.evaluate_script(&tick_script(tick)).ok();
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn attach<'a>(builder: WebViewBuilder<'a>, host: &'a HostWindow) -> Result<WebView> {
+    Ok(builder.build(host)?)
+}
+
+#[cfg(target_os = "linux")]
+fn attach<'a>(builder: WebViewBuilder<'a>, host: &'a HostWindow) -> Result<WebView> {
+    use tao::platform::unix::WindowExtUnix;
+    use wry::WebViewBuilderExtUnix;
+
+    let container = host
+        .default_vbox()
+        .ok_or("the window has no GTK container to hold the page")?;
+    Ok(builder.build_gtk(container)?)
 }
 
 fn app_icon() -> Option<Icon> {
