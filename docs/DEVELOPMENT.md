@@ -810,6 +810,17 @@ hatch.
 **Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull
 requests"** must also be enabled, or the `release-pr` job cannot open the pull request.
 
+### Workflow hardening
+
+Every third-party action is pinned to a full commit SHA with its release in a trailing `# vX.Y.Z`, because
+a tag can be moved and the release jobs hand actions a write token, the PAT and `AUR_SSH_KEY`.
+`.github/dependabot.yml` proposes SHA bumps monthly with a `ci:` prefix, so they never open a release.
+Workflows default to `permissions: contents: read`; only `release.yml`'s `publish` job and the two
+release-plz jobs get `contents: write`. Every `actions/checkout` sets `persist-credentials: false`, so a
+build script, proc-macro or `rustup-init` running during a release cannot read a token out of
+`.git/config`. `release.yml` passes the tag to its scripts as the `TAG` environment variable rather than
+interpolating `${{ github.ref_name }}` into `run:` text.
+
 ## Other platforms
 
 Windows is the main platform; macOS and Linux work and are experimental. `ci.yml` runs clippy and the
