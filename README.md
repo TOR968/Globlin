@@ -67,6 +67,14 @@ sudo dnf install ./globlin-x86_64.rpm     # Fedora
 yay -S globlin-bin                        # Arch, from the AUR
 ```
 
+Until `globlin-bin` is published in the AUR, every release also carries the same PKGBUILD with its version
+and checksums filled in:
+
+```sh
+curl -L -o PKGBUILD https://github.com/TOR968/Globlin/releases/latest/download/globlin-bin.PKGBUILD
+makepkg -si
+```
+
 The package pulls in WebKitGTK 4.1 and the Ayatana AppIndicator library. GNOME shows tray icons only with
 the *AppIndicator and KStatusNotifierItem Support* extension; KDE, Xfce, Cinnamon and most other desktops
 show them out of the box. On Linux the tray icon opens its menu on any click — pick **Open Globlin** for
