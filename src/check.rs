@@ -27,7 +27,7 @@ struct Latest {
 }
 
 pub fn run(config: &Config) -> Report {
-    let release = if install::winget_managed() {
+    let release = if install::managed_by().is_some() {
         None
     } else {
         look_up_release(selfupdate::latest())

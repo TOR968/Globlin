@@ -559,7 +559,7 @@ fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
         activity: None,
         approvals: &[],
         autostart: false,
-        self_update: SelfUpdate::Winget,
+        self_update: SelfUpdate::Managed(crate::install::Manager::Winget),
         pending_restart: None,
         frame: 0,
         elapsed: Duration::ZERO,

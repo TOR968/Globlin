@@ -8,6 +8,37 @@ authors = ["TOR968"]
 repository = "https://github.com/TOR968/Globlin"
 homepage = "https://globlin.pages.dev"
 
+[package.metadata.deb]
+section = "utils"
+priority = "optional"
+depends = "$auto, libayatana-appindicator3-1 | libappindicator3-1"
+extended-description = "A tray app that watches your globally installed packages across npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem, Homebrew and the PowerShell Gallery, and tells you when one falls behind. Beta."
+assets = [
+    ["target/release/globlin", "usr/bin/", "755"],
+    ["packaging/linux/globlin.desktop", "usr/share/applications/", "644"],
+    ["target/linux-icons/32x32/apps/globlin.png", "usr/share/icons/hicolor/32x32/apps/", "644"],
+    ["target/linux-icons/48x48/apps/globlin.png", "usr/share/icons/hicolor/48x48/apps/", "644"],
+    ["target/linux-icons/64x64/apps/globlin.png", "usr/share/icons/hicolor/64x64/apps/", "644"],
+    ["target/linux-icons/128x128/apps/globlin.png", "usr/share/icons/hicolor/128x128/apps/", "644"],
+    ["target/linux-icons/256x256/apps/globlin.png", "usr/share/icons/hicolor/256x256/apps/", "644"],
+    ["target/linux-icons/512x512/apps/globlin.png", "usr/share/icons/hicolor/512x512/apps/", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/globlin", dest = "/usr/bin/globlin", mode = "755" },
+    { source = "packaging/linux/globlin.desktop", dest = "/usr/share/applications/globlin.desktop", mode = "644" },
+    { source = "target/linux-icons/32x32/apps/globlin.png", dest = "/usr/share/icons/hicolor/32x32/apps/globlin.png", mode = "644" },
+    { source = "target/linux-icons/48x48/apps/globlin.png", dest = "/usr/share/icons/hicolor/48x48/apps/globlin.png", mode = "644" },
+    { source = "target/linux-icons/64x64/apps/globlin.png", dest = "/usr/share/icons/hicolor/64x64/apps/globlin.png", mode = "644" },
+    { source = "target/linux-icons/128x128/apps/globlin.png", dest = "/usr/share/icons/hicolor/128x128/apps/globlin.png", mode = "644" },
+    { source = "target/linux-icons/256x256/apps/globlin.png", dest = "/usr/share/icons/hicolor/256x256/apps/globlin.png", mode = "644" },
+    { source = "target/linux-icons/512x512/apps/globlin.png", dest = "/usr/share/icons/hicolor/512x512/apps/globlin.png", mode = "644" },
+]
+
+[package.metadata.generate-rpm.requires]
+"libayatana-appindicator3.so.1()(64bit)" = "*"
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 
@@ -19,15 +50,16 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
 semver = "1"
+wry = { version = "0.57", default-features = false, features = ["os-webview"] }
 
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"
 
-[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
-wry = { version = "0.57", default-features = false, features = ["os-webview"] }
-
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+notify-rust = "4"
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.8"

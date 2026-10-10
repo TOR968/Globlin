@@ -5,6 +5,7 @@ use tray_icon::menu::{
     CheckMenuItem, IsMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu,
 };
 
+use crate::install::Manager;
 use crate::model::{
     self, Activity, Batch, Blocked, Package, PackageRef, RowState, SourceKind, UpdateTarget,
 };
@@ -65,7 +66,7 @@ pub struct Built {
 
 #[derive(Clone, Copy)]
 pub enum SelfUpdate<'a> {
-    Winget,
+    Managed(Manager),
     Own {
         release: Option<&'a Release>,
         auto_update: bool,
@@ -296,18 +297,16 @@ fn target_label(target: &UpdateTarget, marker: char) -> String {
 
 fn self_block(view: &View, busy: bool) -> Result<Submenu> {
     let entry = Submenu::new(format!("Globlin v{}", env!("CARGO_PKG_VERSION")), true);
-    let SelfUpdate::Own {
-        release,
-        auto_update,
-        log,
-    } = view.self_update
-    else {
-        entry.append(&MenuItem::new(
-            "Installed with winget — run winget upgrade",
-            false,
-            None,
-        ))?;
-        return Ok(entry);
+    let (release, auto_update, log) = match view.self_update {
+        SelfUpdate::Managed(manager) => {
+            entry.append(&MenuItem::new(manager.advice(), false, None))?;
+            return Ok(entry);
+        }
+        SelfUpdate::Own {
+            release,
+            auto_update,
+            log,
+        } => (release, auto_update, log),
     };
     if let Some(release) = release {
         entry.append(&MenuItem::with_id(

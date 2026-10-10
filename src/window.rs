@@ -6,24 +6,14 @@ use crate::config::Config;
 use crate::model::{Activity, Batch, Blocked, Package, RowState, SourceKind, Status, KINDS};
 use crate::tray::{self, SelfUpdate, View};
 
-#[cfg(any(windows, target_os = "macos"))]
 mod shell;
-#[cfg(not(any(windows, target_os = "macos")))]
-mod stub;
 
-#[cfg(any(windows, target_os = "macos"))]
 pub use shell::Window;
-#[cfg(not(any(windows, target_os = "macos")))]
-pub use stub::Window;
 
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub const TITLE: &str = "Globlin";
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub const WIDTH: f64 = 960.0;
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub const HEIGHT: f64 = 640.0;
 
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 const UI: &str = include_str!("window/ui.html");
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -93,7 +83,7 @@ pub struct ScriptRow {
 
 pub fn snapshot(view: &View, config: &Config) -> Snapshot {
     let (self_update, auto_update, managed_by) = match view.self_update {
-        SelfUpdate::Winget => (None, false, Some("winget")),
+        SelfUpdate::Managed(manager) => (None, false, Some(manager.label())),
         SelfUpdate::Own {
             release,
             auto_update,
@@ -241,17 +231,14 @@ pub fn tick(view: &View) -> Tick {
     }
 }
 
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub fn payload(snapshot: &Snapshot) -> String {
     serde_json::to_string(snapshot).unwrap_or_else(|_| "null".to_string())
 }
 
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub fn script(snapshot: &Snapshot) -> String {
     format!("window.globlin.render({})", payload(snapshot))
 }
 
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub fn tick_script(tick: &Tick) -> String {
     let body = serde_json::to_string(tick).unwrap_or_else(|_| "null".to_string());
     format!("window.globlin.tick({body})")

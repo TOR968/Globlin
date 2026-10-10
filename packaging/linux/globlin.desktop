@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Globlin
+GenericName=Package update monitor
+Comment=Watches your global packages and tells you when one falls behind
+Exec=globlin
+Icon=globlin
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=false

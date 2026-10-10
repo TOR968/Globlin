@@ -1,8 +1,9 @@
-**Beta.** Globlin is still in beta on every platform — the installer, the ARM64 builds and the macOS
-build are new. Please [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
+**Beta.** Globlin is still in beta on every platform — the installer, the ARM64 builds and the macOS and
+Linux builds are new. Please [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
-A portable Windows tray app that watches your global packages — npm, bun, pnpm, yarn, winget and choco —
-notifies you when one falls behind, and updates it on a click. It never updates anything on its own.
+A tray app for Windows, macOS and Linux that watches your global packages — npm, bun, pnpm, yarn, pipx,
+uv, cargo, go, dotnet, gem, Homebrew, scoop, winget, choco and the PowerShell Gallery — notifies you when
+one falls behind, and updates it on a click. It never updates a package on its own.
 
 ## Install
 
@@ -15,6 +16,10 @@ like. Enable *Run at startup* from the tray menu if you want it to come back aft
 **macOS (experimental, Apple Silicon):** unzip `Globlin-macos-arm64.zip`, move Globlin.app to
 Applications, and allow it once under *System Settings → Privacy & Security → Open Anyway* — it is signed
 ad hoc, not notarised. `globlin-macos-arm64` is the bare binary the Mac app updates itself from.
+
+**Linux (experimental):** `sudo apt install ./globlin-amd64.deb` (or `globlin-arm64.deb`) on Debian and
+Ubuntu, `sudo dnf install ./globlin-x86_64.rpm` (or `globlin-aarch64.rpm`) on Fedora. GNOME needs the
+AppIndicator extension to show the tray icon. Packages do not update themselves — install the next one.
 
 ## Verify the download
 

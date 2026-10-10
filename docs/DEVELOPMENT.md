@@ -744,26 +744,30 @@ requests"** must also be enabled, or the `release-pr` job cannot open the pull r
 
 ## Other platforms
 
-Windows and macOS work; Linux compiles and tests but its platform arm is still the erroring stub. `ci.yml`
-runs clippy and the suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
+Windows is the main platform; macOS and Linux work and are experimental. `ci.yml` runs clippy and the
+suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
 
-- `src/platform/` — `windows.rs` and `macos.rs` are real; `linux.rs` errors from every call it cannot
-  honour. `platform/mod.rs` holds what both real arms share: the notification-click hook.
-- `src/window/shell.rs` serves Windows (WebView2) and macOS (WKWebView); `src/window/stub.rs` is Linux's,
-  an uninhabited enum whose only move is to fail in `Window::new`.
-- `#[cfg_attr(not(...), allow(dead_code))]` marks items a platform does not consume yet:
-  `icon::{ico, write_app_icon}` (Windows only — the `.ico` and the toast artwork) and the window helpers
-  (Windows and macOS). Each attribute narrows as a port starts using the item.
+- `src/platform/` — `windows.rs`, `macos.rs` and `linux.rs`, each real. `platform/mod.rs` holds what
+  every arm shares (the notification-click hook, `BACKGROUND_FLAG`); `platform/unix.rs` holds what macOS
+  and Linux share (the `File::try_lock` single-instance lock and the login-shell `PATH`).
+- `src/window/shell.rs` serves every platform — WebView2, WKWebView, WebKitGTK; only `attach` differs,
+  because on Linux the page goes into the GTK box tao gives the window (`build_gtk`) rather than onto a
+  raw window handle.
+- `#[cfg_attr(not(windows), allow(dead_code))]` on `icon::{ico, write_app_icon}` — the `.ico` and the toast
+  artwork only Windows uses.
 - `source::find_on_path` takes a bare name. On Windows it tries `exe`, `cmd`, `bat` in that order in each
   `PATH` directory, so the first directory holding any of them wins, as in a shell — not `PATHEXT`,
   which can list `.JS` or `.PS1` files `Command::new` cannot spawn. On Unix it requires the execute bit.
   Only npm's `default_location` (`%APPDATA%\npm\npm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
   still `cfg`-split.
 - `SourceKind::windows_only` — scoop, winget and choco; `source::enabled` skips them elsewhere. The
-  window's sidebar still lists them on macOS, switched off.
+  window's sidebar still lists them on macOS and Linux, switched off.
+- `install::managed_by` — `Manager::Winget` for a winget package directory, `Manager::SystemPackage` for
+  a Linux binary under `/usr` (the deb and rpm install to `/usr/bin`). Either one skips the release
+  lookup and tells the user which tool updates Globlin instead.
 - `selfupdate::asset_for(os, arch)` — `windows/x86_64` → `globlin.exe`, `windows/aarch64` →
-  `globlin-arm64.exe`, `macos/aarch64` → `globlin-macos-arm64`; anything else has no build, and the lookup
-  logs why instead of offering one. `globlin.exe` stays the x64 name forever: every released version
+  `globlin-arm64.exe`, `macos/aarch64` → `globlin-macos-arm64`; anything else — Linux included, whose
+  packages never self-update — has no build, and the lookup logs why instead of offering one. `globlin.exe` stays the x64 name forever: every released version
   looks for it by that exact name, and an x64 build running under emulation on ARM keeps updating to x64.
 - `build.rs` — embeds the Windows resource only when the target is Windows.
 
@@ -804,10 +808,37 @@ walks users through *Open Anyway*).
 
 ### Linux
 
-On Linux, `tray-icon` needs `libgtk-3-dev`, `libxdo-dev` and `libayatana-appindicator3-dev` at build time
-(the Linux CI jobs install exactly those), and GNOME shows no tray at all without the AppIndicator
-extension. `wry`'s Linux backend pulls `webkit2gtk` and `soup3`, which is why `wry` is declared only for
-Windows and macOS; porting the window means widening that declaration and replacing `window/stub.rs` with
-the shell. Packaging is decided: deb and rpm first (system dependencies declared, self-update off as for
-winget), an AppImage later, no Flatpak — its sandbox would have to be opened to the host for every
-command Globlin runs.
+Experimental, x64 and ARM64, shipped as a deb and an rpm.
+
+- **Window.** `wry` on WebKitGTK 4.1, attached to tao's GTK box. Build dependencies: `libgtk-3-dev`,
+  `libxdo-dev`, `libayatana-appindicator3-dev`, `libwebkit2gtk-4.1-dev` — every Linux CI job installs
+  exactly those.
+- **Tray.** `tray-icon` uses Ayatana/libappindicator, which reports no clicks — any click opens the menu,
+  and **Open Globlin** is the way to the window. GNOME shows no tray at all without the AppIndicator
+  extension.
+- **Notifications** go through `notify-rust` over D-Bus with a `default` action, so clicking the body
+  fires the shared hook that opens the window (on desktops whose notification server supports actions).
+- **Single instance and "show the window"** — the shared `globlin.lock`, plus a Unix socket,
+  `globlin.sock` in the data directory: the running copy listens on it, and a second copy started by hand
+  connects, writes `show` and exits.
+- **Autostart** is `~/.config/autostart/globlin.desktop` (`$XDG_CONFIG_HOME` honoured) with
+  `Exec="<exe>" --background`, the path quoted and escaped per the Desktop Entry spec.
+- **PATH** — a desktop session often lacks what `.bashrc` adds (nvm, `~/.cargo/bin`), so Linux adopts the
+  login shell's `PATH` exactly as macOS does.
+- **Config** always lives in `$XDG_DATA_HOME/globlin` (`~/.local/share/globlin`), never next to the exe.
+
+**Packaging.** `.github/package-linux.sh` builds the release binary, renders the hicolor icons through the
+ignored `icon::tests::dump_linux_icons` (so they are still code), and runs `cargo deb` and
+`cargo generate-rpm` against `[package.metadata.deb]` / `[package.metadata.generate-rpm]` in
+`Cargo.toml`: `/usr/bin/globlin`, `packaging/linux/globlin.desktop`, and the icons under
+`/usr/share/icons/hicolor`. The deb's library dependencies come from `$auto` (dpkg-shlibdeps) plus an
+explicit `libayatana-appindicator3-1 | libappindicator3-1`, because tray-icon loads that library at
+runtime and shlibdeps cannot see it; the rpm requires `libayatana-appindicator3.so.1()(64bit)` by soname,
+which every rpm distribution can resolve whatever it names the package. Releases are built on
+`ubuntu-22.04` and `ubuntu-22.04-arm`, so the packages need glibc 2.35, not the 2.39 of the CI runners.
+`ci.yml` installs the deb with `apt`, which proves its dependencies resolve, checks the files landed, and
+removes it again.
+
+Decided and deliberately not done: Flatpak (its sandbox would have to be opened to the host for every
+command Globlin runs) and self-update for the packages (the package manager owns `/usr/bin`; a newer
+release is a new package). An AppImage, which could self-update, is the open option.

@@ -636,15 +636,14 @@ fn view_of<'a>(
         packages,
         activity,
         approvals,
-        self_update: if install::winget_managed() {
-            SelfUpdate::Winget
-        } else {
-            SelfUpdate::Own {
+        self_update: install::managed_by().map_or_else(
+            || SelfUpdate::Own {
                 release,
                 auto_update,
                 log: diagnostics::self_update_log_path().is_file(),
-            }
-        },
+            },
+            SelfUpdate::Managed,
+        ),
         pending_restart,
         autostart: platform::autostart_enabled(),
         frame,

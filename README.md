@@ -13,7 +13,7 @@
 </div>
 
 > **Beta.** Globlin is still in beta on every platform: the Windows builds are in daily use, the installer
-> and the ARM64 builds are new, and the macOS build is experimental. Please
+> and the ARM64 builds are new, and the macOS and Linux builds are experimental. Please
 > [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
 **[Install](#install)** · **[Using it](#using-it)** · **[Sources](#sources)** ·
@@ -55,6 +55,23 @@ Dock icon — and updates itself like the Windows builds. Its settings and logs 
 `~/Library/Application Support/globlin/`; *Run at startup* writes
 `~/Library/LaunchAgents/dev.globlin.app.plist`. It is new and tested on one Mac so far — please
 [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
+
+### Linux (experimental)
+
+A `.deb` for Debian and Ubuntu (`globlin-amd64.deb`, `globlin-arm64.deb`) and an `.rpm` for Fedora,
+openSUSE and friends (`globlin-x86_64.rpm`, `globlin-aarch64.rpm`):
+
+```sh
+sudo apt install ./globlin-amd64.deb      # Debian 12+, Ubuntu 22.04+
+sudo dnf install ./globlin-x86_64.rpm     # Fedora
+```
+
+The package pulls in WebKitGTK 4.1 and the Ayatana AppIndicator library. GNOME shows tray icons only with
+the *AppIndicator and KStatusNotifierItem Support* extension; KDE, Xfce, Cinnamon and most other desktops
+show them out of the box. On Linux the tray icon opens its menu on any click — pick **Open Globlin** for
+the window. A packaged Globlin does not update itself: install the new package from the release page.
+Settings and logs live in `~/.local/share/globlin/`; *Run at startup* writes
+`~/.config/autostart/globlin.desktop`.
 
 <details>
 <summary><strong>If Windows Defender flags the download</strong> —
