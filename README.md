@@ -64,6 +64,7 @@ openSUSE and friends (`globlin-x86_64.rpm`, `globlin-aarch64.rpm`):
 ```sh
 sudo apt install ./globlin-amd64.deb      # Debian 12+, Ubuntu 22.04+
 sudo dnf install ./globlin-x86_64.rpm     # Fedora
+yay -S globlin-bin                        # Arch, from the AUR
 ```
 
 The package pulls in WebKitGTK 4.1 and the Ayatana AppIndicator library. GNOME shows tray icons only with
