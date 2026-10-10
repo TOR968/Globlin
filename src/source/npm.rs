@@ -8,10 +8,6 @@ use super::{find_on_path, hidden_command, PackageSource};
 use crate::model::{BlockedScript, Installed, SourceKind};
 use crate::Result;
 
-#[cfg(windows)]
-const EXECUTABLE: &str = "npm.cmd";
-
-#[cfg(not(windows))]
 const EXECUTABLE: &str = "npm";
 
 const STRICT_REFUSAL_CODE: &str = "ESTRICTALLOWSCRIPTS";
@@ -182,7 +178,7 @@ fn resolve(configured: Option<&Path>) -> Option<PathBuf> {
 fn default_location() -> Option<PathBuf> {
     let candidate = PathBuf::from(std::env::var_os("APPDATA")?)
         .join("npm")
-        .join(EXECUTABLE);
+        .join("npm.cmd");
     candidate.is_file().then_some(candidate)
 }
 

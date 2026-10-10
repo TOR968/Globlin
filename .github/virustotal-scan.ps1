@@ -19,7 +19,7 @@ $headers = @{ 'x-apikey' = $key }
 
 function Format-Section([string] $verdict) {
     @"
-## Virus scan
+## Virus scan — $(Split-Path $Path -Leaf)
 
 [VirusTotal report]($reportUrl) — $verdict
 

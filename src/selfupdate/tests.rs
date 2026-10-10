@@ -1,5 +1,8 @@
 use super::*;
 
+const X64_SHA: &str = "globlin.exe.sha256";
+const ARM64_SHA: &str = "globlin-arm64.exe.sha256";
+
 #[test]
 fn the_release_endpoint_points_at_this_repository() {
     assert_eq!(
@@ -76,82 +79,102 @@ fn current() -> Version {
 
 #[test]
 fn a_newer_tag_with_both_assets_is_offered() {
-    let release = offer(&body("v0.2.0", &[EXE_ASSET, SHA_ASSET]), &current()).unwrap();
+    let release = offer(
+        &body("v0.2.0", &[X64_ASSET, X64_SHA]),
+        &current(),
+        X64_ASSET,
+    )
+    .unwrap();
     assert_eq!(release.version, Version::parse("0.2.0").unwrap());
-    assert_eq!(release.exe_url, format!("https://example.test/{EXE_ASSET}"));
-    assert_eq!(release.sha_url, format!("https://example.test/{SHA_ASSET}"));
+    assert_eq!(release.exe_url, format!("https://example.test/{X64_ASSET}"));
+    assert_eq!(release.sha_url, format!("https://example.test/{X64_SHA}"));
 }
 
 #[test]
 fn a_tag_without_the_v_prefix_is_still_read() {
-    let release = offer(&body("0.2.0", &[EXE_ASSET, SHA_ASSET]), &current()).unwrap();
+    let release = offer(&body("0.2.0", &[X64_ASSET, X64_SHA]), &current(), X64_ASSET).unwrap();
     assert_eq!(release.version, Version::parse("0.2.0").unwrap());
 }
 
 #[test]
 fn the_running_version_is_not_offered_to_itself() {
-    assert!(offer(&body("v0.1.1", &[EXE_ASSET, SHA_ASSET]), &current()).is_none());
+    assert!(offer(
+        &body("v0.1.1", &[X64_ASSET, X64_SHA]),
+        &current(),
+        X64_ASSET
+    )
+    .is_none());
 }
 
 #[test]
 fn an_older_release_is_not_offered() {
-    assert!(offer(&body("v0.1.0", &[EXE_ASSET, SHA_ASSET]), &current()).is_none());
+    assert!(offer(
+        &body("v0.1.0", &[X64_ASSET, X64_SHA]),
+        &current(),
+        X64_ASSET
+    )
+    .is_none());
 }
 
 #[test]
 fn a_release_without_an_exe_asset_is_not_offered() {
-    assert!(offer(&body("v0.2.0", &[SHA_ASSET]), &current()).is_none());
+    assert!(offer(&body("v0.2.0", &[X64_SHA]), &current(), X64_ASSET).is_none());
 }
 
 #[test]
 fn a_release_without_a_checksum_asset_is_not_offered() {
-    assert!(offer(&body("v0.2.0", &[EXE_ASSET]), &current()).is_none());
+    assert!(offer(&body("v0.2.0", &[X64_ASSET]), &current(), X64_ASSET).is_none());
 }
 
 #[test]
 fn an_unparsable_tag_is_not_offered() {
-    assert!(offer(&body("nightly", &[EXE_ASSET, SHA_ASSET]), &current()).is_none());
+    assert!(offer(
+        &body("nightly", &[X64_ASSET, X64_SHA]),
+        &current(),
+        X64_ASSET
+    )
+    .is_none());
 }
 
 #[test]
 fn a_body_that_is_not_a_release_is_not_offered() {
-    assert!(offer(r#"{"message":"Not Found"}"#, &current()).is_none());
+    assert!(offer(r#"{"message":"Not Found"}"#, &current(), X64_ASSET).is_none());
 }
 
 #[test]
 fn the_published_hash_is_the_first_field_of_the_checksum_line() {
-    let body = format!("{}  {EXE_ASSET}\n", "a".repeat(64));
-    assert_eq!(published_hash(&body).unwrap(), "a".repeat(64));
+    let body = format!("{}  {X64_ASSET}\n", "a".repeat(64));
+    assert_eq!(published_hash(&body, X64_ASSET).unwrap(), "a".repeat(64));
 }
 
 #[test]
 fn a_checksum_line_is_read_despite_stray_whitespace() {
-    let body = format!("  {}   {EXE_ASSET}  \r\n", "b".repeat(64));
-    assert_eq!(published_hash(&body).unwrap(), "b".repeat(64));
+    let body = format!("  {}   {X64_ASSET}  \r\n", "b".repeat(64));
+    assert_eq!(published_hash(&body, X64_ASSET).unwrap(), "b".repeat(64));
 }
 
 #[test]
 fn an_uppercase_published_hash_is_lowercased() {
-    let body = format!("{}  {EXE_ASSET}\n", "A".repeat(64));
-    assert_eq!(published_hash(&body).unwrap(), "a".repeat(64));
+    let body = format!("{}  {X64_ASSET}\n", "A".repeat(64));
+    assert_eq!(published_hash(&body, X64_ASSET).unwrap(), "a".repeat(64));
 }
 
 #[test]
 fn the_published_hash_is_picked_out_of_a_multi_line_checksum_body() {
     let body = format!(
-        "{}  other-asset.zip\n{}  {EXE_ASSET}\n{}  another-asset.tar.gz\n",
+        "{}  other-asset.zip\n{}  {X64_ASSET}\n{}  another-asset.tar.gz\n",
         "c".repeat(64),
         "d".repeat(64),
         "e".repeat(64),
     );
-    assert_eq!(published_hash(&body).unwrap(), "d".repeat(64));
+    assert_eq!(published_hash(&body, X64_ASSET).unwrap(), "d".repeat(64));
 }
 
 #[test]
 fn a_checksum_body_that_is_not_a_hash_is_rejected() {
-    assert!(published_hash("not found\n").is_none());
-    assert!(published_hash("").is_none());
-    assert!(published_hash(&format!("{}  file\n", "z".repeat(64))).is_none());
+    assert!(published_hash("not found\n", X64_ASSET).is_none());
+    assert!(published_hash("", X64_ASSET).is_none());
+    assert!(published_hash(&format!("{}  file\n", "z".repeat(64)), X64_ASSET).is_none());
 }
 
 #[test]
@@ -164,19 +187,19 @@ fn the_digest_matches_a_known_vector() {
 
 #[test]
 fn matching_bytes_verify() {
-    let body = format!("{}  {EXE_ASSET}\n", digest(b"abc"));
-    assert!(verify(b"abc", &body).is_ok());
+    let body = format!("{}  {X64_ASSET}\n", digest(b"abc"));
+    assert!(verify(b"abc", &body, X64_ASSET).is_ok());
 }
 
 #[test]
 fn bytes_that_do_not_match_the_published_hash_are_refused() {
-    let body = format!("{}  {EXE_ASSET}\n", digest(b"abc"));
-    assert!(verify(b"abd", &body).is_err());
+    let body = format!("{}  {X64_ASSET}\n", digest(b"abc"));
+    assert!(verify(b"abd", &body, X64_ASSET).is_err());
 }
 
 #[test]
 fn a_missing_published_hash_is_refused() {
-    assert!(verify(b"abc", "404: Not Found").is_err());
+    assert!(verify(b"abc", "404: Not Found", X64_ASSET).is_err());
 }
 
 fn scratch(label: &str) -> PathBuf {
@@ -287,4 +310,62 @@ fn a_swap_replaces_a_leftover_previous_build() {
 
     assert_eq!(fs::read(&current).unwrap(), b"new build");
     assert_eq!(fs::read(previous_path(&current)).unwrap(), b"old build");
+}
+
+#[test]
+fn an_x64_build_updates_from_the_asset_every_released_version_already_reads() {
+    assert_eq!(asset_for("x86_64"), Some("globlin.exe"));
+}
+
+#[test]
+fn an_arm64_build_updates_from_its_own_asset() {
+    assert_eq!(asset_for("aarch64"), Some("globlin-arm64.exe"));
+}
+
+#[test]
+fn an_architecture_without_a_published_build_gets_no_asset() {
+    assert_eq!(asset_for("x86"), None);
+    assert_eq!(asset_for("riscv64"), None);
+}
+
+#[test]
+fn the_checksum_asset_is_named_after_its_binary() {
+    assert_eq!(checksum_asset(ARM64_ASSET), ARM64_SHA);
+}
+
+#[test]
+fn an_arm64_release_is_offered_only_when_its_own_assets_are_published() {
+    assert!(offer(
+        &body("v0.2.0", &[X64_ASSET, X64_SHA]),
+        &current(),
+        ARM64_ASSET
+    )
+    .is_none());
+
+    let release = offer(
+        &body("v0.2.0", &[X64_ASSET, X64_SHA, ARM64_ASSET, ARM64_SHA]),
+        &current(),
+        ARM64_ASSET,
+    )
+    .unwrap();
+
+    assert_eq!(
+        release.exe_url,
+        format!("https://example.test/{ARM64_ASSET}")
+    );
+    assert_eq!(release.sha_url, format!("https://example.test/{ARM64_SHA}"));
+}
+
+#[test]
+fn the_checksum_line_for_the_other_architecture_is_ignored() {
+    let body = format!(
+        "{}  {X64_ASSET}
+{}  {ARM64_ASSET}
+",
+        "a".repeat(64),
+        "b".repeat(64)
+    );
+
+    assert_eq!(published_hash(&body, ARM64_ASSET).unwrap(), "b".repeat(64));
+    assert_eq!(published_hash(&body, X64_ASSET).unwrap(), "a".repeat(64));
 }

@@ -4,7 +4,7 @@ use tao::window::WindowId;
 use super::{Snapshot, Tick};
 use crate::{Message, Result};
 
-pub struct Window;
+pub enum Window {}
 
 impl Window {
     pub fn new(
@@ -15,18 +15,26 @@ impl Window {
     }
 
     pub fn id(&self) -> WindowId {
-        unreachable!()
+        match *self {}
     }
 
-    pub const fn show(&self) {}
-
-    pub const fn hide(&self) {}
-
-    pub const fn visible(&self) -> bool {
-        false
+    pub fn show(&self) {
+        match *self {}
     }
 
-    pub const fn render(&self, _snapshot: &Snapshot) {}
+    pub fn hide(&self) {
+        match *self {}
+    }
 
-    pub const fn tick(&self, _tick: &Tick) {}
+    pub fn visible(&self) -> bool {
+        match *self {}
+    }
+
+    pub fn render(&self, _snapshot: &Snapshot) {
+        match *self {}
+    }
+
+    pub fn tick(&self, _tick: &Tick) {
+        match *self {}
+    }
 }

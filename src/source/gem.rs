@@ -6,10 +6,6 @@ use super::{find_on_path, hidden_command, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
-#[cfg(windows)]
-const EXECUTABLE: &str = "gem.cmd";
-
-#[cfg(not(windows))]
 const EXECUTABLE: &str = "gem";
 
 const DEFAULT_MARKER: &str = "default: ";

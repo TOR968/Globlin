@@ -8,11 +8,7 @@ use super::{find_on_path, hidden_command, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
-#[cfg(windows)]
-const EXECUTABLES: [&str; 2] = ["pnpm.cmd", "pnpm.exe"];
-
-#[cfg(not(windows))]
-const EXECUTABLES: [&str; 1] = ["pnpm"];
+const EXECUTABLE: &str = "pnpm";
 
 pub struct Pnpm {
     command: PathBuf,
@@ -20,10 +16,7 @@ pub struct Pnpm {
 
 impl Pnpm {
     pub fn new() -> Result<Self> {
-        let command = EXECUTABLES
-            .into_iter()
-            .find_map(find_on_path)
-            .ok_or("pnpm was not found on PATH")?;
+        let command = find_on_path(EXECUTABLE).ok_or("pnpm was not found on PATH")?;
         Ok(Self { command })
     }
 }

@@ -15,5 +15,5 @@ pub fn is_winget_path(exe: &Path) -> bool {
         .any(|pair| pair[0] == "winget" && pair[1] == "packages")
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
 mod tests;

@@ -8,10 +8,6 @@ use crate::model::{Installed, SourceKind};
 use crate::platform;
 use crate::Result;
 
-#[cfg(windows)]
-const EXECUTABLE: &str = "bun.exe";
-
-#[cfg(not(windows))]
 const EXECUTABLE: &str = "bun";
 
 pub struct Bun {
@@ -118,7 +114,9 @@ fn install_root() -> PathBuf {
 }
 
 fn default_location() -> Option<PathBuf> {
-    let candidate = install_root().join("bin").join(EXECUTABLE);
+    let candidate = install_root()
+        .join("bin")
+        .join(format!("{EXECUTABLE}{}", std::env::consts::EXE_SUFFIX));
     candidate.is_file().then_some(candidate)
 }
 

@@ -5,10 +5,6 @@ use super::{find_on_path, hidden_command, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
-#[cfg(windows)]
-const EXECUTABLE: &str = "cargo.exe";
-
-#[cfg(not(windows))]
 const EXECUTABLE: &str = "cargo";
 
 pub struct Cargo {
