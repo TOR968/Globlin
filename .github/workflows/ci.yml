@@ -112,6 +112,13 @@ jobs:
           & ./.github/installer-smoke.ps1 -Setup $setup
 
       - uses: actions/upload-artifact@v7
+        if: matrix.asset == 'globlin.exe'
+        with:
+          name: globlin-setup-x64.exe-${{ github.sha }}
+          path: installer-out/globlin-setup-x64.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
         if: matrix.asset
         with:
           name: ${{ matrix.asset }}-${{ github.sha }}

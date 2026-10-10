@@ -1,3 +1,6 @@
+**Beta.** Globlin is still in beta on every platform — the installer, the ARM64 builds and the macOS
+build are new. Please [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
+
 A portable Windows tray app that watches your global packages — npm, bun, pnpm, yarn, winget and choco —
 notifies you when one falls behind, and updates it on a click. It never updates anything on its own.
 
