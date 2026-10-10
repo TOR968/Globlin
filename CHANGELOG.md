@@ -7,6 +7,18 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.10](https://github.com/TOR968/Globlin/compare/v0.3.9...v0.3.10) - 2026-10-10
+
+### Fixed
+
+- list the other sources when one of them fails ([#63](https://github.com/TOR968/Globlin/pull/63))
+
+### Other
+
+- keep the suite out of the real data directory ([#62](https://github.com/TOR968/Globlin/pull/62))
+- attach the Arch PKGBUILD to every release ([#60](https://github.com/TOR968/Globlin/pull/60))
+- build an AUR package for Arch Linux and publish it on release ([#59](https://github.com/TOR968/Globlin/pull/59))
+
 ## [0.3.9](https://github.com/TOR968/Globlin/compare/v0.3.8...v0.3.9) - 2026-10-10
 
 ### Added

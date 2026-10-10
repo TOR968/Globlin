@@ -1080,7 +1080,7 @@ dependencies = [
 
 [[package]]
 name = "globlin"
-version = "0.3.9"
+version = "0.3.10"
 dependencies = [
  "mac-notification-sys",
  "notify-rust",
