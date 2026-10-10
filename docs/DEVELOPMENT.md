@@ -682,6 +682,12 @@ the new `v*` tag, and so it still believes the previous release is the latest on
 release pull request proposing the version that was just released, whose diff against `master` is empty.
 Harmless, but it appears after every release and has to be closed by hand.
 
+`tag` is serialised across runs too (its own `concurrency` group, never cancelled). Merging the release
+PR and another PR seconds apart starts two runs; without the group both check out before either has
+tagged, the second tries to create the same `v*` tag, and GitHub answers `422 Reference already exists`
+— the release itself is fine, but `master` shows a red run. Queued, the second run checks out after the
+tag exists and has nothing to do.
+
 ### The VirusTotal scan
 
 Every release uploads both binaries, `globlin.exe` and `globlin-arm64.exe`, to VirusTotal and links each
