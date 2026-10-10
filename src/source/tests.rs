@@ -166,3 +166,20 @@ fn the_first_path_directory_that_has_the_tool_wins() {
 
     assert_eq!(find_in(&path, "fake-tool"), Some(first.join(&file_name)));
 }
+
+#[test]
+fn an_empty_listing_names_the_command_and_carries_its_stderr() {
+    let output = std::process::Output {
+        status: std::process::ExitStatus::default(),
+        stdout: Vec::new(),
+        stderr: b"npm error code EBUSY\n".to_vec(),
+    };
+
+    let message = silent_listing("npm ls -g", &output);
+
+    assert!(
+        message.starts_with("npm ls -g printed nothing and "),
+        "{message}"
+    );
+    assert!(message.ends_with(": npm error code EBUSY"), "{message}");
+}

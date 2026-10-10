@@ -144,6 +144,7 @@ fn a_failed_package_check_still_carries_the_release() {
     };
     let report = Report {
         packages: Err("npm is not installed".into()),
+        skipped: Vec::new(),
         release: Some(release.clone()),
     };
     assert!(report.packages.is_err());
@@ -301,4 +302,94 @@ fn an_app_with_no_local_index_entry_is_unknown_not_current() {
     );
 
     assert_eq!(package.status, Status::Unknown);
+}
+
+struct Listed {
+    kind: SourceKind,
+    reply: std::result::Result<Vec<&'static str>, &'static str>,
+}
+
+impl PackageSource for Listed {
+    fn kind(&self) -> SourceKind {
+        self.kind
+    }
+
+    fn installed(&self) -> Result<Vec<Installed>> {
+        match &self.reply {
+            Ok(names) => Ok(names
+                .iter()
+                .map(|name| Installed::new(*name, "1.0.0", self.kind))
+                .collect()),
+            Err(error) => Err((*error).into()),
+        }
+    }
+
+    fn update_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn uninstall_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+}
+
+fn listed(
+    kind: SourceKind,
+    reply: std::result::Result<Vec<&'static str>, &'static str>,
+) -> Box<dyn PackageSource> {
+    Box::new(Listed { kind, reply })
+}
+
+#[test]
+fn a_source_that_cannot_be_listed_does_not_hide_the_others() {
+    let sources = vec![
+        listed(
+            SourceKind::Npm,
+            Err("EOF while parsing a value at line 1 column 0"),
+        ),
+        listed(SourceKind::Cargo, Ok(vec!["ripgrep"])),
+        listed(SourceKind::Go, Ok(vec!["gopls"])),
+    ];
+
+    let listing = collect(&sources).unwrap();
+    let names: Vec<&str> = listing
+        .installed
+        .iter()
+        .map(|item| item.name.as_str())
+        .collect();
+
+    assert_eq!(names, ["gopls", "ripgrep"]);
+    assert_eq!(
+        listing.skipped,
+        ["npm: EOF while parsing a value at line 1 column 0"]
+    );
+}
+
+#[test]
+fn the_check_fails_only_when_no_source_could_be_listed() {
+    let sources = vec![
+        listed(
+            SourceKind::Npm,
+            Err("EOF while parsing a value at line 1 column 0"),
+        ),
+        listed(SourceKind::Pnpm, Err("pnpm crashed")),
+    ];
+
+    let error = collect(&sources).err().unwrap().to_string();
+
+    assert!(error.contains("npm: EOF while parsing"), "{error}");
+    assert!(error.contains("pnpm: pnpm crashed"), "{error}");
+}
+
+#[test]
+fn sources_that_list_nothing_without_failing_are_an_empty_success() {
+    let sources = vec![
+        listed(SourceKind::Npm, Ok(Vec::new())),
+        listed(SourceKind::Cargo, Ok(Vec::new())),
+    ];
+
+    let listing = collect(&sources).unwrap();
+
+    assert!(listing.installed.is_empty());
+    assert!(listing.skipped.is_empty());
 }

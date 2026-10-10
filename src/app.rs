@@ -39,6 +39,7 @@ pub struct App {
     approvals: Vec<Blocked>,
     window: Option<Window>,
     failed: bool,
+    skipped: Vec<String>,
     frame: u32,
     next_check: Instant,
     step_started: Instant,
@@ -60,6 +61,7 @@ impl App {
             approvals: Vec::new(),
             window: None,
             failed: false,
+            skipped: Vec::new(),
             frame: 0,
             next_check,
             step_started: Instant::now(),
@@ -428,8 +430,9 @@ impl App {
         match report.packages {
             Ok(packages) => {
                 self.packages = packages;
-                self.failed = false;
+                self.failed = !report.skipped.is_empty();
                 self.announce_new_updates();
+                self.announce_skipped(report.skipped);
             }
             Err(error) => {
                 self.failed = true;
@@ -440,6 +443,18 @@ impl App {
             self.start_self_update();
         }
         self.render();
+    }
+
+    fn announce_skipped(&mut self, skipped: Vec<String>) {
+        if skipped == self.skipped {
+            return;
+        }
+        if !skipped.is_empty() {
+            let body = skipped.join("\n");
+            diagnostics::record_note(&format!("could not list every source:\n{body}\n\n"));
+            platform::notify("Globlin — some packages are missing", &body).ok();
+        }
+        self.skipped = skipped;
     }
 
     fn wants_auto_update(&self) -> bool {

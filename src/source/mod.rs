@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 use serde::Deserialize;
 
@@ -101,6 +101,16 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
         SourceKind::Winget => Box::new(Winget::new()?),
         SourceKind::Choco => Box::new(Choco::new()?),
     })
+}
+
+pub(crate) fn silent_listing(command: &str, output: &Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr.trim();
+    if stderr.is_empty() {
+        format!("{command} printed nothing and {}", output.status)
+    } else {
+        format!("{command} printed nothing and {}: {stderr}", output.status)
+    }
 }
 
 pub(crate) fn find_on_path(name: &str) -> Option<PathBuf> {
