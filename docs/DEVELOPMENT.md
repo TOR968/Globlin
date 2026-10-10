@@ -689,9 +689,7 @@ the suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The se
 - `source::find_on_path` takes a bare name. On Windows it tries `exe`, `cmd`, `bat` in that order in each
   `PATH` directory, so the first directory holding any of them wins, as in a shell — not `PATHEXT`,
   which can list `.JS` or `.PS1` files `Command::new` cannot spawn. On Unix it requires the execute bit.
-  Only npm's `default_location` (`%APPDATA%
-pm
-pm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
+  Only npm's `default_location` (`%APPDATA%\npm\npm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
   still `cfg`-split.
 - `SourceKind::windows_only` — scoop, winget and choco; `source::enabled` skips them elsewhere. The
   window's sidebar does not filter yet; the macOS port adds that when the window exists there.
