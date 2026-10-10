@@ -581,6 +581,14 @@ and a second installer cannot race the swap. Two things change for an installed 
   version into the uninstall key, so *Settings → Apps* does not keep showing the version that was
   installed. A failed write lands in `self-update.log`; it never fails the update.
 
+The installer's *Launch Globlin* checkbox starts it through `explorer.exe`, not directly. A program
+started straight from the setup process inherits setup's environment, and a manual upgrade showed what
+that can mean: `npm ls -g` answered with an empty tree (no `APPDATA`, so npm looked for its global prefix
+in the wrong place), scoop listed nothing, and scoop's `bun.exe` shim could not start bun — while the same
+build started from the Start menu saw every package. Explorer hands it the same environment the Start menu
+does. Globlin also repairs its own environment on Windows, whoever starts it — see
+`platform::prepare_environment` under [Other platforms](#other-platforms).
+
 The autostart task writes the same `HKCU\…\Run\globlin` = `"<exe>"` the tray toggle writes, so the two
 read one value. A second `[Registry]` entry with `ValueType: none; Flags: uninsdeletevalue` deletes it on
 uninstall whoever created it. Setup and uninstall both `taskkill /F /IM globlin.exe` first, because the
@@ -770,6 +778,12 @@ suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
   packages never self-update — has no build, and the lookup logs why instead of offering one. `globlin.exe` stays the x64 name forever: every released version
   looks for it by that exact name, and an x64 build running under emulation on ARM keeps updating to x64.
 - `build.rs` — embeds the Windows resource only when the target is Windows.
+- `platform::prepare_environment` runs first in `main` on every OS. On macOS and Linux it adopts the login
+  shell's `PATH`. On Windows it restores `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `HOMEDRIVE` and
+  `HOMEPATH` from `HKCU\Volatile Environment` when the launcher dropped them, and appends the registered
+  machine and user `Path` entries (variables expanded) that the inherited `PATH` lacks — never reordering
+  what is already there. A launcher with a stale or stripped environment therefore cannot hide npm, scoop
+  or a shim's target.
 
 The `App` — and with it the tray — is created on `StartCause::Init`, on every OS, because macOS refuses
 a status item before its event loop runs. Two test quirks off Windows: the five `tray::menu` tests that
