@@ -4,7 +4,7 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, silent_listing, PackageSource};
 use crate::model::{BlockedScript, Installed, SourceKind};
 use crate::Result;
 
@@ -38,6 +38,9 @@ impl PackageSource for Npm {
         let output = hidden_command(&self.command)
             .args(["ls", "-g", "--json", "--depth=0"])
             .output()?;
+        if output.stdout.trim_ascii().is_empty() {
+            return Err(silent_listing("npm ls -g", &output).into());
+        }
         parse_listing(&output.stdout)
     }
 

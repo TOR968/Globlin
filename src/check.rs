@@ -14,7 +14,14 @@ use crate::Result;
 #[derive(Debug)]
 pub struct Report {
     pub packages: Result<Vec<Package>>,
+    pub skipped: Vec<String>,
     pub release: Option<Release>,
+}
+
+#[derive(Debug, Default)]
+struct Listing {
+    installed: Vec<Installed>,
+    skipped: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -32,15 +39,20 @@ pub fn run(config: &Config) -> Report {
     } else {
         look_up_release(selfupdate::latest())
     };
+    let (packages, skipped) = match collect_packages(config) {
+        Ok((packages, skipped)) => (Ok(packages), skipped),
+        Err(error) => (Err(error), Vec::new()),
+    };
     Report {
-        packages: collect_packages(config),
+        packages,
+        skipped,
         release,
     }
 }
 
-fn collect_packages(config: &Config) -> Result<Vec<Package>> {
+fn collect_packages(config: &Config) -> Result<(Vec<Package>, Vec<String>)> {
     let sources = source::enabled(config)?;
-    let installed = collect(&sources)?;
+    let Listing { installed, skipped } = collect(&sources)?;
     let latest = Latest {
         npm: registry::npm_latest(&lookup_names(&installed, config, Catalog::Npm))?,
         pypi: registry::pypi_latest(&lookup_names(&installed, config, Catalog::PyPi)),
@@ -57,7 +69,7 @@ fn collect_packages(config: &Config) -> Result<Vec<Package>> {
         .map(|item| classify(item, config, &latest))
         .collect();
     diagnostics::record_snapshot(&packages);
-    Ok(packages)
+    Ok((packages, skipped))
 }
 
 fn look_up_release(outcome: Result<Option<Release>>) -> Option<Release> {
@@ -72,13 +84,23 @@ fn look_up_release(outcome: Result<Option<Release>>) -> Option<Release> {
     }
 }
 
-fn collect(sources: &[Box<dyn PackageSource>]) -> Result<Vec<Installed>> {
-    let mut installed = Vec::new();
+fn collect(sources: &[Box<dyn PackageSource>]) -> Result<Listing> {
+    let mut listing = Listing::default();
     for source in sources {
-        installed.extend(source.installed()?);
+        match source.installed() {
+            Ok(found) => listing.installed.extend(found),
+            Err(error) => listing
+                .skipped
+                .push(format!("{}: {error}", source.kind().label())),
+        }
     }
-    installed.sort_by(|left, right| (&left.name, left.source).cmp(&(&right.name, right.source)));
-    Ok(installed)
+    if listing.installed.is_empty() && !listing.skipped.is_empty() {
+        return Err(listing.skipped.join("\n").into());
+    }
+    listing
+        .installed
+        .sort_by(|left, right| (&left.name, left.source).cmp(&(&right.name, right.source)));
+    Ok(listing)
 }
 
 fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> Vec<String> {
