@@ -5,24 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
 
-    <title>Globlin — Keep Your Global Packages Updated on Windows and macOS</title>
-    <meta name="description" content="A free tray app for Windows and macOS (beta) that watches your global npm, pnpm, cargo, pipx, Homebrew, winget and other packages and tells you the moment one falls behind. One window, filters, bulk updates, installer or portable, open source.">
+    <title>Globlin — Keep Your Global Packages Updated on Windows, macOS and Linux</title>
+    <meta name="description" content="A free tray app for Windows, macOS and Linux (beta) that watches your global npm, pnpm, cargo, pipx, Homebrew, winget and other packages and tells you the moment one falls behind. One window, filters, bulk updates, installer or portable, open source.">
     <link rel="canonical" href="https://globlin.pages.dev/">
     <link rel="icon" href="/img/logo.png" type="image/png">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Globlin">
     <meta property="og:url" content="https://globlin.pages.dev/">
-    <meta property="og:title" content="Globlin — Keep Your Global Packages Updated on Windows and macOS">
-    <meta property="og:description" content="A tray icon for Windows and macOS (beta) that watches your global packages across fifteen package managers and tells you when one falls behind. One click to update.">
+    <meta property="og:title" content="Globlin — Keep Your Global Packages Updated on Windows, macOS and Linux">
+    <meta property="og:description" content="A tray icon for Windows, macOS and Linux (beta) that watches your global packages across fifteen package managers and tells you when one falls behind. One click to update.">
     <meta property="og:image" content="https://globlin.pages.dev/img/og.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="The Globlin logo above the tray icon in its four states">
 
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Globlin — Keep Your Global Packages Updated on Windows and macOS">
-    <meta name="twitter:description" content="A tray icon for Windows and macOS (beta) that watches your global packages across fifteen package managers and tells you when one falls behind. One click to update.">
+    <meta name="twitter:title" content="Globlin — Keep Your Global Packages Updated on Windows, macOS and Linux">
+    <meta name="twitter:description" content="A tray icon for Windows, macOS and Linux (beta) that watches your global packages across fifteen package managers and tells you when one falls behind. One click to update.">
     <meta name="twitter:image" content="https://globlin.pages.dev/img/og.png">
 
     <script type="application/ld+json">
@@ -30,11 +30,11 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Globlin",
-        "description": "A tray application for Windows and macOS, in beta, that watches globally installed packages across npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem, Homebrew, scoop, winget, choco and the PowerShell Gallery, reports which ones are outdated, and updates them on a click.",
+        "description": "A tray application for Windows, macOS and Linux, in beta, that watches globally installed packages across npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem, Homebrew, scoop, winget, choco and the PowerShell Gallery, reports which ones are outdated, and updates them on a click.",
         "url": "https://globlin.pages.dev/",
         "downloadUrl": "https://github.com/TOR968/Globlin/releases/latest",
         "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "Windows 10, Windows 11, macOS 11 or later",
+        "operatingSystem": "Windows 10, Windows 11, macOS 11 or later, Linux",
         "license": "https://www.gnu.org/licenses/gpl-3.0.html",
         "isAccessibleForFree": true,
         "offers": {
@@ -61,7 +61,7 @@
             "name": "Is Globlin stable?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "It is in beta on every platform. The Windows builds are in daily use; the installer, the ARM64 builds and the macOS build are new. Please report anything that misbehaves on GitHub."
+              "text": "It is in beta on every platform. The Windows builds are in daily use; the installer, the ARM64 builds and the macOS and Linux builds are new. Please report anything that misbehaves on GitHub."
             }
           },
           {
@@ -77,7 +77,7 @@
             "name": "Does it work on macOS or Linux?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings, Privacy and Security, Open Anyway. Linux is not available yet; deb and rpm packages are planned."
+              "text": "Both, in beta. macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings, Privacy and Security, Open Anyway. Linux gets a deb for Debian and Ubuntu and an rpm for Fedora and openSUSE, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon."
             }
           },
           {
@@ -117,7 +117,7 @@
             "name": "How do I remove it?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "If you used the installer, uninstall Globlin from Settings, Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin and ~/Library/LaunchAgents/dev.globlin.app.plist."
+              "text": "If you used the installer, uninstall Globlin from Settings, Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin and ~/Library/LaunchAgents/dev.globlin.app.plist. On Linux, remove the package (sudo apt remove globlin, or sudo dnf remove globlin) and delete ~/.local/share/globlin."
             }
           }
         ]
@@ -709,12 +709,12 @@
     <main>
       <section class="hero">
         <div class="shell">
-          <p class="eyebrow">Tray app for Windows and macOS · <span class="tag">Beta</span></p>
+          <p class="eyebrow">Tray app for Windows, macOS and Linux · <span class="tag">Beta</span></p>
           <h1>Keep every global package up to date</h1>
           <p>
             Global CLIs rot silently. Nothing tells you <code>@salesforce/cli</code> is six versions
             behind until a command breaks in a way that turns out to be &ldquo;oh, I&rsquo;m ancient.&rdquo;
-            Globlin sits in the Windows tray or the macOS menu bar, checks on a schedule across every
+            Globlin sits in the Windows tray, the macOS menu bar or the Linux system tray, checks on a schedule across every
             package manager you have installed, and shows you exactly what has fallen behind.
           </p>
           <div class="hero-actions">
@@ -729,13 +729,14 @@
           </p>
           <p class="beta-note">
             Globlin is in beta. The Windows builds are in daily use; the installer, the ARM64 builds and
-            the macOS build are new.
+            the macOS and Linux builds are new.
             <a href="https://github.com/TOR968/Globlin/issues">Report anything that breaks</a>.
           </p>
           <ul class="badges">
             <li>Installer or portable</li>
             <li>Windows x64 and ARM64</li>
             <li>macOS on Apple Silicon</li>
+            <li>Linux deb and rpm</li>
             <li>Open source, GPL-3.0</li>
           </ul>
         </div>
@@ -942,11 +943,18 @@
               </ul>
             </article>
             <article class="card">
-              <h3>Linux</h3>
+              <h3>Linux <span class="tag">Experimental</span></h3>
               <p>
-                Not yet. The code already builds and passes its tests on Linux; deb and rpm packages are
-                planned.
+                A deb for Debian and Ubuntu, an rpm for Fedora and openSUSE — install it with apt or dnf.
+                GNOME needs the AppIndicator extension for the tray icon. Packages do not update
+                themselves; install the next one.
               </p>
+              <ul class="download-links" role="list">
+                <li><a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-amd64.deb" rel="nofollow">globlin-amd64.deb</a> · x64 · <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-amd64.deb.sha256" rel="nofollow">SHA-256</a></li>
+                <li><a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-arm64.deb" rel="nofollow">globlin-arm64.deb</a> · ARM64 · <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-arm64.deb.sha256" rel="nofollow">SHA-256</a></li>
+                <li><a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-x86_64.rpm" rel="nofollow">globlin-x86_64.rpm</a> · x64 · <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-x86_64.rpm.sha256" rel="nofollow">SHA-256</a></li>
+                <li><a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-aarch64.rpm" rel="nofollow">globlin-aarch64.rpm</a> · ARM64 · <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-aarch64.rpm.sha256" rel="nofollow">SHA-256</a></li>
+              </ul>
             </article>
           </div>
           <ol class="steps" role="list">
@@ -963,7 +971,7 @@
           <div class="hero-actions">
             <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases">All releases</a>
           </div>
-          <p class="download-note">Latest: <span data-version>latest</span> · Windows 10 and 11 · macOS 11 or later</p>
+          <p class="download-note">Latest: <span data-version>latest</span> · Windows 10 and 11 · macOS 11 or later · Linux with glibc 2.35 or later</p>
         </div>
       </section>
 
@@ -973,7 +981,7 @@
           <h2>Questions worth answering</h2>
           <details>
             <summary>Is Globlin stable?</summary>
-            <p>It is in beta on every platform. The Windows builds are in daily use; the installer, the ARM64 builds and the macOS build are new. Please <a href="https://github.com/TOR968/Globlin/issues">report anything that misbehaves</a>.</p>
+            <p>It is in beta on every platform. The Windows builds are in daily use; the installer, the ARM64 builds and the macOS and Linux builds are new. Please <a href="https://github.com/TOR968/Globlin/issues">report anything that misbehaves</a>.</p>
           </details>
           <details>
             <summary>Is Globlin free?</summary>
@@ -981,11 +989,11 @@
           </details>
           <details>
             <summary>Does it work on macOS or Linux?</summary>
-            <p>macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux is not available yet; deb and rpm packages are planned.</p>
+            <p>Both, in beta. macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux gets a deb for Debian and Ubuntu and an rpm for Fedora and openSUSE, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon.</p>
           </details>
           <details>
             <summary>Do I need Node.js installed?</summary>
-            <p>Globlin itself has no runtime dependencies, but it drives the package managers already on your machine — npm, pnpm, cargo, pipx, Homebrew, winget and the rest. If none is installed there is nothing for it to check. On Windows the window is drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 10; on macOS by the system's WebKit.</p>
+            <p>Globlin itself has no runtime dependencies, but it drives the package managers already on your machine — npm, pnpm, cargo, pipx, Homebrew, winget and the rest. If none is installed there is nothing for it to check. On Windows the window is drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 10; on macOS by the system's WebKit; on Linux by WebKitGTK, which the package installs.</p>
           </details>
           <details>
             <summary>Will it update anything without asking?</summary>
@@ -1001,7 +1009,7 @@
           </details>
           <details>
             <summary>How do I remove it?</summary>
-            <p>If you used the installer, uninstall Globlin from Settings → Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin and ~/Library/LaunchAgents/dev.globlin.app.plist.</p>
+            <p>If you used the installer, uninstall Globlin from Settings → Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin and ~/Library/LaunchAgents/dev.globlin.app.plist. On Linux, remove the package (<code>sudo apt remove globlin</code> or <code>sudo dnf remove globlin</code>) and delete ~/.local/share/globlin.</p>
           </details>
         </div>
       </section>
@@ -1054,11 +1062,16 @@
 
         if (/mac/i.test(platform)) {
           offer("Globlin-macos-arm64.zip", "Download for macOS");
-        } else if (/linux|android|iphone|ipad/i.test(platform)) {
+        } else if (/android|iphone|ipad/i.test(platform)) {
           button.href = "#install";
           button.textContent = "See every download";
-          file.textContent = "Windows and macOS builds";
+          file.textContent = "Windows, macOS and Linux builds";
           sha.hidden = true;
+        } else if (/linux/i.test(platform)) {
+          offer(
+            /aarch64|arm/i.test(platform) ? "globlin-arm64.deb" : "globlin-amd64.deb",
+            "Download for Linux (.deb)"
+          );
         } else if (data && data.getHighEntropyValues) {
           data
             .getHighEntropyValues(["architecture"])
