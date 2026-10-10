@@ -314,18 +314,19 @@ fn a_swap_replaces_a_leftover_previous_build() {
 
 #[test]
 fn an_x64_build_updates_from_the_asset_every_released_version_already_reads() {
-    assert_eq!(asset_for("x86_64"), Some("globlin.exe"));
+    assert_eq!(asset_for("windows", "x86_64"), Some("globlin.exe"));
 }
 
 #[test]
 fn an_arm64_build_updates_from_its_own_asset() {
-    assert_eq!(asset_for("aarch64"), Some("globlin-arm64.exe"));
+    assert_eq!(asset_for("windows", "aarch64"), Some("globlin-arm64.exe"));
 }
 
 #[test]
 fn an_architecture_without_a_published_build_gets_no_asset() {
-    assert_eq!(asset_for("x86"), None);
-    assert_eq!(asset_for("riscv64"), None);
+    assert_eq!(asset_for("windows", "x86"), None);
+    assert_eq!(asset_for("linux", "x86_64"), None);
+    assert_eq!(asset_for("macos", "x86_64"), None);
 }
 
 #[test]
@@ -368,4 +369,9 @@ fn the_checksum_line_for_the_other_architecture_is_ignored() {
 
     assert_eq!(published_hash(&body, ARM64_ASSET).unwrap(), "b".repeat(64));
     assert_eq!(published_hash(&body, X64_ASSET).unwrap(), "a".repeat(64));
+}
+
+#[test]
+fn an_apple_silicon_build_updates_from_the_bare_macos_binary() {
+    assert_eq!(asset_for("macos", "aarch64"), Some("globlin-macos-arm64"));
 }

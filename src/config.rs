@@ -191,7 +191,7 @@ fn candidate_paths() -> Vec<PathBuf> {
 }
 
 fn exe_dir() -> Option<PathBuf> {
-    if install::winget_managed() || install::setup_managed() {
+    if cfg!(target_os = "macos") || install::winget_managed() || install::setup_managed() {
         return None;
     }
     std::env::current_exe().ok()?.parent().map(PathBuf::from)
