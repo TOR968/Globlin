@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use semver::Version;
 use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
 use tao::window::WindowId;
-use tray_icon::{MouseButton, TrayIconEvent};
+use tray_icon::{MouseButton, MouseButtonState, TrayIconEvent};
 
 use crate::check::{self, Report};
 use crate::config::Config;
@@ -90,6 +90,7 @@ impl App {
             Message::Menu(event) => return self.on_action(Action::from_id(&event.id), target),
             Message::Ipc(body) => return self.on_action(Action::from_key(&body), target),
             Message::Tray(event) => self.on_tray(&event, target),
+            Message::NotificationClicked => self.open_window(target),
             Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome, target),
@@ -106,8 +107,9 @@ impl App {
     }
 
     fn on_tray(&mut self, event: &TrayIconEvent, target: &EventLoopWindowTarget<Message>) {
-        if let TrayIconEvent::DoubleClick {
+        if let TrayIconEvent::Click {
             button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
             ..
         } = event
         {

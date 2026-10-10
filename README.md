@@ -79,7 +79,7 @@ model's line. If yours objects:
 
 ## Using it
 
-Double-click the tray icon, or pick **Open Globlin** from its menu:
+Click the tray icon or one of its notifications, or pick **Open Globlin** from the right-click menu:
 
 ```
 ┌─ Globlin ─────────────────────────────────────────────────────────────────┐
