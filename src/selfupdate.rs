@@ -178,6 +178,11 @@ pub fn apply(release: &Release) -> Result<Version> {
     let current = std::env::current_exe()?;
     let staged = staged_path(&current);
     fs::write(&staged, &binary)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&staged, fs::Permissions::from_mode(0o755))?;
+    }
     match swap(&current, &staged) {
         Ok(()) => {
             record_installed_version(&release.version);

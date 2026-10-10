@@ -72,6 +72,30 @@ fn dump_every_state_for_visual_review() {
 }
 
 #[test]
+#[ignore = "writes the macOS iconset that bundle-macos.sh turns into an .icns: GLOBLIN_ICONSET=<dir>.iconset cargo test -- --ignored --exact icon::tests::dump_macos_iconset"]
+fn dump_macos_iconset() {
+    let directory = std::path::PathBuf::from(
+        std::env::var_os("GLOBLIN_ICONSET").expect("GLOBLIN_ICONSET names the .iconset directory"),
+    );
+    fs::create_dir_all(&directory).unwrap();
+
+    for (points, scale) in [16, 32, 128, 256, 512]
+        .into_iter()
+        .flat_map(|points| [(points, 1), (points, 2)])
+    {
+        let size = points * scale;
+        let pixels = render::rgba(IconState::Idle, 0, 0.0, size);
+        let name = if scale == 1 {
+            format!("icon_{points}x{points}.png")
+        } else {
+            format!("icon_{points}x{points}@2x.png")
+        };
+        fs::write(directory.join(name), png::encode(size, size, &pixels)).unwrap();
+    }
+    println!("iconset written to {}", directory.display());
+}
+
+#[test]
 #[ignore = "writes PNGs for the README into docs/img: cargo test -- --ignored --exact icon::tests::dump_readme_images"]
 fn dump_readme_images() {
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/img");
