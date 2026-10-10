@@ -10,8 +10,8 @@ use ureq::Agent;
 
 use crate::Result;
 
-pub const EXE_ASSET: &str = "globlin.exe";
-pub const SHA_ASSET: &str = "globlin.exe.sha256";
+const X64_ASSET: &str = "globlin.exe";
+const ARM64_ASSET: &str = "globlin-arm64.exe";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
@@ -32,7 +32,7 @@ struct ApiAsset {
     browser_download_url: String,
 }
 
-fn offer(body: &str, current: &Version) -> Option<Release> {
+fn offer(body: &str, current: &Version, asset: &str) -> Option<Release> {
     let release: ApiRelease = serde_json::from_str(body).ok()?;
     let version = Version::parse(release.tag_name.trim_start_matches('v')).ok()?;
     if version <= *current {
@@ -40,8 +40,8 @@ fn offer(body: &str, current: &Version) -> Option<Release> {
     }
     Some(Release {
         version,
-        exe_url: asset_url(&release.assets, EXE_ASSET)?,
-        sha_url: asset_url(&release.assets, SHA_ASSET)?,
+        exe_url: asset_url(&release.assets, asset)?,
+        sha_url: asset_url(&release.assets, &checksum_asset(asset))?,
     })
 }
 
@@ -60,10 +60,27 @@ fn asset_url(assets: &[ApiAsset], name: &str) -> Option<String> {
         .map(|asset| asset.browser_download_url.clone())
 }
 
-fn published_hash(body: &str) -> Option<String> {
+fn asset_for(arch: &str) -> Option<&'static str> {
+    match arch {
+        "x86_64" => Some(X64_ASSET),
+        "aarch64" => Some(ARM64_ASSET),
+        _ => None,
+    }
+}
+
+fn checksum_asset(asset: &str) -> String {
+    format!("{asset}.sha256")
+}
+
+fn running_asset() -> Result<&'static str> {
+    let arch = std::env::consts::ARCH;
+    asset_for(arch).ok_or_else(|| format!("no build is published for {arch}").into())
+}
+
+fn published_hash(body: &str, asset: &str) -> Option<String> {
     body.lines().find_map(|line| {
         let (hash, name) = line.trim().split_once(char::is_whitespace)?;
-        if name.trim() != EXE_ASSET || hash.len() != 64 {
+        if name.trim() != asset || hash.len() != 64 {
             return None;
         }
         if !hash.chars().all(|character| character.is_ascii_hexdigit()) {
@@ -84,8 +101,8 @@ fn digest(bytes: &[u8]) -> String {
     })
 }
 
-fn verify(bytes: &[u8], sha_body: &str) -> Result<()> {
-    let Some(published) = published_hash(sha_body) else {
+fn verify(bytes: &[u8], sha_body: &str, asset: &str) -> Result<()> {
+    let Some(published) = published_hash(sha_body, asset) else {
         return Err("the release did not publish a usable checksum".into());
     };
     let actual = digest(bytes);
@@ -144,16 +161,17 @@ const DOWNLOAD_TIMEOUT: Duration = Duration::from_mins(2);
 pub const RESTART_FLAG: &str = "--replaced";
 
 pub fn latest() -> Result<Option<Release>> {
+    let asset = running_asset()?;
     let current = Version::parse(env!("CARGO_PKG_VERSION"))?;
     let body = get(&agent(TIMEOUT), LATEST_URL)?.read_to_string()?;
-    Ok(offer(&body, &current))
+    Ok(offer(&body, &current, asset))
 }
 
 pub fn apply(release: &Release) -> Result<Version> {
     clean_stale();
     let binary = get(&agent(DOWNLOAD_TIMEOUT), &release.exe_url)?.read_to_vec()?;
     let checksum = get(&agent(TIMEOUT), &release.sha_url)?.read_to_string()?;
-    verify(&binary, &checksum)?;
+    verify(&binary, &checksum, running_asset()?)?;
 
     let current = std::env::current_exe()?;
     let staged = staged_path(&current);
