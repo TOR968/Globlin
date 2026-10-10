@@ -16,10 +16,14 @@ pub use shell::Window;
 #[cfg(not(windows))]
 pub use stub::Window;
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const TITLE: &str = "Globlin";
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const WIDTH: f64 = 960.0;
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const HEIGHT: f64 = 640.0;
 
+#[cfg_attr(not(windows), allow(dead_code))]
 const UI: &str = include_str!("window/ui.html");
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -237,14 +241,17 @@ pub fn tick(view: &View) -> Tick {
     }
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn payload(snapshot: &Snapshot) -> String {
     serde_json::to_string(snapshot).unwrap_or_else(|_| "null".to_string())
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn script(snapshot: &Snapshot) -> String {
     format!("window.globlin.render({})", payload(snapshot))
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn tick_script(tick: &Tick) -> String {
     let body = serde_json::to_string(tick).unwrap_or_else(|_| "null".to_string());
     format!("window.globlin.tick({body})")
