@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -83,11 +82,10 @@ pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE").map(PathBuf::from)
 }
 
-pub fn data_dir() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA").map_or_else(std::env::temp_dir, PathBuf::from);
-    let dir = base.join("globlin");
-    fs::create_dir_all(&dir).ok();
-    dir
+pub(super) fn user_data_dir() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map_or_else(std::env::temp_dir, PathBuf::from)
+        .join("globlin")
 }
 
 pub fn notify(title: &str, body: &str) -> Result<()> {
@@ -145,7 +143,7 @@ fn register_app_user_model_id() -> Result<()> {
     ))?;
     key.set_value("DisplayName", &DISPLAY_NAME.to_string())?;
 
-    let artwork = data_dir().join("app.ico");
+    let artwork = super::data_dir().join("app.ico");
     icon::write_app_icon(&artwork).ok();
     if artwork.is_file() {
         key.set_value("IconUri", &artwork.display().to_string())?;

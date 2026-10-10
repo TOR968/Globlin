@@ -79,3 +79,15 @@ fn a_failure_written_after_a_note_replaces_everything() {
     assert!(!contents.contains("bun note"), "{contents}");
     assert!(contents.contains("failure report"), "{contents}");
 }
+
+#[test]
+fn a_test_build_never_writes_into_the_users_data_directory() {
+    let scratch = std::env::temp_dir();
+
+    assert!(log_path().starts_with(&scratch), "{}", log_path().display());
+    assert!(
+        self_update_log_path().starts_with(&scratch),
+        "{}",
+        self_update_log_path().display()
+    );
+}

@@ -31,7 +31,7 @@ fn raises_a_real_notification() {
     )
     .unwrap();
 
-    let artwork = data_dir().join("app.ico");
+    let artwork = super::super::data_dir().join("app.ico");
     assert!(
         artwork.is_file(),
         "the toast artwork should have been written"
@@ -62,7 +62,7 @@ fn disabling_autostart_twice_is_not_an_error() {
 
 #[test]
 fn the_data_dir_exists_after_it_is_requested() {
-    assert!(data_dir().is_dir());
+    assert!(super::super::data_dir().is_dir());
 }
 
 #[test]

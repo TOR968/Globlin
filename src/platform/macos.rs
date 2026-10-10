@@ -15,7 +15,7 @@ pub fn prepare_environment() {
 }
 
 pub fn claim_single_instance() -> bool {
-    super::unix::claim_instance_lock(&data_dir())
+    super::unix::claim_instance_lock(&super::data_dir())
 }
 
 pub const fn signal_running_instance() {}
@@ -26,13 +26,12 @@ pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
 
-pub fn data_dir() -> PathBuf {
-    let base = home_dir().map_or_else(std::env::temp_dir, |home| {
-        home.join("Library").join("Application Support")
-    });
-    let dir = base.join("globlin");
-    fs::create_dir_all(&dir).ok();
-    dir
+pub(super) fn user_data_dir() -> PathBuf {
+    home_dir()
+        .map_or_else(std::env::temp_dir, |home| {
+            home.join("Library").join("Application Support")
+        })
+        .join("globlin")
 }
 
 pub fn notify(title: &str, body: &str) -> Result<()> {

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 459 tests (430 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 460 tests (431 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -19,6 +19,11 @@ fix the code instead. `src/icon/png.rs` (the test-only PNG encoder, see below) p
 special-cased: it does the same cast-heavy work with `try_from` instead of `as` and needs no allow.
 
 Run one test: `cargo test -- --exact check::tests::versions_compare_numerically_not_as_strings`
+
+"No side effects" includes the data directory: under `cfg(test)`, `platform::data_dir()` is
+`%TEMP%/globlin-test-data`, never the user's `%LOCALAPPDATA%\globlin` (or its macOS/Linux equivalent), so
+a test that records a failure cannot show up in an installed Globlin's *Open last log*. Every module reaches
+the directory through that one function — keep it that way.
 
 Twenty-nine tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
 real `npm install -g` x2, one that runs the real `npm config get/set` against a temporary userconfig,
