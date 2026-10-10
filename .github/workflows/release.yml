@@ -228,3 +228,34 @@ jobs:
           dist/globlin-aarch64.rpm.sha256
           --title "Globlin ${{ github.ref_name }}"
           --notes-file dist/notes.md
+
+  aur:
+    name: Publish globlin-bin to the AUR
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+
+    steps:
+      - uses: actions/checkout@v7
+        if: env.AUR_SSH_KEY != ''
+
+      - name: Render the PKGBUILD for this release
+        if: env.AUR_SSH_KEY != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version='${{ github.ref_name }}'
+          version="${version#v}"
+          gh release download "v$version" --pattern 'globlin-amd64.deb.sha256' --pattern 'globlin-arm64.deb.sha256' --dir sums
+          bash .github/render-pkgbuild.sh "$version" "$(cut -d' ' -f1 sums/globlin-amd64.deb.sha256)" "$(cut -d' ' -f1 sums/globlin-arm64.deb.sha256)" aur
+
+      - uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        if: env.AUR_SSH_KEY != ''
+        with:
+          pkgname: globlin-bin
+          pkgbuild: aur/PKGBUILD
+          commit_username: TOR968
+          commit_email: ${{ vars.AUR_COMMIT_EMAIL || 'TOR968@users.noreply.github.com' }}
+          ssh_private_key: ${{ secrets.AUR_SSH_KEY }}
+          commit_message: Update to ${{ github.ref_name }}

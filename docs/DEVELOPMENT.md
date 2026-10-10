@@ -839,6 +839,20 @@ which every rpm distribution can resolve whatever it names the package. Releases
 `ci.yml` installs the deb with `apt`, which proves its dependencies resolve, checks the files landed, and
 removes it again.
 
+**Arch Linux** gets `globlin-bin` in the AUR rather than a release file. `packaging/aur/PKGBUILD.in` is a
+template: `.github/render-pkgbuild.sh <version> <sha-amd64> <sha-arm64> <dir>` fills it in, and the
+PKGBUILD downloads the release's deb for the machine's architecture, checks its sha256, and unpacks its
+`data.tar` into the package — the same binary, desktop file and icons, with Arch package names for the
+dependencies. `ci.yml` proves it on every push: `.github/aur-smoke.sh` renders the PKGBUILD around the
+freshly built deb and, in an `archlinux:base-devel` container, runs `makepkg --syncdeps --install`, checks
+the files, and removes the package again. `release.yml`'s `aur` job renders it from the published
+`.sha256` files and pushes it to `ssh://aur@aur.archlinux.org/globlin-bin.git` with
+`KSXGitHub/github-actions-deploy-aur` — but only when the `AUR_SSH_KEY` secret exists; without it the job
+does nothing. To switch it on: create an account on aur.archlinux.org, add an SSH public key to it, store
+the private key as the repository secret `AUR_SSH_KEY`, and optionally set the repository variable
+`AUR_COMMIT_EMAIL`. The first push creates the package. Like the deb and rpm it installs to `/usr/bin`, so
+`install::managed_by` reports a system package and self-update stays off.
+
 Decided and deliberately not done: Flatpak (its sandbox would have to be opened to the host for every
 command Globlin runs) and self-update for the packages (the package manager owns `/usr/bin`; a newer
 release is a new package). An AppImage, which could self-update, is the open option.
