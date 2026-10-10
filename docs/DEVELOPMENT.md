@@ -99,7 +99,10 @@ Before this, a public package squatting the name of a private or linked tool at 
 as an update, and one click installed it and ran its install scripts. Package names are also
 percent-encoded into every registry URL, so a name cannot change the request's path or query, and the
 PowerShell Gallery source refuses to build a command for a module name with anything but letters,
-digits, `.`, `_` and `-`.
+digits, `.`, `_` and `-`. `diagnostics::record_failures` runs a failed command's output through
+`redacted` before it reaches `last-run.log`: the rest of a line after `_authToken=`, `_auth=`,
+`_password=` or `Authorization:` and any `npm_…`, `ghp_…` or `github_pat_…` token of 30+ characters
+become `<redacted>`, because a verbose package manager can echo its credentials into stderr.
 
 **Why each remote endpoint is the one it is.** Every choice here is the smallest reply that still names
 the newest stable release, because the check runs every six hours in the background.
@@ -658,7 +661,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-497 tests on Windows: 468 run by default (no network, no side effects), 29 `#[ignore]`d because they
+498 tests on Windows: 469 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
@@ -891,7 +894,8 @@ Experimental, x64 and ARM64, shipped as a deb and an rpm.
   fires the shared hook that opens the window (on desktops whose notification server supports actions).
 - **Single instance and "show the window"** — the shared `globlin.lock`, plus a Unix socket,
   `globlin.sock` in the data directory: the running copy listens on it, and a second copy started by hand
-  connects, writes `show` and exits.
+  connects, writes `show` and exits. The socket is chmodded `0600` right after `bind`, so its mode does not
+  depend on the umask; `show` is the only thing a connection can ask for.
 - **Autostart** is `~/.config/autostart/globlin.desktop` (`$XDG_CONFIG_HOME` honoured) with
   `Exec="<exe>" --background`, the path quoted and escaped per the Desktop Entry spec.
 - **PATH** — a desktop session often lacks what `.bashrc` adds (nvm, `~/.cargo/bin`), so Linux adopts the

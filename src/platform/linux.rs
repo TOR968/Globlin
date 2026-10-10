@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -11,6 +12,7 @@ use crate::Result;
 const NOT_INSTALLED_BY_SETUP: &str = "Globlin has no setup-managed install on Linux";
 const DEFAULT_SHELL: &str = "/bin/sh";
 const SHOW_SOCKET: &str = "globlin.sock";
+const OWNER_ONLY: u32 = 0o600;
 const AUTOSTART_FILE: &str = "globlin.desktop";
 const ICON_NAME: &str = "globlin";
 const DEFAULT_ACTION: &str = "default";
@@ -35,6 +37,7 @@ pub fn on_show_request(handler: impl Fn() + Send + 'static) {
     let Ok(listener) = UnixListener::bind(&path) else {
         return;
     };
+    fs::set_permissions(&path, fs::Permissions::from_mode(OWNER_ONLY)).ok();
     std::thread::Builder::new()
         .name("show-request".to_string())
         .spawn(move || {

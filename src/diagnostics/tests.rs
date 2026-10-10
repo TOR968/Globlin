@@ -124,3 +124,23 @@ fn a_command_report_carries_the_action_the_status_and_both_streams() {
     assert!(report.contains("--- stdout ---\nsome out\n"), "{report}");
     assert!(report.contains("--- stderr ---\nsome err\n"), "{report}");
 }
+
+#[test]
+fn credentials_a_package_manager_echoes_never_reach_the_log() {
+    let report = "npm verbose config //registry.npmjs.org/:_authToken=abc123secret\n\
+                  using npm_0123456789abcdefghijABCDEFGHIJ0123456789 for auth\n\
+                  Authorization: Bearer xyz\n\
+                  prettier 3.9.6 is fine\n";
+
+    let cleaned = redacted(report);
+
+    assert!(!cleaned.contains("abc123secret"), "{cleaned}");
+    assert!(!cleaned.contains("npm_0123456789abcdefghij"), "{cleaned}");
+    assert!(!cleaned.contains("Bearer xyz"), "{cleaned}");
+    assert!(
+        cleaned.contains("//registry.npmjs.org/:_authToken=<redacted>\n"),
+        "{cleaned}"
+    );
+    assert!(cleaned.contains("using <redacted> for auth\n"), "{cleaned}");
+    assert!(cleaned.ends_with("prettier 3.9.6 is fine\n"), "{cleaned}");
+}
