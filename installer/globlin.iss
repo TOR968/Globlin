@@ -50,7 +50,7 @@ Name: "{autoprograms}\Globlin"; Filename: "{app}\globlin.exe"
 Name: "{autodesktop}\Globlin"; Filename: "{app}\globlin.exe"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "globlin"; ValueData: """{app}\globlin.exe"""; Tasks: autostart
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "globlin"; ValueData: """{app}\globlin.exe"" --background"; Tasks: autostart
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "globlin"; Flags: uninsdeletevalue
 
 [Run]

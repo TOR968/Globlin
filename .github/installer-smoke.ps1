@@ -35,8 +35,9 @@ if ($entry.DisplayVersion -ne $version) {
     throw "DisplayVersion is '$($entry.DisplayVersion)', expected '$version'"
 }
 $autostart = (Get-ItemProperty $runKey -ErrorAction SilentlyContinue).globlin
-if ($autostart -ne "`"$exe`"") {
-    throw "the Run value is '$autostart', expected '`"$exe`"'"
+$expected = "`"$exe`" --background"
+if ($autostart -ne $expected) {
+    throw "the Run value is '$autostart', expected '$expected'"
 }
 "installed $version into $app"
 

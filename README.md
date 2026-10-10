@@ -100,7 +100,10 @@ model's line. If yours objects:
 
 ## Using it
 
-Click the tray icon or one of its notifications, or pick **Open Globlin** from the right-click menu:
+Starting Globlin yourself — from the Start menu, a pinned icon or the `.exe` — opens the window, or
+brings it forward when Globlin is already running; started by *Run at startup* it stays quietly in the
+tray. After that, click the tray icon or one of its notifications, or pick **Open Globlin** from the
+right-click menu:
 
 ```
 ┌─ Globlin ─────────────────────────────────────────────────────────────────┐

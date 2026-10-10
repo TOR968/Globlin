@@ -18,6 +18,8 @@ mod linux;
 #[cfg(not(any(windows, target_os = "macos")))]
 pub use linux::*;
 
+pub const BACKGROUND_FLAG: &str = "--background";
+
 static NOTIFICATION_CLICK: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
 pub fn on_notification_click(handler: impl Fn() + Send + Sync + 'static) {

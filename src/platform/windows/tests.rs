@@ -64,3 +64,11 @@ fn disabling_autostart_twice_is_not_an_error() {
 fn the_data_dir_exists_after_it_is_requested() {
     assert!(data_dir().is_dir());
 }
+
+#[test]
+fn the_run_value_starts_globlin_in_the_background() {
+    assert_eq!(
+        run_value(Path::new(r"C:\Tools\globlin.exe")),
+        r#""C:\Tools\globlin.exe" --background"#
+    );
+}

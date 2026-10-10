@@ -453,6 +453,22 @@ settings in `release-plz.toml` do the work: `release_commits = "^(feat|fix)"` me
 `(site)`, so the landing page never appears in a changelog that documents the application. Both match on
 the scope, which is why it is not optional.
 
+## How a launch decides whether to show the window
+
+`main::launch_kind` sorts every start into three kinds. **Opened** — no flag: the user started it from
+the Start menu, a pinned icon or the exe, so the window opens once the `App` exists. **Background** —
+`--background`, which every autostart entry carries (the `Run` value `set_autostart` writes, the
+installer's autostart task, the macOS LaunchAgent): tray only. **Replaced** — `--replaced`, self-update's
+relaunch: tray only, plus the "updated" notification; it wins over `--background`.
+
+An Opened start that loses the single-instance race does not just exit, which is what made a pinned icon
+look dead while Globlin sat in the tray: on Windows it sets the auto-reset event `Local\globlin-show`,
+which the running instance waits on in a `show-request` thread and turns into `Message::ShowWindow`. On
+macOS Launch Services never starts a second copy of a running `.app`; it sends a reopen, which tao
+delivers as `Event::Reopen` and `main.rs` maps to the same message. Older entries without the flag are
+upgraded on the next start: `refresh_autostart` rewrites the entry whenever autostart is on, so only the
+first sign-in after updating opens the window.
+
 ## Self-update mechanics
 
 The full mechanics behind the brief version in the [README](../README.md#keeping-itself-updated).

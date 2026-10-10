@@ -45,6 +45,10 @@ pub fn claim_single_instance() -> bool {
     }
 }
 
+pub const fn signal_running_instance() {}
+
+pub fn on_show_request(_handler: impl Fn() + Send + 'static) {}
+
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
@@ -125,6 +129,7 @@ fn launch_agent_plist(exe: &Path) -> String {
     <key>ProgramArguments</key>
     <array>
         <string>{}</string>
+        <string>{}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -133,7 +138,8 @@ fn launch_agent_plist(exe: &Path) -> String {
 </dict>
 </plist>
 "#,
-        xml_escape(&exe.to_string_lossy())
+        xml_escape(&exe.to_string_lossy()),
+        super::BACKGROUND_FLAG
     )
 }
 

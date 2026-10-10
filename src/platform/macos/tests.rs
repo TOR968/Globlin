@@ -50,6 +50,10 @@ fn the_launch_agent_runs_the_exe_at_login_under_the_bundle_label() {
         "{plist}"
     );
     assert!(
+        plist.contains("globlin</string>\n        <string>--background</string>"),
+        "{plist}"
+    );
+    assert!(
         plist.contains("<key>RunAtLoad</key>\n    <true/>"),
         "{plist}"
     );

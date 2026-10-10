@@ -12,6 +12,10 @@ pub fn claim_single_instance() -> bool {
     true
 }
 
+pub const fn signal_running_instance() {}
+
+pub fn on_show_request(_handler: impl Fn() + Send + 'static) {}
+
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
