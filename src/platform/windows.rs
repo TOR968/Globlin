@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use tauri_winrt_notification::{Duration as ToastDuration, Toast};
 use winreg::enums::HKEY_CURRENT_USER;
@@ -13,6 +14,8 @@ const APP_USER_MODEL_ID: &str = "Globlin.Tray";
 const DISPLAY_NAME: &str = "Globlin";
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "globlin";
+
+static NOTIFICATION_CLICK: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
 pub fn claim_single_instance() -> bool {
     use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};
@@ -51,6 +54,10 @@ pub fn notify(title: &str, body: &str) -> Result<()> {
         Ok(()) => Ok(()),
         Err(_) => show_toast(Toast::POWERSHELL_APP_ID, title, body),
     }
+}
+
+pub fn on_notification_click(handler: impl Fn() + Send + Sync + 'static) {
+    NOTIFICATION_CLICK.set(Box::new(handler)).ok();
 }
 
 pub fn autostart_enabled() -> bool {
@@ -95,6 +102,12 @@ fn show_toast(app_id: &str, title: &str, body: &str) -> Result<()> {
         .title(title)
         .text1(body)
         .duration(ToastDuration::Short)
+        .on_activated(|_| {
+            if let Some(handler) = NOTIFICATION_CLICK.get() {
+                handler();
+            }
+            Ok(())
+        })
         .show()
         .map_err(|error| error.to_string())?;
     Ok(())

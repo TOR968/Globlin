@@ -27,6 +27,8 @@ pub fn notify(_title: &str, _body: &str) -> Result<()> {
     Err(NOT_IMPLEMENTED.into())
 }
 
+pub fn on_notification_click(_handler: impl Fn() + Send + Sync + 'static) {}
+
 pub fn autostart_enabled() -> bool {
     false
 }

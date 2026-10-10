@@ -36,6 +36,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Message {
     Menu(MenuEvent),
     Tray(TrayIconEvent),
+    NotificationClicked,
     Ipc(String),
     Checked(Report),
     Step(Step),
@@ -95,6 +96,7 @@ fn run() -> Result<()> {
     let mut app = App::new(event_loop.create_proxy())?;
     forward_menu_events(event_loop.create_proxy());
     forward_tray_events(event_loop.create_proxy());
+    forward_notification_clicks(event_loop.create_proxy());
 
     event_loop.run(move |event, target, control_flow| {
         *control_flow = match event {
@@ -129,6 +131,12 @@ fn forward_tray_events(proxy: EventLoopProxy<Message>) {
     TrayIconEvent::set_event_handler(Some(move |event| {
         proxy.send_event(Message::Tray(event)).ok();
     }));
+}
+
+fn forward_notification_clicks(proxy: EventLoopProxy<Message>) {
+    platform::on_notification_click(move || {
+        proxy.send_event(Message::NotificationClicked).ok();
+    });
 }
 
 #[cfg(test)]

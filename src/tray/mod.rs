@@ -38,6 +38,7 @@ impl Tray {
             .with_tooltip(menu::headline(&view))
             .with_icon(icon::tray(IconState::Busy, 0, 0.0)?)
             .with_menu(Box::new(built.menu))
+            .with_menu_on_left_click(false)
             .build()?;
         Ok(Self {
             icon,
