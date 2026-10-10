@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6](https://github.com/TOR968/Globlin/compare/v0.3.5...v0.3.6) - 2026-10-10
+
+### Added
+
+- *(tray)* open the window on left click and on notification click ([#46](https://github.com/TOR968/Globlin/pull/46))
+
 ## [0.3.5](https://github.com/TOR968/Globlin/compare/v0.3.4...v0.3.5) - 2026-10-03
 
 ### Added
