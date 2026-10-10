@@ -62,7 +62,7 @@ pub fn enabled(config: &Config) -> Result<Vec<Box<dyn PackageSource>>> {
     let mut failures = Vec::new();
 
     for kind in KINDS {
-        if !config.source_enabled(kind) {
+        if !kind.available() || !config.source_enabled(kind) {
             continue;
         }
         match build(kind, config) {

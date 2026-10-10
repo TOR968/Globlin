@@ -88,6 +88,14 @@ impl SourceKind {
         !matches!(self, Self::Go | Self::Winget | Self::Choco)
     }
 
+    pub const fn windows_only(self) -> bool {
+        matches!(self, Self::Scoop | Self::Winget | Self::Choco)
+    }
+
+    pub const fn available(self) -> bool {
+        cfg!(windows) || !self.windows_only()
+    }
+
     pub const fn suffix(self) -> &'static str {
         match self {
             Self::Npm => "",

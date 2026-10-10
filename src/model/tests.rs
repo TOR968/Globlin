@@ -258,3 +258,25 @@ fn only_the_sources_that_need_elevation_are_read_only() {
 
     assert_eq!(read_only, vec!["winget", "choco"]);
 }
+
+#[test]
+fn only_winget_choco_and_scoop_are_windows_only() {
+    let windows_only: Vec<&str> = KINDS
+        .iter()
+        .filter(|kind| kind.windows_only())
+        .map(|kind| kind.label())
+        .collect();
+
+    assert_eq!(windows_only, ["scoop", "winget", "choco"]);
+}
+
+#[test]
+fn every_source_is_available_on_windows_and_only_the_portable_ones_elsewhere() {
+    for kind in KINDS {
+        assert_eq!(
+            kind.available(),
+            cfg!(windows) || !kind.windows_only(),
+            "{kind:?}"
+        );
+    }
+}
