@@ -26,6 +26,7 @@ fn round_trips_through_json() {
             dotnet: false,
             psgallery: false,
             gem: false,
+            brew: false,
             winget: false,
             choco: false,
         },

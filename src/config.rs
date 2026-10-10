@@ -40,6 +40,7 @@ pub struct Sources {
     pub dotnet: bool,
     pub psgallery: bool,
     pub gem: bool,
+    pub brew: bool,
     pub winget: bool,
     pub choco: bool,
 }
@@ -74,6 +75,7 @@ impl Default for Sources {
             dotnet: true,
             psgallery: false,
             gem: true,
+            brew: true,
             winget: false,
             choco: false,
         }
@@ -137,6 +139,7 @@ impl Config {
             SourceKind::Dotnet => self.sources.dotnet,
             SourceKind::PsGallery => self.sources.psgallery,
             SourceKind::Gem => self.sources.gem,
+            SourceKind::Brew => self.sources.brew,
             SourceKind::Winget => self.sources.winget,
             SourceKind::Choco => self.sources.choco,
         }
@@ -156,6 +159,7 @@ impl Config {
             SourceKind::Dotnet => &mut self.sources.dotnet,
             SourceKind::PsGallery => &mut self.sources.psgallery,
             SourceKind::Gem => &mut self.sources.gem,
+            SourceKind::Brew => &mut self.sources.brew,
             SourceKind::Winget => &mut self.sources.winget,
             SourceKind::Choco => &mut self.sources.choco,
         };

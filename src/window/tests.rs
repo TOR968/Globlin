@@ -55,6 +55,7 @@ fn config() -> Config {
             dotnet: false,
             psgallery: false,
             gem: false,
+            brew: false,
             winget: true,
             choco: false,
         },
