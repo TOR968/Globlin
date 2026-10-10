@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8](https://github.com/TOR968/Globlin/compare/v0.3.7...v0.3.8) - 2026-10-10
+
+### Added
+
+- ship a per-user Windows installer and an experimental macOS build ([#52](https://github.com/TOR968/Globlin/pull/52))
+
 ## [0.3.7](https://github.com/TOR968/Globlin/compare/v0.3.6...v0.3.7) - 2026-10-10
 
 ### Added
