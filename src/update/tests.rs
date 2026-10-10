@@ -18,7 +18,9 @@ struct UnrunnableNpm {
 
 impl UnrunnableNpm {
     fn new(label: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("globlin-fake-npm-{label}"));
+        let dir = std::env::temp_dir().join(format!("globlin-fake-npm-{label}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("npm");
         std::fs::write(&path, b"not an executable").unwrap();
         Self {
             config: Config {
@@ -235,7 +237,9 @@ struct FakeNpmRun {
 #[cfg(windows)]
 impl FakeNpmRun {
     fn new(label: &str, script: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("globlin-fake-npm-run-{label}.cmd"));
+        let dir = std::env::temp_dir().join(format!("globlin-fake-npm-run-{label}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("npm.cmd");
         std::fs::write(&path, script).unwrap();
         Self {
             config: Config {

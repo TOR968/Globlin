@@ -439,3 +439,24 @@ fn an_unreachable_registry_is_skipped_instead_of_failing_the_check() {
     assert!(found.is_empty());
     assert_eq!(skipped, ["registry.npmjs.org could not be reached"]);
 }
+
+#[test]
+fn a_package_installed_from_outside_its_registry_is_never_looked_up_or_offered() {
+    let linked = installed("internal-tool", "1.0.0").with_external(true);
+    let mut latest = Latest::default();
+    latest.npm.insert(
+        "internal-tool".to_string(),
+        Version::parse("99.0.0").unwrap(),
+    );
+
+    assert!(lookup_names(
+        std::slice::from_ref(&linked),
+        &Config::default(),
+        Catalog::Npm
+    )
+    .is_empty());
+    assert_eq!(
+        classify(linked, &Config::default(), &latest).status,
+        Status::Unknown
+    );
+}

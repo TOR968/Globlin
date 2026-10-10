@@ -284,3 +284,15 @@ fn a_registry_that_answered_but_knew_none_of_the_names_is_not_an_error() {
         .unwrap()
         .is_empty());
 }
+
+#[test]
+fn a_name_cannot_change_the_path_or_the_query_of_a_registry_request() {
+    assert_eq!(
+        dist_tags_url("../x?y=1#z"),
+        "https://registry.npmjs.org/-/package/..%2fx%3fy%3d1%23z/dist-tags"
+    );
+    assert_eq!(
+        feed_url("a/b&c"),
+        "https://pypi.org/rss/project/a%2fb%26c/releases.xml"
+    );
+}

@@ -15,6 +15,8 @@ pub const WIDTH: f64 = 960.0;
 pub const HEIGHT: f64 = 640.0;
 
 const UI: &str = include_str!("window/ui.html");
+const OWN_PAGE_BLANK: &str = "about:blank";
+const OWN_PAGE_DATA: &str = "data:text/html";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)]
@@ -233,6 +235,10 @@ pub fn tick(view: &View) -> Tick {
 
 pub fn payload(snapshot: &Snapshot) -> String {
     serde_json::to_string(snapshot).unwrap_or_else(|_| "null".to_string())
+}
+
+pub fn is_own_page(uri: &str) -> bool {
+    uri == OWN_PAGE_BLANK || uri.starts_with(OWN_PAGE_DATA)
 }
 
 pub fn script(snapshot: &Snapshot) -> String {

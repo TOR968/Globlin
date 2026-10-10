@@ -148,7 +148,7 @@ fn approve(sources: &[Box<dyn PackageSource>], blocked: &Blocked) -> Result<(), 
 fn apply(sources: &[Box<dyn PackageSource>], target: &UpdateTarget) -> Result<(), Failure> {
     let source = source::source_for(sources, &target.name, target.source)?;
     let output = source::run_change(
-        source.update_command(&target.name),
+        source.update_to(&target.name, &target.to),
         &target.name,
         target.source,
     )?;

@@ -37,7 +37,9 @@ fn removing_without_any_enabled_source_fails_instead_of_reporting_success() {
 
 #[test]
 fn a_source_that_cannot_be_started_fails_instead_of_reporting_success() {
-    let path = std::env::temp_dir().join("globlin-test-remove-fake-npm");
+    let dir = std::env::temp_dir().join("globlin-test-remove-fake-npm");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("npm");
     std::fs::write(&path, b"not an executable").unwrap();
     let config = Config {
         npm_cmd: Some(path.clone()),

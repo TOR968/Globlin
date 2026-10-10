@@ -49,6 +49,10 @@ pub trait PackageSource {
 
     fn update_command(&self, name: &str) -> Option<Command>;
 
+    fn update_to(&self, name: &str, _version: &str) -> Option<Command> {
+        self.update_command(name)
+    }
+
     fn uninstall_command(&self, name: &str) -> Option<Command>;
 
     fn blocked_scripts(&self, _stderr: &str) -> Option<Vec<BlockedScript>> {
@@ -184,21 +188,35 @@ fn executable_in(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 pub(crate) fn manifest_names(raw: &str) -> Result<Vec<String>> {
+    Ok(manifest_specs(raw)?.into_keys().collect())
+}
+
+fn manifest_specs(raw: &str) -> Result<BTreeMap<String, String>> {
     let manifest: GlobalManifest = serde_json::from_str(raw)?;
-    Ok(manifest.dependencies.into_keys().collect())
+    Ok(manifest.dependencies)
 }
 
 pub(crate) fn node_modules_listing(root: &Path, source: SourceKind) -> Vec<Installed> {
     let Ok(raw) = fs::read_to_string(root.join("package.json")) else {
         return Vec::new();
     };
-    let Ok(names) = manifest_names(&raw) else {
+    let Ok(specs) = manifest_specs(&raw) else {
         return Vec::new();
     };
-    names
+    specs
         .iter()
-        .filter_map(|name| installed_version(root, name, source))
+        .filter_map(|(name, spec)| {
+            Some(installed_version(root, name, source)?.with_external(names_another_origin(spec)))
+        })
         .collect()
+}
+
+pub(crate) fn names_another_origin(spec: &str) -> bool {
+    spec.contains(':') || spec.contains('/')
+}
+
+pub(crate) fn pinned_to(name: &str, version: &str) -> String {
+    format!("{name}@{version}")
 }
 
 pub(crate) fn installed_version(root: &Path, name: &str, source: SourceKind) -> Option<Installed> {

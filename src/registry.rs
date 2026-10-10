@@ -165,7 +165,7 @@ fn crates_page(client: &Client, names: &[String]) -> Option<Vec<(String, Version
 fn crates_url(names: &[String]) -> String {
     let ids: Vec<String> = names
         .iter()
-        .map(|name| format!("ids%5B%5D={name}"))
+        .map(|name| format!("ids%5B%5D={}", encoded(name)))
         .collect();
     format!("{CRATES}?per_page={BATCH}&{}", ids.join("&"))
 }
@@ -182,7 +182,7 @@ fn gallery_newest_release(client: &Client, name: &str) -> Option<String> {
     let response = client.answered(
         client
             .agent
-            .get(format!("{GALLERY}/{name}"))
+            .get(format!("{GALLERY}/{}", encoded(name)))
             .config()
             .max_redirects(0)
             .build()
@@ -200,7 +200,7 @@ fn version_in_package_url(location: &str, name: &str) -> Option<String> {
 }
 
 fn nuget_url(name: &str) -> String {
-    format!("{NUGET}/{}/index.json", name.to_lowercase())
+    format!("{NUGET}/{}/index.json", encoded(&name.to_lowercase()))
 }
 
 fn npm_dist_tag(client: &Client, name: &str) -> Option<Version> {
@@ -221,14 +221,24 @@ fn body(client: &Client, url: &str) -> Option<String> {
 }
 
 fn dist_tags_url(name: &str) -> String {
-    format!(
-        "{REGISTRY}/-/package/{}/dist-tags",
-        name.replace('/', "%2f")
-    )
+    format!("{REGISTRY}/-/package/{}/dist-tags", encoded(name))
 }
 
 fn feed_url(name: &str) -> String {
-    format!("{FEED}/{name}/releases.xml")
+    format!("{FEED}/{}/releases.xml", encoded(name))
+}
+
+fn encoded(name: &str) -> String {
+    use std::fmt::Write;
+
+    name.bytes().fold(String::new(), |mut out, byte| {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'@') {
+            out.push(char::from(byte));
+        } else {
+            write!(out, "%{byte:02x}").ok();
+        }
+        out
+    })
 }
 
 fn newest_stable(feed: &str) -> Option<String> {

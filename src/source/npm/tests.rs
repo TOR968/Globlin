@@ -73,12 +73,12 @@ fn arguments(command: &std::process::Command) -> Vec<String> {
 #[test]
 fn the_npm_update_runs_the_packages_own_install_scripts_and_fails_on_any_other_blocked_one() {
     assert_eq!(
-        install_arguments("@anthropic-ai/claude-code", ""),
+        install_arguments("@anthropic-ai/claude-code", "2.1.0", ""),
         vec![
             "install",
             "-g",
-            "@anthropic-ai/claude-code@latest",
-            "--allow-scripts=@anthropic-ai/claude-code",
+            "@anthropic-ai/claude-code@2.1.0",
+            "--allow-scripts=@anthropic-ai/claude-code@2.1.0",
             "--strict-allow-scripts",
         ]
     );
@@ -89,14 +89,15 @@ fn the_npm_update_keeps_the_scripts_the_user_already_approved_in_npmrc() {
     assert_eq!(
         install_arguments(
             "@deepseek-ai/dsh",
+            "0.4.0",
             "@stripe/cli,koffi,node-pty
 "
         ),
         vec![
             "install",
             "-g",
-            "@deepseek-ai/dsh@latest",
-            "--allow-scripts=@stripe/cli,koffi,node-pty,@deepseek-ai/dsh",
+            "@deepseek-ai/dsh@0.4.0",
+            "--allow-scripts=@stripe/cli,koffi,node-pty,@deepseek-ai/dsh@0.4.0",
             "--strict-allow-scripts",
         ]
     );
@@ -328,4 +329,108 @@ fn the_npm_uninstall_command_removes_the_package_globally() {
         arguments(&npm.uninstall_command("@salesforce/cli").unwrap()),
         vec!["uninstall", "-g", "@salesforce/cli"]
     );
+}
+
+const LOCK: &str = r#"{
+  "name": "lib",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/prettier": {
+      "version": "3.9.6",
+      "resolved": "https://registry.npmjs.org/prettier/-/prettier-3.9.6.tgz"
+    },
+    "node_modules/@corp/cli": {
+      "version": "2.0.0",
+      "resolved": "https://npm.corp.example/@corp/cli/-/cli-2.0.0.tgz"
+    },
+    "node_modules/mirrored": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmmirror.com/mirrored/-/mirrored-1.0.0.tgz"
+    },
+    "node_modules/from-git": {
+      "version": "0.1.0",
+      "resolved": "git+ssh://git@github.com/me/from-git.git#abc123"
+    },
+    "node_modules/my-tool": {
+      "resolved": "../../../src/my-tool",
+      "link": true
+    }
+  }
+}"#;
+
+fn origins(registry: Option<&str>) -> Origins {
+    Origins {
+        root: None,
+        registry: registry.map(str::to_owned),
+        lock: parse_lock(LOCK).unwrap(),
+    }
+}
+
+#[test]
+fn only_packages_resolved_from_the_registry_are_checked_against_it() {
+    let origins = origins(Some("https://registry.npmmirror.com/"));
+
+    assert!(!origins.is_external("prettier"));
+    assert!(!origins.is_external("mirrored"));
+    assert!(origins.is_external("@corp/cli"));
+    assert!(origins.is_external("from-git"));
+    assert!(origins.is_external("my-tool"));
+}
+
+#[test]
+fn a_registry_prefix_must_end_at_a_path_boundary() {
+    let origins = Origins {
+        registry: Some("https://npm.corp.example/team".to_owned()),
+        ..Origins::default()
+    };
+
+    assert!(origins.resolves_through_registry("https://npm.corp.example/team/x/-/x-1.0.0.tgz"));
+    assert!(
+        !origins.resolves_through_registry("https://npm.corp.example/team-evil/x/-/x-1.0.0.tgz")
+    );
+}
+
+#[test]
+fn a_package_missing_from_the_lockfile_is_checked_unless_it_is_a_link() {
+    assert!(!origins(None).is_external("never-locked"));
+}
+
+#[test]
+fn an_npm_override_must_name_npm_itself() {
+    assert!(names_npm(Path::new("tools/npm.cmd")));
+    assert!(names_npm(Path::new("/usr/local/bin/npm")));
+    assert!(names_npm(Path::new("tools/NPM.EXE")));
+    assert!(!names_npm(Path::new("Downloads/setup.exe")));
+}
+
+#[cfg(windows)]
+#[test]
+fn a_downloaded_npm_override_is_not_trusted() {
+    let dir = std::env::temp_dir().join("globlin-npm-override");
+    std::fs::create_dir_all(&dir).unwrap();
+    let marked = dir.join("npm.cmd");
+    std::fs::write(&marked, "@exit 0").unwrap();
+    std::fs::write(
+        dir.join("npm.cmd:Zone.Identifier"),
+        "[ZoneTransfer]\r\nZoneId=3\r\n",
+    )
+    .unwrap();
+    let clean = dir.join("clean").join("npm.cmd");
+    std::fs::create_dir_all(clean.parent().unwrap()).unwrap();
+    std::fs::write(&clean, "@exit 0").unwrap();
+
+    assert!(!trusted_override(&marked));
+    assert!(trusted_override(&clean));
+}
+
+#[test]
+fn a_refused_npm_override_is_an_error_and_never_falls_back_to_the_npm_on_path() {
+    let dir = std::env::temp_dir().join("globlin-npm-refused");
+    std::fs::create_dir_all(&dir).unwrap();
+    let payload = dir.join("setup.exe");
+    std::fs::write(&payload, b"not an executable").unwrap();
+
+    let error = Npm::new(Some(&payload)).err().unwrap().to_string();
+
+    assert!(error.contains("was refused"), "{error}");
 }

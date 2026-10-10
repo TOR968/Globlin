@@ -86,6 +86,21 @@ that is ahead — a go pseudo-version built from `master`, an `-rc` — reads `C
 would otherwise be a downgrade. Versions neither comparison understands (`7.1_1`, a cask's `latest`)
 still read `Outdated` when they differ, since the tool itself reported them.
 
+**A package installed from somewhere else is never looked up or updated.** `Installed.external` marks
+an npm-family package that did not come from the registry Globlin would compare it against, and
+`check.rs` leaves it out of the registry request and reads it as `Unknown`, which also means it never
+gets an **Update** button. npm reads `<npm root -g>/.package-lock.json`: an entry marked `link`, or one
+whose `resolved` URL is neither `https://registry.npmjs.org/` nor the configured `npm config get
+registry`, is external (a scoped private registry, a git URL, a tarball, `npm link`, `npm i -g ./dir`);
+with no lockfile entry, a symlink in the global `node_modules` is. bun and yarn read the spec in their
+global `package.json` — anything containing `:` or `/` (`file:`, `link:`, `github:`, `npm:` aliases,
+URLs, `user/repo`) is external. pnpm already drops such entries, because their version is not semver.
+Before this, a public package squatting the name of a private or linked tool at a higher version showed
+as an update, and one click installed it and ran its install scripts. Package names are also
+percent-encoded into every registry URL, so a name cannot change the request's path or query, and the
+PowerShell Gallery source refuses to build a command for a module name with anything but letters,
+digits, `.`, `_` and `-`.
+
 **Why each remote endpoint is the one it is.** Every choice here is the smallest reply that still names
 the newest stable release, because the check runs every six hours in the background.
 
@@ -143,7 +158,15 @@ batch rows, mirroring the `Tray::render` / `Tray::animate` split exactly.
 the binary. Everything it needs arrives in the snapshot, already in display order: `window.rs` puts enabled sources
 that found packages first (most outdated, then most packages), empty ones next and switched-off ones
 last, and orders the package list by that same source order with outdated packages first inside each
-source. The page owns filtering, search and the two-click uninstall confirmation, and nothing else. The no-comments rule covers it: no `<!-- -->`, no
+source. The page owns filtering, search and the two-click uninstall confirmation, and nothing else.
+
+**The page is the only document the view will ever show.** `window::is_own_page` accepts `about:blank`
+and `data:text/html…` — what WebView2 reports for `with_html` (navigation is the `data:` URL, IPC
+arrives from `about:blank`; WKWebView and WebKitGTK report `about:blank`). The navigation handler
+cancels everything else, new windows are denied, file and link drops are swallowed by
+`with_drag_drop_handler`, and the IPC handler drops any message whose origin is not the page. Without
+these a link or an `.html` file dragged onto the window became a page with `window.ipc` that could post
+`auto-approve`, `update-all` or `remove:` ids. The no-comments rule covers it: no `<!-- -->`, no
 `/* */`, no `//`.
 
 ### The icon
@@ -318,13 +341,14 @@ Things about the environment the code has to work around, all verified rather th
   `allow-scripts` list has its `postinstall` skipped with only a warning. `@anthropic-ai/claude-code`
   is the case that surfaced it: its `postinstall` copies the native binary over a 500-byte stub in
   `bin/claude.exe`, so a "successful" update left a `claude` that Windows refuses to start. The update
-  command therefore passes `--allow-scripts=<name>`, which approves the scripts of the package the user
-  already chose to install, and `--strict-allow-scripts`, which turns any other blocked script (a
+  command therefore passes `--allow-scripts=<name>@<version>`, which approves the scripts of exactly the
+  release the user chose to install — the one the check showed, which is also the one installed, as
+  `<name>@<version>` rather than `@latest` — and `--strict-allow-scripts`, which turns any other blocked script (a
   dependency's) into `ESTRICTALLOWSCRIPTS` and a non-zero exit. That check runs before the old version
   is touched, so a refused update leaves the working install in place and reports as blocked (see the
   next bullet). A CLI `--allow-scripts` replaces the `.npmrc` list rather than extending it (npm warns
   `.npmrc allow-scripts setting is being ignored`), so the update first reads
-  `npm config get allow-scripts -g` and passes that list with the package name appended. Without that
+  `npm config get allow-scripts -g` and passes that list with the pinned package appended. Without that
   merge a dependency the user approved in `.npmrc` could never be approved at all:
   `@deepseek-ai/dsh` needs `koffi`, `node-pty` and `protobufjs`, and failed every time. The fix for a
   refused update is to append the listed dependencies to the user-level list — npm's own hint,
@@ -634,7 +658,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-486 tests on Windows: 457 run by default (no network, no side effects), 29 `#[ignore]`d because they
+497 tests on Windows: 468 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
@@ -651,7 +675,10 @@ installs `$env:UPDATE_TARGET` globally, so point it at something harmless. To se
 demand, downgrade something disposable (`npm i -g npm-check-updates@23.0.0`) and hit *Check now*.
 
 The update orchestration is exercised by pointing `npm_cmd` at a file that cannot be executed, which
-drives the real failure paths without installing anything. The source adapters are tested against
+drives the real failure paths without installing anything. **Every such fake must be named `npm` or
+`npm.cmd`, in a directory of its own.** An override that is refused is an error and never falls back to
+the `npm` on `PATH` — the one time it did (while the name check was being added), the suite ran the
+real `npm install -g` and `npm uninstall -g prettier` on the developer's machine. The source adapters are tested against
 captured stdout — a real `winget list` table, a `choco list -r` listing, a `pnpm ls -g --json` reply —
 rather than by running those tools, so the parsers are pinned without the suite needing them installed.
 

@@ -2,7 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, manifest_names, node_modules_listing, PackageSource};
+use super::{
+    find_on_path, hidden_command, manifest_names, node_modules_listing, pinned_to, PackageSource,
+};
 use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
 use crate::platform;
@@ -41,8 +43,12 @@ impl PackageSource for Bun {
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        self.update_to(name, "latest")
+    }
+
+    fn update_to(&self, name: &str, version: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
-        command.args(["add", "-g", &format!("{name}@latest")]);
+        command.args(["add", "-g", &pinned_to(name, version)]);
         Some(command)
     }
 

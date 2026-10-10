@@ -246,3 +246,21 @@ fn a_read_only_source_runs_nothing() {
 
     assert_eq!(error, "Git.Git: the winget source is read-only\n");
 }
+
+#[test]
+fn a_manifest_spec_that_names_a_path_a_link_a_git_url_or_an_alias_is_another_origin() {
+    for spec in [
+        "file:../tool",
+        "link:tool",
+        "github:me/tool",
+        "me/tool",
+        "git+https://example.com/tool.git",
+        "https://example.com/tool.tgz",
+        "npm:other@1.0.0",
+    ] {
+        assert!(names_another_origin(spec), "{spec}");
+    }
+    for spec in ["^1.2.3", "1.2.3", "latest", "*", ">=1 <2", "1.x"] {
+        assert!(!names_another_origin(spec), "{spec}");
+    }
+}

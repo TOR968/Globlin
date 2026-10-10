@@ -158,7 +158,9 @@ right-click menu:
 ```
 
 - `↑` outdated · `✓` current · `·` ignored · `?` the registry hasn't answered yet (never treated as
-  "fine" — the headline counts these as *not checked*).
+  "fine" — the headline counts these as *not checked*). A package installed from a git URL, a local
+  folder, `npm link` or a private registry also shows `?`: Globlin never compares it with the public
+  registry, so a public package with the same name can never be offered as its update.
 - **The sidebar is the grouping.** Status rows filter the list; source rows filter it too, and each shows
   `total · outdated`. The small `on`/`off` link beside a source switches that source on or off for good —
   it goes into `globlin.json` and triggers a fresh check.
@@ -333,7 +335,9 @@ edits are never silently overwritten.
 - **`last_notified`** — bookkeeping for the "only notify on change" rule. Clear it to force the next
   check to notify again.
 - **`npm_cmd`** — an override, only needed if `npm.cmd` is somewhere unusual. Left `null`, `PATH` is
-  searched, then `%APPDATA%\npm\npm.cmd`.
+  searched, then `%APPDATA%\npm\npm.cmd`. The file must be called `npm` (`npm.cmd`, `npm.exe`) and
+  must not be a downloaded file still carrying Windows' *from the internet* mark; otherwise npm is
+  skipped rather than run.
 - **`auto_update`** — see [Keeping itself updated](#keeping-itself-updated).
 - **`auto_approve_scripts`** — the window's **Auto-approve npm scripts** switch; see
   [Using it](#using-it).

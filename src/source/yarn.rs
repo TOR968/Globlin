@@ -2,7 +2,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use super::{
-    find_on_path, hidden_command, node_modules_listing, run_listing, stdout_text, PackageSource,
+    find_on_path, hidden_command, node_modules_listing, pinned_to, run_listing, stdout_text,
+    PackageSource,
 };
 use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
@@ -43,8 +44,12 @@ impl PackageSource for Yarn {
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        self.update_to(name, "latest")
+    }
+
+    fn update_to(&self, name: &str, version: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
-        command.args(["global", "add", &format!("{name}@latest")]);
+        command.args(["global", "add", &pinned_to(name, version)]);
         Some(command)
     }
 

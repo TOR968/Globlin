@@ -422,3 +422,18 @@ fn the_auto_approve_setting_reaches_the_window_from_the_config() {
 
     assert!(snapshot(&view(&[], None), &config).auto_approve);
 }
+
+#[test]
+fn only_the_page_globlin_loaded_itself_counts_as_its_own() {
+    assert!(is_own_page("about:blank"));
+    assert!(is_own_page("data:text/html;charset=utf-8;base64,PGh0bWw+"));
+    for foreign in [
+        "file:///C:/Users/me/Downloads/evil.html",
+        "https://example.com/",
+        "about:blank#x",
+        "data:image/svg+xml,<svg/>",
+        "javascript:alert(1)",
+    ] {
+        assert!(!is_own_page(foreign), "{foreign}");
+    }
+}
