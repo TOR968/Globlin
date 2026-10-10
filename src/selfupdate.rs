@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use ureq::Agent;
 
-use crate::Result;
+use crate::{diagnostics, install, platform, Result};
 
 const X64_ASSET: &str = "globlin.exe";
 const ARM64_ASSET: &str = "globlin-arm64.exe";
@@ -177,13 +177,27 @@ pub fn apply(release: &Release) -> Result<Version> {
     let staged = staged_path(&current);
     fs::write(&staged, &binary)?;
     match swap(&current, &staged) {
-        Ok(()) => Ok(release.version.clone()),
+        Ok(()) => {
+            record_installed_version(&release.version);
+            Ok(release.version.clone())
+        }
         Err(error) => {
             if should_discard_staged(&current) {
                 fs::remove_file(&staged).ok();
             }
             Err(error)
         }
+    }
+}
+
+fn record_installed_version(version: &Version) {
+    if !install::setup_managed() {
+        return;
+    }
+    if let Err(error) = platform::record_installed_version(&version.to_string()) {
+        diagnostics::record_self_update_failure(&format!(
+            "could not record {version} as the installed version: {error}\n"
+        ));
     }
 }
 
