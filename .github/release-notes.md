@@ -19,7 +19,8 @@ ad hoc, not notarised. `globlin-macos-arm64` is the bare binary the Mac app upda
 
 **Linux (experimental):** `sudo apt install ./globlin-amd64.deb` (or `globlin-arm64.deb`) on Debian and
 Ubuntu, `sudo dnf install ./globlin-x86_64.rpm` (or `globlin-aarch64.rpm`) on Fedora. GNOME needs the
-AppIndicator extension to show the tray icon. Packages do not update themselves — install the next one.
+AppIndicator extension to show the tray icon. On Arch, download `globlin-bin.PKGBUILD`, save it as
+`PKGBUILD` and run `makepkg -si`. Packages do not update themselves — install the next one.
 
 ## Verify the download
 

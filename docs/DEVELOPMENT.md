@@ -850,7 +850,9 @@ the files, and removes the package again. `release.yml`'s `aur` job renders it f
 `KSXGitHub/github-actions-deploy-aur` — but only when the `AUR_SSH_KEY` secret exists; without it the job
 does nothing. To switch it on: create an account on aur.archlinux.org, add an SSH public key to it, store
 the private key as the repository secret `AUR_SSH_KEY`, and optionally set the repository variable
-`AUR_COMMIT_EMAIL`. The first push creates the package. Like the deb and rpm it installs to `/usr/bin`, so
+`AUR_COMMIT_EMAIL`. The first push creates the package. Independently of the AUR, the `publish` job renders
+the same PKGBUILD from the release's own deb checksums and attaches it as `globlin-bin.PKGBUILD`, so Arch
+users can `makepkg -si` it while the AUR package does not exist yet. Like the deb and rpm it installs to `/usr/bin`, so
 `install::managed_by` reports a system package and self-update stays off.
 
 Decided and deliberately not done: Flatpak (its sandbox would have to be opened to the host for every
