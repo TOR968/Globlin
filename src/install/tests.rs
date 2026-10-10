@@ -1,4 +1,4 @@
-use super::is_winget_path;
+use super::{is_setup_path, is_winget_path};
 use std::path::Path;
 
 #[test]
@@ -47,4 +47,46 @@ fn the_two_components_must_be_adjacent() {
     assert!(!is_winget_path(Path::new(
         r"C:\winget\other\packages\globlin.exe"
     )));
+}
+
+const SETUP_LOCATION: &str = r"C:\Users\me\AppData\Local\Programs\Globlin\";
+
+#[test]
+fn an_exe_in_the_recorded_install_location_is_managed_by_setup() {
+    assert!(is_setup_path(
+        Path::new(r"C:\Users\me\AppData\Local\Programs\Globlin\globlin.exe"),
+        Path::new(SETUP_LOCATION)
+    ));
+}
+
+#[test]
+fn the_setup_location_matches_regardless_of_case() {
+    assert!(is_setup_path(
+        Path::new(r"c:\users\ME\appdata\local\programs\globlin\globlin.exe"),
+        Path::new(SETUP_LOCATION)
+    ));
+}
+
+#[test]
+fn the_trailing_separator_inno_records_does_not_matter() {
+    assert!(is_setup_path(
+        Path::new(r"C:\Users\me\AppData\Local\Programs\Globlin\globlin.exe"),
+        Path::new(r"C:\Users\me\AppData\Local\Programs\Globlin")
+    ));
+}
+
+#[test]
+fn a_portable_copy_elsewhere_is_not_managed_by_setup() {
+    assert!(!is_setup_path(
+        Path::new(r"D:\tools\globlin.exe"),
+        Path::new(SETUP_LOCATION)
+    ));
+}
+
+#[test]
+fn a_copy_in_a_subdirectory_of_the_install_location_is_not_the_installed_one() {
+    assert!(!is_setup_path(
+        Path::new(r"C:\Users\me\AppData\Local\Programs\Globlin\old\globlin.exe"),
+        Path::new(SETUP_LOCATION)
+    ));
 }

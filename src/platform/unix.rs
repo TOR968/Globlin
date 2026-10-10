@@ -37,6 +37,14 @@ pub fn set_autostart(_enabled: bool) -> Result<()> {
     Err(NOT_IMPLEMENTED.into())
 }
 
+pub fn setup_install_location() -> Option<PathBuf> {
+    None
+}
+
+pub fn record_installed_version(_version: &str) -> Result<()> {
+    Err(NOT_IMPLEMENTED.into())
+}
+
 pub fn open_in_shell(_path: &Path) -> Result<()> {
     Err(NOT_IMPLEMENTED.into())
 }

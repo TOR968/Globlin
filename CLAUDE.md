@@ -143,6 +143,10 @@ encoder in `src/icon/png.rs`. Regenerate them, never hand-edit them; see
   self-update swap/rollback mechanics, and the release machinery. Read the relevant one before changing
   behaviour it describes. The same rule extends to `site/` — no `<!-- -->`, no `/* */` — and the site
   holds that line today.
+- The installer is `installer/globlin.iss` (Inno Setup, per-user), built by `.github/build-installer.ps1`
+  and exercised end to end by `.github/installer-smoke.ps1` in CI. The no-comments rule covers both, and
+  its `AppId` must never change — `platform::windows`'s `SETUP_KEY` is derived from it. See
+  [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#when-the-installer-owns-the-directory).
 - The window's markup, CSS and JavaScript live in one `include_str!`d file, `src/window/ui.html`, with no
   build step and no bundler. External resources are not fetched at runtime — the page is the binary.
 - `Cargo.toml` declares the package at the repository root, so release-plz reads every commit in the
