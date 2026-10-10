@@ -84,6 +84,13 @@ jobs:
           cargo build --release
           bash .github/bundle-macos.sh target/release/globlin macos-out
 
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with:
+          name: Globlin-macos-arm64-${{ github.sha }}
+          path: macos-out/Globlin-macos-arm64.zip
+          if-no-files-found: error
+
       - name: Build the release binary
         if: matrix.asset
         run: cargo build --release
