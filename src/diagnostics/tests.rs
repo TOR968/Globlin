@@ -91,3 +91,36 @@ fn a_test_build_never_writes_into_the_users_data_directory() {
         self_update_log_path().display()
     );
 }
+
+#[test]
+fn the_same_note_is_written_to_the_log_only_once() {
+    let path = std::env::temp_dir().join("globlin-note-once.log");
+    std::fs::remove_file(&path).ok();
+
+    append_once(&path, "bun: no global package.json found\n");
+    append_once(&path, "bun: no global package.json found\n");
+    append_once(&path, "yarn: yarn 2+ removed global installs\n");
+
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "bun: no global package.json found\nyarn: yarn 2+ removed global installs\n"
+    );
+}
+
+#[test]
+fn a_command_report_carries_the_action_the_status_and_both_streams() {
+    let output = std::process::Output {
+        status: std::process::ExitStatus::default(),
+        stdout: b"some out".to_vec(),
+        stderr: b"some err".to_vec(),
+    };
+
+    let report = command_report("removing @scope/tool via npm", &output);
+
+    assert!(
+        report.starts_with("removing @scope/tool via npm exited with "),
+        "{report}"
+    );
+    assert!(report.contains("--- stdout ---\nsome out\n"), "{report}");
+    assert!(report.contains("--- stderr ---\nsome err\n"), "{report}");
+}

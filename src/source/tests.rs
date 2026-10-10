@@ -228,3 +228,21 @@ fn rows_from_a_command_that_exited_badly_are_still_kept() {
         ["a"]
     );
 }
+
+#[test]
+fn a_source_that_is_not_built_is_reported_by_name() {
+    let sources: Vec<Box<dyn PackageSource>> = Vec::new();
+
+    let error = source_for(&sources, "prettier", SourceKind::Pnpm)
+        .err()
+        .unwrap();
+
+    assert_eq!(error, "prettier: the pnpm source is not available\n");
+}
+
+#[test]
+fn a_read_only_source_runs_nothing() {
+    let error = run_change(None, "Git.Git", SourceKind::Winget).unwrap_err();
+
+    assert_eq!(error, "Git.Git: the winget source is read-only\n");
+}

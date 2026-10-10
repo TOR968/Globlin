@@ -104,6 +104,29 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
     })
 }
 
+pub(crate) fn source_for<'a>(
+    sources: &'a [Box<dyn PackageSource>],
+    name: &str,
+    kind: SourceKind,
+) -> std::result::Result<&'a dyn PackageSource, String> {
+    sources
+        .iter()
+        .find(|source| source.kind() == kind)
+        .map(AsRef::as_ref)
+        .ok_or_else(|| format!("{name}: the {} source is not available\n", kind.label()))
+}
+
+pub(crate) fn run_change(
+    command: Option<Command>,
+    name: &str,
+    kind: SourceKind,
+) -> std::result::Result<Output, String> {
+    let mut command =
+        command.ok_or_else(|| format!("{name}: the {} source is read-only\n", kind.label()))?;
+    process::output_within(&mut command, process::CHANGE_LIMIT)
+        .map_err(|error| format!("{name}: could not run {}: {error}\n", kind.label()))
+}
+
 pub(crate) fn run_listing(command: &mut Command) -> Result<Output> {
     Ok(process::output_within(command, process::LISTING_LIMIT)?)
 }

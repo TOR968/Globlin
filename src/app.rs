@@ -40,6 +40,7 @@ pub struct App {
     window: Option<Window>,
     failed: bool,
     skipped: Vec<String>,
+    recheck_after_retry: bool,
     frame: u32,
     next_check: Instant,
     step_started: Instant,
@@ -62,6 +63,7 @@ impl App {
             window: None,
             failed: false,
             skipped: Vec::new(),
+            recheck_after_retry: false,
             frame: 0,
             next_check,
             step_started: Instant::now(),
@@ -495,9 +497,15 @@ impl App {
             )
             .ok();
         } else if !outcome.updated.is_empty() {
-            platform::notify("Globlin — updated", &outcome.updated.join("\n")).ok();
+            let names: Vec<String> = outcome
+                .updated
+                .iter()
+                .map(|target| format!("{}{}", target.name, target.source.suffix()))
+                .collect();
+            platform::notify("Globlin — updated", &names.join("\n")).ok();
         }
         if !approved.is_empty() {
+            self.recheck_after_retry |= outcome.changed_packages();
             self.start_approvals(approved);
             return;
         }
@@ -519,7 +527,8 @@ impl App {
                 .ok();
             }
         }
-        if outcome.changed_packages() {
+        let carried = std::mem::take(&mut self.recheck_after_retry);
+        if outcome.changed_packages() || carried {
             self.start_check();
         } else {
             self.render();

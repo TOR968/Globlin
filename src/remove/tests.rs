@@ -10,22 +10,6 @@ fn target(name: &str) -> RemoveTarget {
 }
 
 #[test]
-fn the_failure_report_names_the_package_the_source_and_the_status() {
-    let report = describe_failure(
-        &target("@scope/tool"),
-        "exit code: 1",
-        b"some out",
-        b"some err",
-    );
-
-    assert!(report.contains("@scope/tool"), "{report}");
-    assert!(report.contains("npm"), "{report}");
-    assert!(report.contains("exit code: 1"), "{report}");
-    assert!(report.contains("some out"), "{report}");
-    assert!(report.contains("some err"), "{report}");
-}
-
-#[test]
 fn removing_without_any_enabled_source_fails_instead_of_reporting_success() {
     let config = Config {
         sources: Sources {
