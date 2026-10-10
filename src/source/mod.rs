@@ -100,11 +100,35 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
     })
 }
 
-pub(crate) fn find_on_path(file_name: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .map(|dir| dir.join(file_name))
+pub(crate) fn find_on_path(name: &str) -> Option<PathBuf> {
+    find_in(&std::env::var_os("PATH")?, name)
+}
+
+fn find_in(path: &std::ffi::OsStr, name: &str) -> Option<PathBuf> {
+    std::env::split_paths(path).find_map(|dir| executable_in(&dir, name))
+}
+
+#[cfg(windows)]
+fn executable_in(dir: &Path, name: &str) -> Option<PathBuf> {
+    const EXTENSIONS: [&str; 3] = ["exe", "cmd", "bat"];
+
+    let bare = dir.join(name);
+    if Path::new(name).extension().is_some() {
+        return bare.is_file().then_some(bare);
+    }
+    EXTENSIONS
+        .iter()
+        .map(|extension| bare.with_extension(extension))
         .find(|candidate| candidate.is_file())
+}
+
+#[cfg(not(windows))]
+fn executable_in(dir: &Path, name: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let candidate = dir.join(name);
+    let metadata = fs::metadata(&candidate).ok()?;
+    (metadata.is_file() && metadata.permissions().mode() & 0o111 != 0).then_some(candidate)
 }
 
 pub(crate) fn manifest_names(raw: &str) -> Result<Vec<String>> {

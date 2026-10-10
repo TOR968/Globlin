@@ -6,11 +6,7 @@ use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
-#[cfg(windows)]
-const EXECUTABLES: [&str; 2] = ["yarn.cmd", "yarn.exe"];
-
-#[cfg(not(windows))]
-const EXECUTABLES: [&str; 1] = ["yarn"];
+const EXECUTABLE: &str = "yarn";
 
 pub struct Yarn {
     command: PathBuf,
@@ -18,10 +14,7 @@ pub struct Yarn {
 
 impl Yarn {
     pub fn new() -> Result<Self> {
-        let command = EXECUTABLES
-            .into_iter()
-            .find_map(find_on_path)
-            .ok_or("yarn was not found on PATH")?;
+        let command = find_on_path(EXECUTABLE).ok_or("yarn was not found on PATH")?;
         Ok(Self { command })
     }
 

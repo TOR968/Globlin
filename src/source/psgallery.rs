@@ -5,11 +5,7 @@ use super::{find_on_path, hidden_command, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
-#[cfg(windows)]
-const SHELLS: [&str; 2] = ["pwsh.exe", "powershell.exe"];
-
-#[cfg(not(windows))]
-const SHELLS: [&str; 1] = ["pwsh"];
+const SHELLS: [&str; 2] = ["pwsh", "powershell"];
 
 const LISTING: &str =
     "Get-InstalledModule | ForEach-Object { $_.Name + ' ' + $_.Version.ToString() }";
