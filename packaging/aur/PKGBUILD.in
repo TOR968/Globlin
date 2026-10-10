@@ -1,0 +1,19 @@
+pkgname=globlin-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Tray app that watches your global packages and tells you when one falls behind (beta)"
+arch=('x86_64' 'aarch64')
+url="https://globlin.pages.dev"
+license=('GPL-3.0-or-later')
+depends=('gtk3' 'webkit2gtk-4.1' 'libsoup3' 'libayatana-appindicator' 'xdotool' 'cairo' 'gdk-pixbuf2' 'glib2' 'dbus' 'glibc' 'gcc-libs')
+provides=('globlin')
+conflicts=('globlin')
+source_x86_64=("globlin-${pkgver}-amd64.deb::https://github.com/TOR968/Globlin/releases/download/v${pkgver}/globlin-amd64.deb")
+source_aarch64=("globlin-${pkgver}-arm64.deb::https://github.com/TOR968/Globlin/releases/download/v${pkgver}/globlin-arm64.deb")
+sha256sums_x86_64=('@SHA_AMD64@')
+sha256sums_aarch64=('@SHA_ARM64@')
+
+package() {
+    bsdtar -xf data.tar.* -C "${pkgdir}"
+    chmod -R u=rwX,go=rX "${pkgdir}/usr"
+}

@@ -97,6 +97,10 @@ jobs:
           sudo apt-get remove -y globlin
           test ! -e /usr/bin/globlin
 
+      - name: Build the AUR package from the deb and install it on Arch
+        if: runner.os == 'Linux' && runner.arch == 'X64'
+        run: bash .github/aur-smoke.sh linux-out/globlin-amd64.deb
+
       - uses: actions/upload-artifact@v7
         if: runner.os == 'Linux'
         with:
