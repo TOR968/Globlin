@@ -3,9 +3,9 @@ notifies you when one falls behind, and updates it on a click. It never updates 
 
 ## Install
 
-Download `globlin.exe` and run it. There is no installer — it keeps its config in a
-`globlin.json` next to itself, so it can live on a USB stick or in any folder you like. Enable
-*Run at startup* from the tray menu if you want it to come back after a reboot.
+Download `globlin.exe` (or `globlin-arm64.exe` on Windows on ARM) and run it. There is no installer — it
+keeps its config in a `globlin.json` next to itself, so it can live on a USB stick or in any folder you
+like. Enable *Run at startup* from the tray menu if you want it to come back after a reboot.
 
 ## Verify the download
 
@@ -13,11 +13,11 @@ Download `globlin.exe` and run it. There is no installer — it keeps its config
 (Get-FileHash globlin.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-Compare the result with `globlin.exe.sha256`.
+Compare the result with `globlin.exe.sha256` (or the `globlin-arm64.exe` pair).
 
 ## Notes
 
-- Double-click the tray icon, or pick *Open Globlin*, for the window: every package in one list, filtered
+- Click the tray icon, or pick *Open Globlin* from its right-click menu, for the window: every package in one list, filtered
   by status or by source, with bulk updates.
 - npm, bun, pnpm and yarn are checked by default. winget and choco are switched off until you turn them
   on, and are reported rather than updated — both need an elevated process, and Globlin runs unelevated.

@@ -575,22 +575,25 @@ and a toolchain bump should not turn a green build red.
 
 ## CI and releases
 
-Three workflows, all Windows-only, because that is the only platform arm this project implements. That
-includes `release-plz.yml`, which is not obvious: computing a version number sounds platform-independent,
-but release-plz runs `cargo package` with verification to compare the packaged files against the last
+Three workflows. `release-plz.yml` stays Windows-only, which is not obvious: computing a version number
+sounds platform-independent, but release-plz runs `cargo package` with verification to compare the packaged files against the last
 release, and verification *compiles* the crate. `tao` and `tray-icon` sit in plain `[dependencies]`, so on
 a Linux runner they pull the GTK stack and the build dies on `The system library glib-2.0 ... was not
 found`, taking the whole job with it — `failed to determine next versions: run cargo package`. There is no
 config switch for this: `publish_no_verify` only reaches `cargo publish`, not the packaging done while
 determining versions.
 
-- **`ci.yml`** — every push to `master`/`main` and every pull request: fmt, clippy, test, then a release
-  build whose `.exe` is attached to the run as an artifact. The `#[ignore]`d tests never run here.
-- **`release.yml`** — a `v*` tag only. It first refuses to continue if the tag does not match the
-  `version` in `Cargo.toml`, so a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a
-  mislabelled build. Then it tests, builds, and creates the GitHub Release with the bare `.exe` and a
-  `.sha256` next to it. Between the build and the release it uploads the `.exe` to VirusTotal and appends
-  a **Virus scan** section to the notes — see below.
+- **`ci.yml`** — every push to `master`/`main` and every pull request: fmt once, then clippy and the
+  suite on five runners — Windows x64 and ARM64, macOS ARM64, Linux x64 and ARM64 (see
+  [Other platforms](#other-platforms)). The two Windows runners also build the release binary and attach
+  it to the run as an artifact (`globlin.exe-<sha>`, `globlin-arm64.exe-<sha>`). `windows-11-arm` ships
+  no Rust, so that job installs it with `rustup-init` first. The `#[ignore]`d tests never run here.
+- **`release.yml`** — a `v*` tag only. A `build` matrix on `windows-latest` and `windows-11-arm` tests,
+  builds, names the binary for its architecture (`globlin.exe`, `globlin-arm64.exe`), writes its
+  `.sha256`, and uploads it to VirusTotal for a **Virus scan** section named after the file — see below.
+  The `publish` job then refuses to continue if the tag does not match the `version` in `Cargo.toml`, so
+  a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, and creates one
+  GitHub Release with all four files.
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
@@ -618,7 +621,8 @@ Harmless, but it appears after every release and has to be closed by hand.
 
 ### The VirusTotal scan
 
-Every release uploads its `globlin.exe` to VirusTotal and links the report from the release notes, because
+Every release uploads both binaries, `globlin.exe` and `globlin-arm64.exe`, to VirusTotal and links each
+report from the release notes under a **Virus scan — <file>** heading, because
 an unsigned binary that writes an autostart key, spawns `npm` and rewrites its own `.exe` is flagged by
 machine-learning heuristics on a regular basis. Defender has quarantined the download as
 `Trojan:Win32/Wacatac.B!ml` and as `Program:Win32/Wacapew.C!ml`; the README explains this to users, and the
@@ -671,9 +675,37 @@ requests"** must also be enabled, or the `release-pr` job cannot open the pull r
 
 ## Other platforms
 
-Windows only in practice. `src/platform/unix.rs` returns an error from every call it cannot honour, and
-`src/window/stub.rs` does the same for the window; the rest of the code, and every dependency, already
-works on all three OSes — `tao` was chosen over `winit` precisely because `tray-icon` needs a **GTK**
+Windows is the only platform that works, but every platform compiles and tests: `ci.yml` runs clippy and
+the suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams a port fills in:
+
+- `src/platform/` — `windows.rs` is real; `unix.rs` errors from every call it cannot honour. A port
+  splits it into `macos.rs` and `linux.rs`.
+- `src/window/shell.rs` vs `src/window/stub.rs` — the stub's `Window` is an uninhabited enum, so
+  `Window::new` is the only thing it can do (fail).
+- `#[cfg_attr(not(windows), allow(dead_code))]` on `icon::{ico, image, write_app_icon}` and
+  `window::{TITLE, WIDTH, HEIGHT, UI, payload, script, tick_script}` — items only the Windows arm
+  consumes today. Each attribute is deleted by the port that starts using the item; when none are left,
+  the port is feature-complete.
+- `source::find_on_path` takes a bare name. On Windows it tries `exe`, `cmd`, `bat` in that order in each
+  `PATH` directory, so the first directory holding any of them wins, as in a shell — not `PATHEXT`,
+  which can list `.JS` or `.PS1` files `Command::new` cannot spawn. On Unix it requires the execute bit.
+  Only npm's `default_location` (`%APPDATA%
+pm
+pm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
+  still `cfg`-split.
+- `SourceKind::windows_only` — scoop, winget and choco; `source::enabled` skips them elsewhere. The
+  window's sidebar does not filter yet; the macOS port adds that when the window exists there.
+- `selfupdate::asset_for` — `x86_64` → `globlin.exe`, `aarch64` → `globlin-arm64.exe`; any other
+  architecture has no build, and the lookup logs why instead of offering one. `globlin.exe` stays the x64
+  name forever: every released version looks for it by that exact name, and an x64 build running under
+  emulation on ARM keeps updating to x64 — moving to the native build is a manual download.
+- `build.rs` — embeds the Windows resource only when the target is Windows.
+
+Two test quirks off Windows: the five `tray::menu` tests that build a real menu are ignored on macOS,
+because muda creates menus only on the main thread and libtest runs tests on worker threads; and the
+`install` tests are Windows-only, because their fixtures are Windows paths.
+
+The rest of the code, and every dependency, already works on all three OSes — `tao` was chosen over `winit` precisely because `tray-icon` needs a **GTK**
 event loop on Linux, which `tao` provides, and `wry` is `tao`'s sibling. Finishing macOS
 or Linux means writing that one file: `notify-rust` for notifications (not used on Windows because it
 offers no way to set the AppUserModelID, which would leave every toast attributed to PowerShell), a
@@ -682,7 +714,8 @@ instead of a named mutex.
 
 Two costs to know about first: on macOS, notifications require a signed `.app` bundle with an
 `Info.plist`, so "portable, no install" does not survive the port. On Linux, `tray-icon` needs
-`libgtk-3-dev`, `libxdo-dev` and `libayatana-appindicator3-dev` at build time, and GNOME shows no tray at
+`libgtk-3-dev`, `libxdo-dev` and `libayatana-appindicator3-dev` at build time (the Linux CI jobs install
+exactly those), and GNOME shows no tray at
 all without the AppIndicator extension.
 
 `wry` is declared under `[target.'cfg(windows)'.dependencies]` for the same reason: its Linux backend

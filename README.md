@@ -29,7 +29,8 @@ drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 1
 
 ## Install
 
-1. Download `globlin.exe` from the [latest release](https://github.com/TOR968/Globlin/releases/latest).
+1. Download `globlin.exe` from the [latest release](https://github.com/TOR968/Globlin/releases/latest)
+   — or `globlin-arm64.exe` on a Windows on ARM machine (Snapdragon and other ARM64 laptops).
 2. Run it. That's it — no installer, nothing to unzip.
 
 It keeps its config next to itself, so it's portable: move the `.exe` anywhere and it keeps working.
