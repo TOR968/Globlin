@@ -1,5 +1,7 @@
 use super::*;
 
+const LINUX_ICON_SIZES: [u32; 6] = [32, 48, 64, 128, 256, 512];
+
 #[test]
 fn busy_outranks_every_other_state() {
     assert_eq!(state_for(true, true, 5), IconState::Busy);
@@ -69,6 +71,26 @@ fn dump_every_state_for_visual_review() {
     }
 
     println!("icons written to {}", directory.display());
+}
+
+#[test]
+#[ignore = "writes the hicolor icons package-linux.sh puts in the deb and rpm: GLOBLIN_ICON_DIR=<dir> cargo test -- --ignored --exact icon::tests::dump_linux_icons"]
+fn dump_linux_icons() {
+    let root = std::path::PathBuf::from(
+        std::env::var_os("GLOBLIN_ICON_DIR").expect("GLOBLIN_ICON_DIR names the output directory"),
+    );
+
+    for size in LINUX_ICON_SIZES {
+        let directory = root.join(format!("{size}x{size}")).join("apps");
+        fs::create_dir_all(&directory).unwrap();
+        let pixels = render::rgba(IconState::Idle, 0, 0.0, size);
+        fs::write(
+            directory.join("globlin.png"),
+            png::encode(size, size, &pixels),
+        )
+        .unwrap();
+    }
+    println!("hicolor icons written to {}", root.display());
 }
 
 #[test]
