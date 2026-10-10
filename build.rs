@@ -6,16 +6,19 @@ mod render;
 #[path = "src/icon/ico.rs"]
 mod ico;
 
-use std::path::PathBuf;
-
 fn main() {
     println!("cargo:rerun-if-changed=src/icon/render.rs");
     println!("cargo:rerun-if-changed=src/icon/ico.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
-        return;
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        embed_windows_resource();
     }
+}
+
+#[cfg(windows)]
+fn embed_windows_resource() {
+    use std::path::PathBuf;
 
     let images: Vec<(u32, Vec<u8>)> = ico::SIZES
         .iter()
@@ -37,3 +40,6 @@ fn main() {
         .compile()
         .expect("the resource should compile");
 }
+
+#[cfg(not(windows))]
+fn embed_windows_resource() {}
