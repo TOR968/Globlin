@@ -43,7 +43,7 @@ version to compare against come from, and what does its absence mean?*
 | `PyPi` | pipx | `registry::pypi_latest`, the RSS release feed | `registry::numeric_is_newer` |
 | `NuGet` | dotnet | `registry::nuget_latest`, the flat-container `index.json` | `registry::numeric_is_newer` |
 | `PsGallery` | psgallery | `registry::psgallery_latest`, the package endpoint's redirect | `registry::numeric_is_newer` |
-| `SelfResolved` | uv, scoop, go, gem | the source fills `Installed.available` | string equality |
+| `SelfResolved` | uv, scoop, go, gem, brew | the source fills `Installed.available` | string equality |
 | `SelfReported` | winget, choco | the source fills `Installed.available` | presence |
 
 The first five are remote: the source reports only what is installed, and `check.rs` asks the registry
@@ -453,6 +453,22 @@ settings in `release-plz.toml` do the work: `release_commits = "^(feat|fix)"` me
 `(site)`, so the landing page never appears in a changelog that documents the application. Both match on
 the scope, which is why it is not optional.
 
+## How a launch decides whether to show the window
+
+`main::launch_kind` sorts every start into three kinds. **Opened** — no flag: the user started it from
+the Start menu, a pinned icon or the exe, so the window opens once the `App` exists. **Background** —
+`--background`, which every autostart entry carries (the `Run` value `set_autostart` writes, the
+installer's autostart task, the macOS LaunchAgent): tray only. **Replaced** — `--replaced`, self-update's
+relaunch: tray only, plus the "updated" notification; it wins over `--background`.
+
+An Opened start that loses the single-instance race does not just exit, which is what made a pinned icon
+look dead while Globlin sat in the tray: on Windows it sets the auto-reset event `Local\globlin-show`,
+which the running instance waits on in a `show-request` thread and turns into `Message::ShowWindow`. On
+macOS Launch Services never starts a second copy of a running `.app`; it sends a reopen, which tao
+delivers as `Event::Reopen` and `main.rs` maps to the same message. Older entries without the flag are
+upgraded on the next start: `refresh_autostart` rewrites the entry whenever autostart is on, so only the
+first sign-in after updating opens the window.
+
 ## Self-update mechanics
 
 The full mechanics behind the brief version in the [README](../README.md#keeping-itself-updated).
@@ -463,8 +479,9 @@ On the same schedule as the package check, the app makes one extra request per c
 so a missing npm, a `PATH` without bun, or an unreachable registry cannot stop the app from finding — and
 installing — its own update. That endpoint always resolves to the newest *published* release; GitHub
 excludes pre-releases and drafts from it, so neither can reach a user by accident. A release is offered
-only when its tag parses as semver strictly newer than the running build, and both `globlin.exe` and
-`globlin.exe.sha256` are attached — a release missing either asset is skipped rather than half-offered.
+only when its tag parses as semver strictly newer than the running build, and both the binary for the
+running architecture (`globlin.exe` on x64, `globlin-arm64.exe` on ARM64 — `selfupdate::asset_for`) and
+its `.sha256` are attached — a release missing either asset is skipped rather than half-offered.
 
 Applying an update downloads both assets, hashes the `.exe` with SHA-256, and compares that against the
 published `.sha256`; a mismatch discards the download and reports a failure, and the running binary is
@@ -537,6 +554,44 @@ cases are alternatives, not independent switches. `SelfUpdate::Winget` has no fi
 Globlin manages itself — so the auto-update checkbox cannot be rendered in a state where ticking it would
 do nothing.
 
+### When the installer owns the directory
+
+`installer/globlin.iss` is an Inno Setup 6 script for a **per-user** install: `PrivilegesRequired=lowest`,
+into `%LOCALAPPDATA%\Programs\Globlin`, with a Start menu entry, an entry in *Settings → Apps*, and two
+tasks — a desktop shortcut (off by default) and *Run Globlin when I sign in* (on). The release builds it
+twice, `globlin-setup-x64.exe` (`ArchitecturesAllowed=x64compatible`) and `globlin-setup-arm64.exe`
+(`arm64`), from the same two binaries the portable downloads are, through `.github/build-installer.ps1`.
+MSI was considered and declined: it is per-machine by habit, and an MSI repair would put back an exe that
+self-update had replaced.
+
+The fixed `AppId` `{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}` is load-bearing twice. Re-running a newer setup
+finds the existing install through it and upgrades in place. And Inno records the install under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}_is1`,
+whose `InstallLocation` is how Globlin recognises an installed copy: `install::setup_managed()` is true
+when `current_exe`'s directory equals it, compared component-wise and case-insensitively by
+`install::is_setup_path`, so the trailing backslash Inno writes does not matter.
+
+Unlike winget, the installer does not take self-update away — the directory is the user's and writable,
+and a second installer cannot race the swap. Two things change for an installed copy instead:
+
+- **Config lives in `%LOCALAPPDATA%\globlin\`**, as for winget (`config::exe_dir` returns `None`). The
+  program directory holds only `globlin.exe` and Inno's uninstaller, and uninstalling leaves settings and
+  logs behind for a reinstall, which is the convention.
+- **`DisplayVersion` follows self-update.** After a successful swap, `selfupdate::apply` writes the new
+  version into the uninstall key, so *Settings → Apps* does not keep showing the version that was
+  installed. A failed write lands in `self-update.log`; it never fails the update.
+
+The autostart task writes the same `HKCU\…\Run\globlin` = `"<exe>"` the tray toggle writes, so the two
+read one value. A second `[Registry]` entry with `ValueType: none; Flags: uninsdeletevalue` deletes it on
+uninstall whoever created it. Setup and uninstall both `taskkill /F /IM globlin.exe` first, because the
+exe is locked while it runs; the single-instance mutex means there is at most one to stop.
+
+`ci.yml` proves the round trip on every push: the Windows x64 job compiles the x64 setup, installs it
+silently with the autostart task, checks the exe, `InstallLocation`, `DisplayVersion` and the Run value,
+uninstalls silently, and checks that the exe, the Apps entry and the Run value are gone
+(`.github/installer-smoke.ps1`). The uninstaller re-launches itself from `%TEMP%` and returns at once,
+which is why the script polls for the removal instead of trusting `-Wait`.
+
 ## Tests
 
 ```
@@ -587,13 +642,21 @@ determining versions.
   suite on five runners — Windows x64 and ARM64, macOS ARM64, Linux x64 and ARM64 (see
   [Other platforms](#other-platforms)). The two Windows runners also build the release binary and attach
   it to the run as an artifact (`globlin.exe-<sha>`, `globlin-arm64.exe-<sha>`). `windows-11-arm` ships
-  no Rust, so that job installs it with `rustup-init` first. The `#[ignore]`d tests never run here.
+  no Rust, so that job installs it with `rustup-init` first. The x64 job also builds the installer and
+  runs it through a silent install and uninstall (see
+  [When the installer owns the directory](#when-the-installer-owns-the-directory)). The macOS job bundles
+  `Globlin.app`, verifies its signature and attaches the zip (see [macOS](#macos)). The `#[ignore]`d
+  tests never run here.
 - **`release.yml`** — a `v*` tag only. A `build` matrix on `windows-latest` and `windows-11-arm` tests,
   builds, names the binary for its architecture (`globlin.exe`, `globlin-arm64.exe`), writes its
   `.sha256`, and uploads it to VirusTotal for a **Virus scan** section named after the file — see below.
   The `publish` job then refuses to continue if the tag does not match the `version` in `Cargo.toml`, so
-  a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, and creates one
-  GitHub Release with all four files.
+  a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
+  `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
+  on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), checksums and scans
+  them too, and creates one GitHub Release with all twelve files — the eight Windows ones plus the
+  `build-macos` job's `Globlin-macos-arm64.zip` and bare `globlin-macos-arm64`, each with its `.sha256`
+  (no VirusTotal scan for those).
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
@@ -675,48 +738,70 @@ requests"** must also be enabled, or the `release-pr` job cannot open the pull r
 
 ## Other platforms
 
-Windows is the only platform that works, but every platform compiles and tests: `ci.yml` runs clippy and
-the suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams a port fills in:
+Windows and macOS work; Linux compiles and tests but its platform arm is still the erroring stub. `ci.yml`
+runs clippy and the suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
 
-- `src/platform/` — `windows.rs` is real; `unix.rs` errors from every call it cannot honour. A port
-  splits it into `macos.rs` and `linux.rs`.
-- `src/window/shell.rs` vs `src/window/stub.rs` — the stub's `Window` is an uninhabited enum, so
-  `Window::new` is the only thing it can do (fail).
-- `#[cfg_attr(not(windows), allow(dead_code))]` on `icon::{ico, image, write_app_icon}` and
-  `window::{TITLE, WIDTH, HEIGHT, UI, payload, script, tick_script}` — items only the Windows arm
-  consumes today. Each attribute is deleted by the port that starts using the item; when none are left,
-  the port is feature-complete.
+- `src/platform/` — `windows.rs` and `macos.rs` are real; `linux.rs` errors from every call it cannot
+  honour. `platform/mod.rs` holds what both real arms share: the notification-click hook.
+- `src/window/shell.rs` serves Windows (WebView2) and macOS (WKWebView); `src/window/stub.rs` is Linux's,
+  an uninhabited enum whose only move is to fail in `Window::new`.
+- `#[cfg_attr(not(...), allow(dead_code))]` marks items a platform does not consume yet:
+  `icon::{ico, write_app_icon}` (Windows only — the `.ico` and the toast artwork) and the window helpers
+  (Windows and macOS). Each attribute narrows as a port starts using the item.
 - `source::find_on_path` takes a bare name. On Windows it tries `exe`, `cmd`, `bat` in that order in each
   `PATH` directory, so the first directory holding any of them wins, as in a shell — not `PATHEXT`,
   which can list `.JS` or `.PS1` files `Command::new` cannot spawn. On Unix it requires the execute bit.
   Only npm's `default_location` (`%APPDATA%\npm\npm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
   still `cfg`-split.
 - `SourceKind::windows_only` — scoop, winget and choco; `source::enabled` skips them elsewhere. The
-  window's sidebar does not filter yet; the macOS port adds that when the window exists there.
-- `selfupdate::asset_for` — `x86_64` → `globlin.exe`, `aarch64` → `globlin-arm64.exe`; any other
-  architecture has no build, and the lookup logs why instead of offering one. `globlin.exe` stays the x64
-  name forever: every released version looks for it by that exact name, and an x64 build running under
-  emulation on ARM keeps updating to x64 — moving to the native build is a manual download.
+  window's sidebar still lists them on macOS, switched off.
+- `selfupdate::asset_for(os, arch)` — `windows/x86_64` → `globlin.exe`, `windows/aarch64` →
+  `globlin-arm64.exe`, `macos/aarch64` → `globlin-macos-arm64`; anything else has no build, and the lookup
+  logs why instead of offering one. `globlin.exe` stays the x64 name forever: every released version
+  looks for it by that exact name, and an x64 build running under emulation on ARM keeps updating to x64.
 - `build.rs` — embeds the Windows resource only when the target is Windows.
 
-Two test quirks off Windows: the five `tray::menu` tests that build a real menu are ignored on macOS,
-because muda creates menus only on the main thread and libtest runs tests on worker threads; and the
-`install` tests are Windows-only, because their fixtures are Windows paths.
+The `App` — and with it the tray — is created on `StartCause::Init`, on every OS, because macOS refuses
+a status item before its event loop runs. Two test quirks off Windows: the five `tray::menu` tests that
+build a real menu are ignored on macOS, because muda creates menus only on the main thread and libtest
+runs tests on worker threads; and the `install` tests are Windows-only, because their fixtures are
+Windows paths.
 
-The rest of the code, and every dependency, already works on all three OSes — `tao` was chosen over `winit` precisely because `tray-icon` needs a **GTK**
-event loop on Linux, which `tao` provides, and `wry` is `tao`'s sibling. Finishing macOS
-or Linux means writing that one file: `notify-rust` for notifications (not used on Windows because it
-offers no way to set the AppUserModelID, which would leave every toast attributed to PowerShell), a
-`~/Library/LaunchAgents/*.plist` or `~/.config/autostart/*.desktop` entry for autostart, and a lock file
-instead of a named mutex.
+### macOS
 
-Two costs to know about first: on macOS, notifications require a signed `.app` bundle with an
-`Info.plist`, so "portable, no install" does not survive the port. On Linux, `tray-icon` needs
-`libgtk-3-dev`, `libxdo-dev` and `libayatana-appindicator3-dev` at build time (the Linux CI jobs install
-exactly those), and GNOME shows no tray at
-all without the AppIndicator extension.
+Experimental, Apple Silicon only, signed ad hoc (no Apple Developer ID, so no notarisation — the README
+walks users through *Open Anyway*).
 
-`wry` is declared under `[target.'cfg(windows)'.dependencies]` for the same reason: its Linux backend
-pulls `webkit2gtk` and `soup3`, which a Windows-only build has no business compiling. Porting the window
-means widening that declaration and replacing `window/stub.rs` with the shell — the snapshot, the page
-and the IPC vocabulary are already platform-independent.
+- **Bundle.** `.github/bundle-macos.sh` builds `Globlin.app`: an `Info.plist` with the `Cargo.toml`
+  version, `LSUIElement` (no Dock icon, no app menu) and bundle id `dev.globlin.app`; an `.icns` that
+  `iconutil` makes from the PNGs the ignored `icon::tests::dump_macos_iconset` renders (so the icon is
+  still code); `codesign --force --sign -`; `ditto` into `Globlin-macos-arm64.zip`. `main.rs` also sets
+  `ActivationPolicy::Accessory`, because self-update relaunches the bare binary rather than going
+  through Launch Services. CI attaches the zip to every run, for testing a branch on a real Mac.
+- **PATH.** A GUI app on macOS inherits launchd's minimal `PATH`, without `/opt/homebrew/bin`,
+  `~/.cargo/bin` or nvm. `platform::prepare_environment` runs first in `main`: it asks `$SHELL -i -l -c`
+  to print `PATH` between markers (5 s timeout; the markers survive a noisy rc file) and puts those
+  entries in front of the inherited ones, deduplicated.
+- **Single instance** is `File::try_lock` on `globlin.lock` in the data directory; the handle lives in a
+  `OnceLock` for the life of the process.
+- **Notifications** go through `mac-notification-sys` under bundle id `dev.globlin.app`, each on its own
+  thread with `wait_for_click`; a click fires the shared hook that opens the window.
+- **Autostart** is a LaunchAgent, `~/Library/LaunchAgents/dev.globlin.app.plist`, whose presence is the
+  setting. `SMAppService` would be the modern route, but it needs a properly signed app.
+- **Config** always lives in `~/Library/Application Support/globlin/` — never next to the exe, which is
+  inside the bundle.
+- **Self-update** downloads `globlin-macos-arm64`, the bare binary from the same build as the zip, and
+  swaps `Contents/MacOS/globlin` like the Windows exe, setting the execute bit on the staged file because
+  release assets do not carry it. Replacing the main executable breaks the bundle's ad-hoc seal, but the
+  app was approved on first launch and the download carries no quarantine flag, so Gatekeeper does not
+  look again; the binary keeps its own linker signature, which is what the kernel checks.
+
+### Linux
+
+On Linux, `tray-icon` needs `libgtk-3-dev`, `libxdo-dev` and `libayatana-appindicator3-dev` at build time
+(the Linux CI jobs install exactly those), and GNOME shows no tray at all without the AppIndicator
+extension. `wry`'s Linux backend pulls `webkit2gtk` and `soup3`, which is why `wry` is declared only for
+Windows and macOS; porting the window means widening that declaration and replacing `window/stub.rs` with
+the shell. Packaging is decided: deb and rpm first (system dependencies declared, self-update off as for
+winget), an AppImage later, no Flatpak — its sandbox would have to be opened to the host for every
+command Globlin runs.

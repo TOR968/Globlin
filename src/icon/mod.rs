@@ -36,7 +36,7 @@ pub fn tray(state: IconState, frame: u32, level: f32) -> Result<Icon> {
     .map_err(|error| error.to_string())?)
 }
 
-#[cfg_attr(not(windows), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub fn image(state: IconState, size: u32) -> Vec<u8> {
     render::rgba(state, 0, 0.0, size)
 }

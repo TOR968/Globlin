@@ -1,11 +1,20 @@
+**Beta.** Globlin is still in beta on every platform — the installer, the ARM64 builds and the macOS
+build are new. Please [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
+
 A portable Windows tray app that watches your global packages — npm, bun, pnpm, yarn, winget and choco —
 notifies you when one falls behind, and updates it on a click. It never updates anything on its own.
 
 ## Install
 
-Download `globlin.exe` (or `globlin-arm64.exe` on Windows on ARM) and run it. There is no installer — it
+Either run the installer — `globlin-setup-x64.exe`, or `globlin-setup-arm64.exe` on Windows on ARM —
+which installs for your user without an administrator prompt and adds Start menu and *Settings → Apps*
+entries; or download the portable `globlin.exe` (or `globlin-arm64.exe`) and run it. The portable one
 keeps its config in a `globlin.json` next to itself, so it can live on a USB stick or in any folder you
 like. Enable *Run at startup* from the tray menu if you want it to come back after a reboot.
+
+**macOS (experimental, Apple Silicon):** unzip `Globlin-macos-arm64.zip`, move Globlin.app to
+Applications, and allow it once under *System Settings → Privacy & Security → Open Anyway* — it is signed
+ad hoc, not notarised. `globlin-macos-arm64` is the bare binary the Mac app updates itself from.
 
 ## Verify the download
 
@@ -13,7 +22,7 @@ like. Enable *Run at startup* from the tray menu if you want it to come back aft
 (Get-FileHash globlin.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-Compare the result with `globlin.exe.sha256` (or the `globlin-arm64.exe` pair).
+Compare the result with the `.sha256` published beside the file you downloaded.
 
 ## Notes
 

@@ -90,7 +90,7 @@ impl App {
             Message::Menu(event) => return self.on_action(Action::from_id(&event.id), target),
             Message::Ipc(body) => return self.on_action(Action::from_key(&body), target),
             Message::Tray(event) => self.on_tray(&event, target),
-            Message::NotificationClicked => self.open_window(target),
+            Message::ShowWindow => self.open_window(target),
             Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome, target),

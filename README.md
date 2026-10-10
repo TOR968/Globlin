@@ -4,13 +4,17 @@
   # Globlin
 
   A tray icon that watches your global packages — npm, bun, pnpm, yarn, pipx, uv, scoop, cargo, go,
-  dotnet, PowerShell Gallery, gem, winget, choco — and tells you when one falls behind.
+  dotnet, PowerShell Gallery, gem, Homebrew, winget, choco — and tells you when one falls behind.
 
   [![CI](https://github.com/TOR968/Globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/Globlin/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/TOR968/Globlin)](https://github.com/TOR968/Globlin/releases/latest)
 
   [**globlin.pages.dev**](https://globlin.pages.dev)
 </div>
+
+> **Beta.** Globlin is still in beta on every platform: the Windows builds are in daily use, the installer
+> and the ARM64 builds are new, and the macOS build is experimental. Please
+> [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
 **[Install](#install)** · **[Using it](#using-it)** · **[Sources](#sources)** ·
 **[Icon states](#icon-states)** · **[Keeping itself updated](#keeping-itself-updated)** ·
@@ -29,12 +33,28 @@ drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 1
 
 ## Install
 
-1. Download `globlin.exe` from the [latest release](https://github.com/TOR968/Globlin/releases/latest)
-   — or `globlin-arm64.exe` on a Windows on ARM machine (Snapdragon and other ARM64 laptops).
-2. Run it. That's it — no installer, nothing to unzip.
+Every [release](https://github.com/TOR968/Globlin/releases/latest) comes two ways, each for x64 and for
+Windows on ARM (Snapdragon and other ARM64 laptops):
 
-It keeps its config next to itself, so it's portable: move the `.exe` anywhere and it keeps working.
-Right-click the tray icon and tick **Run at startup** if you want it running every time you log in.
+- **Installer** — `globlin-setup-x64.exe` or `globlin-setup-arm64.exe`. Installs for your user only, no
+  administrator prompt, into `%LOCALAPPDATA%\Programs\Globlin`; adds a Start menu entry, an entry in
+  *Settings → Apps* to uninstall it from, and optionally a desktop shortcut and *Run when I sign in*.
+- **Portable** — `globlin.exe` or `globlin-arm64.exe`. Run it; nothing to install, nothing to unzip. It
+  keeps its config next to itself, so you can move the `.exe` anywhere and it keeps working.
+
+Both update themselves the same way. Right-click the tray icon and tick **Run at startup** if you want it
+running every time you log in.
+
+### macOS (experimental)
+
+Apple Silicon only. Download `Globlin-macos-arm64.zip`, unzip it, and move **Globlin.app** to
+*Applications*. The app is signed ad hoc, not notarised, so the first launch is blocked: open
+*System Settings → Privacy & Security* and choose **Open Anyway**, or run
+`xattr -dr com.apple.quarantine /Applications/Globlin.app` once. After that it lives in the menu bar — no
+Dock icon — and updates itself like the Windows builds. Its settings and logs are in
+`~/Library/Application Support/globlin/`; *Run at startup* writes
+`~/Library/LaunchAgents/dev.globlin.app.plist`. It is new and tested on one Mac so far — please
+[open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
 <details>
 <summary><strong>If Windows Defender flags the download</strong> —
@@ -80,7 +100,10 @@ model's line. If yours objects:
 
 ## Using it
 
-Click the tray icon or one of its notifications, or pick **Open Globlin** from the right-click menu:
+Starting Globlin yourself — from the Start menu, a pinned icon or the `.exe` — opens the window, or
+brings it forward when Globlin is already running; started by *Run at startup* it stays quietly in the
+tray. After that, click the tray icon or one of its notifications, or pick **Open Globlin** from the
+right-click menu:
 
 ```
 ┌─ Globlin ─────────────────────────────────────────────────────────────────┐
@@ -169,6 +192,7 @@ not actionable.
 | **dotnet** | `dotnet tool list --global` | the NuGet flat-container index | `dotnet tool update --global <name>` |
 | **psgallery** | `Get-InstalledModule` | the PowerShell Gallery's package redirect | `Update-Module -Scope CurrentUser` |
 | **gem** | `gem list --local` | `gem outdated` | `gem update <name>` |
+| **brew** | `brew info --json=v2 --installed` (formulae and casks) | the same reply — brew's `outdated` flag | `brew upgrade <name>` |
 | **winget** | `winget list` | winget's own `Available` column | read-only |
 | **choco** | `choco list -r` + `choco outdated -r` | choco's own report | read-only |
 
@@ -190,6 +214,10 @@ numbers (`1.0.0rc1`, `1.0.0.post1`) is reported as not checked rather than guess
 **scoop is compared against your local buckets.** Globlin reads the same bucket manifests `scoop status`
 reads and never runs `scoop update` for you, so an app is only as current as your last bucket refresh.
 Apps installed with `scoop install -g` live under `C:\ProgramData\scoop` and are not listed.
+
+**brew is compared against your local taps**, like scoop against its buckets: Globlin never runs
+`brew update`, so a formula is only as current as your last `brew update` (which brew runs on its own
+before most installs). Both formulae and casks are listed.
 
 **cargo and go build from source.** Their **Update** runs a real compile, which can take minutes; the row
 keeps spinning until it finishes. Go has no uninstall command, so go rows offer no **Uninstall** —
@@ -291,7 +319,10 @@ the most recent *failed* package update, reachable from *Open last log*), **`sel
 error from the most recent *failed* self-update lookup, kept separate so an offline run doesn't overwrite
 the log *Open last log* reads), and **`app.ico`** (the notification artwork).
 
-To remove Globlin: quit from the tray menu, delete the `.exe` and its `.json`, then delete
+To remove an installed Globlin, uninstall it from *Settings → Apps*; that also removes the *Run at
+startup* entry, and leaves `%LOCALAPPDATA%\globlin\` (settings and logs) for a reinstall — delete it if
+you are done for good. To remove the portable one: quit from the tray menu, delete the `.exe` and its
+`.json`, then delete
 `%LOCALAPPDATA%\globlin\`. If a self-update was interrupted, `globlin.exe.old` may still be sitting next
 to the `.exe` — safe to delete too. Two optional `HKEY_CURRENT_USER` cleanups:
 
