@@ -20,17 +20,17 @@ pub fn prepare_environment() {
 }
 
 pub fn claim_single_instance() -> bool {
-    super::unix::claim_instance_lock(&data_dir())
+    super::unix::claim_instance_lock(&super::data_dir())
 }
 
 pub fn signal_running_instance() {
-    if let Ok(mut stream) = UnixStream::connect(data_dir().join(SHOW_SOCKET)) {
+    if let Ok(mut stream) = UnixStream::connect(super::data_dir().join(SHOW_SOCKET)) {
         stream.write_all(b"show").ok();
     }
 }
 
 pub fn on_show_request(handler: impl Fn() + Send + 'static) {
-    let path = data_dir().join(SHOW_SOCKET);
+    let path = super::data_dir().join(SHOW_SOCKET);
     fs::remove_file(&path).ok();
     let Ok(listener) = UnixListener::bind(&path) else {
         return;
@@ -49,14 +49,12 @@ pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
 
-pub fn data_dir() -> PathBuf {
-    let base = std::env::var_os("XDG_DATA_HOME")
+pub(super) fn user_data_dir() -> PathBuf {
+    std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .or_else(|| home_dir().map(|home| home.join(".local").join("share")))
-        .unwrap_or_else(std::env::temp_dir);
-    let dir = base.join("globlin");
-    fs::create_dir_all(&dir).ok();
-    dir
+        .unwrap_or_else(std::env::temp_dir)
+        .join("globlin")
 }
 
 pub fn notify(title: &str, body: &str) -> Result<()> {
