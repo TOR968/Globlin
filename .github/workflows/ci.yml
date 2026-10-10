@@ -14,23 +14,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build and test on Windows
-    runs-on: windows-latest
+  format:
+    name: Check formatting
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+  build:
+    name: Build and test on ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-latest
+            asset: globlin.exe
+          - name: Windows ARM64
+            runner: windows-11-arm
+            asset: globlin-arm64.exe
+          - name: macOS ARM64
+            runner: macos-latest
+          - name: Linux x64
+            runner: ubuntu-latest
+          - name: Linux ARM64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the native libraries the tray links against
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libxdo-dev libayatana-appindicator3-dev
+
+      - name: Install the Rust toolchain
+        if: runner.os == 'Windows' && runner.arch == 'ARM64'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://win.rustup.rs/aarch64 -OutFile rustup-init.exe
+          ./rustup-init.exe -y --profile minimal
+          "$env:USERPROFILE\.cargo\bin" | Add-Content $env:GITHUB_PATH
 
       - name: Report the toolchain
         run: |
           rustc --version
           cargo --version
 
-      - name: Install the lint components
-        run: rustup component add clippy rustfmt
-
-      - name: Check formatting
-        run: cargo fmt --check
+      - name: Install clippy
+        run: rustup component add clippy
 
       - name: Lint
         run: cargo clippy --all-targets -- -D warnings
@@ -39,16 +79,19 @@ jobs:
         run: cargo test
 
       - name: Build the release binary
+        if: matrix.asset
         run: cargo build --release
 
       - name: Report the binary size
+        if: matrix.asset
         shell: pwsh
         run: |
           $exe = Get-Item target/release/globlin.exe
           "{0:N0} bytes ({1:N2} MB)" -f $exe.Length, ($exe.Length / 1MB)
 
       - uses: actions/upload-artifact@v7
+        if: matrix.asset
         with:
-          name: globlin-${{ github.sha }}
+          name: ${{ matrix.asset }}-${{ github.sha }}
           path: target/release/globlin.exe
           if-no-files-found: error
