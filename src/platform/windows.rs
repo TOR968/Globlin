@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use tauri_winrt_notification::{Duration as ToastDuration, Toast};
-use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
-use winreg::RegKey;
+use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_SET_VALUE};
+use winreg::{RegKey, HKEY};
 
 use crate::icon;
 use crate::Result;
@@ -12,11 +12,98 @@ const APP_USER_MODEL_ID: &str = "Globlin.Tray";
 const DISPLAY_NAME: &str = "Globlin";
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "globlin";
+const USER_ENVIRONMENT: &str = "Environment";
+const SYSTEM_ENVIRONMENT: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
+const VOLATILE_ENVIRONMENT: &str = "Volatile Environment";
+const PROFILE_VARIABLES: [&str; 5] = [
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "HOMEDRIVE",
+    "HOMEPATH",
+];
 const INSTANCE_MUTEX: &str = r"Local\globlin";
 const SHOW_EVENT: &str = r"Local\globlin-show";
 const SETUP_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}_is1";
 
-pub const fn prepare_environment() {}
+pub fn prepare_environment() {
+    restore_profile_variables();
+    let registered: Vec<String> = [
+        registry_value(HKEY_LOCAL_MACHINE, SYSTEM_ENVIRONMENT, "Path"),
+        registry_value(HKEY_CURRENT_USER, USER_ENVIRONMENT, "Path"),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|raw| expand_variables(&raw, |name| std::env::var(name).ok()))
+    .collect();
+    let current = std::env::var("PATH").unwrap_or_default();
+    std::env::set_var(
+        "PATH",
+        append_missing_paths(&current, &registered.join(";")),
+    );
+}
+
+fn restore_profile_variables() {
+    let Ok(key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(VOLATILE_ENVIRONMENT) else {
+        return;
+    };
+    for name in PROFILE_VARIABLES {
+        if std::env::var_os(name).is_some() {
+            continue;
+        }
+        if let Ok(value) = key.get_value::<String, _>(name) {
+            std::env::set_var(name, value);
+        }
+    }
+}
+
+fn registry_value(root: HKEY, path: &str, name: &str) -> Option<String> {
+    RegKey::predef(root)
+        .open_subkey(path)
+        .ok()?
+        .get_value::<String, _>(name)
+        .ok()
+}
+
+fn expand_variables(raw: &str, lookup: impl Fn(&str) -> Option<String>) -> String {
+    let mut expanded = String::new();
+    let mut rest = raw;
+    while let Some(start) = rest.find('%') {
+        expanded.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let Some(end) = after.find('%') else {
+            expanded.push('%');
+            rest = after;
+            break;
+        };
+        let name = &after[..end];
+        if let Some(value) = lookup(name).filter(|_| !name.is_empty()) {
+            expanded.push_str(&value);
+        } else {
+            expanded.push('%');
+            expanded.push_str(name);
+            expanded.push('%');
+        }
+        rest = &after[end + 1..];
+    }
+    expanded.push_str(rest);
+    expanded
+}
+
+fn append_missing_paths(current: &str, registered: &str) -> String {
+    let mut merged: Vec<&str> = Vec::new();
+    let mut seen: Vec<String> = Vec::new();
+    for entry in current.split(';').chain(registered.split(';')) {
+        let entry = entry.trim();
+        let key = entry.trim_end_matches(['\\', '/']).to_ascii_lowercase();
+        if entry.is_empty() || seen.contains(&key) {
+            continue;
+        }
+        seen.push(key);
+        merged.push(entry);
+    }
+    merged.join(";")
+}
 
 pub fn claim_single_instance() -> bool {
     use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};

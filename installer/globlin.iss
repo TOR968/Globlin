@@ -54,7 +54,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "globlin"; Flags: uninsdeletevalue
 
 [Run]
-Filename: "{app}\globlin.exe"; Description: "{cm:LaunchProgram,Globlin}"; Flags: nowait postinstall skipifsilent
+Filename: "{win}\explorer.exe"; Parameters: """{app}\globlin.exe"""; Description: "{cm:LaunchProgram,Globlin}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 procedure StopGloblin;
