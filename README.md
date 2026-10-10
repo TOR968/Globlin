@@ -29,12 +29,17 @@ drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 1
 
 ## Install
 
-1. Download `globlin.exe` from the [latest release](https://github.com/TOR968/Globlin/releases/latest)
-   — or `globlin-arm64.exe` on a Windows on ARM machine (Snapdragon and other ARM64 laptops).
-2. Run it. That's it — no installer, nothing to unzip.
+Every [release](https://github.com/TOR968/Globlin/releases/latest) comes two ways, each for x64 and for
+Windows on ARM (Snapdragon and other ARM64 laptops):
 
-It keeps its config next to itself, so it's portable: move the `.exe` anywhere and it keeps working.
-Right-click the tray icon and tick **Run at startup** if you want it running every time you log in.
+- **Installer** — `globlin-setup-x64.exe` or `globlin-setup-arm64.exe`. Installs for your user only, no
+  administrator prompt, into `%LOCALAPPDATA%\Programs\Globlin`; adds a Start menu entry, an entry in
+  *Settings → Apps* to uninstall it from, and optionally a desktop shortcut and *Run when I sign in*.
+- **Portable** — `globlin.exe` or `globlin-arm64.exe`. Run it; nothing to install, nothing to unzip. It
+  keeps its config next to itself, so you can move the `.exe` anywhere and it keeps working.
+
+Both update themselves the same way. Right-click the tray icon and tick **Run at startup** if you want it
+running every time you log in.
 
 <details>
 <summary><strong>If Windows Defender flags the download</strong> —
@@ -291,7 +296,10 @@ the most recent *failed* package update, reachable from *Open last log*), **`sel
 error from the most recent *failed* self-update lookup, kept separate so an offline run doesn't overwrite
 the log *Open last log* reads), and **`app.ico`** (the notification artwork).
 
-To remove Globlin: quit from the tray menu, delete the `.exe` and its `.json`, then delete
+To remove an installed Globlin, uninstall it from *Settings → Apps*; that also removes the *Run at
+startup* entry, and leaves `%LOCALAPPDATA%\globlin\` (settings and logs) for a reinstall — delete it if
+you are done for good. To remove the portable one: quit from the tray menu, delete the `.exe` and its
+`.json`, then delete
 `%LOCALAPPDATA%\globlin\`. If a self-update was interrupted, `globlin.exe.old` may still be sitting next
 to the `.exe` — safe to delete too. Two optional `HKEY_CURRENT_USER` cleanups:
 

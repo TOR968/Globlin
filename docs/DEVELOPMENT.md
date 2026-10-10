@@ -463,8 +463,9 @@ On the same schedule as the package check, the app makes one extra request per c
 so a missing npm, a `PATH` without bun, or an unreachable registry cannot stop the app from finding — and
 installing — its own update. That endpoint always resolves to the newest *published* release; GitHub
 excludes pre-releases and drafts from it, so neither can reach a user by accident. A release is offered
-only when its tag parses as semver strictly newer than the running build, and both `globlin.exe` and
-`globlin.exe.sha256` are attached — a release missing either asset is skipped rather than half-offered.
+only when its tag parses as semver strictly newer than the running build, and both the binary for the
+running architecture (`globlin.exe` on x64, `globlin-arm64.exe` on ARM64 — `selfupdate::asset_for`) and
+its `.sha256` are attached — a release missing either asset is skipped rather than half-offered.
 
 Applying an update downloads both assets, hashes the `.exe` with SHA-256, and compares that against the
 published `.sha256`; a mismatch discards the download and reports a failure, and the running binary is
@@ -537,6 +538,44 @@ cases are alternatives, not independent switches. `SelfUpdate::Winget` has no fi
 Globlin manages itself — so the auto-update checkbox cannot be rendered in a state where ticking it would
 do nothing.
 
+### When the installer owns the directory
+
+`installer/globlin.iss` is an Inno Setup 6 script for a **per-user** install: `PrivilegesRequired=lowest`,
+into `%LOCALAPPDATA%\Programs\Globlin`, with a Start menu entry, an entry in *Settings → Apps*, and two
+tasks — a desktop shortcut (off by default) and *Run Globlin when I sign in* (on). The release builds it
+twice, `globlin-setup-x64.exe` (`ArchitecturesAllowed=x64compatible`) and `globlin-setup-arm64.exe`
+(`arm64`), from the same two binaries the portable downloads are, through `.github/build-installer.ps1`.
+MSI was considered and declined: it is per-machine by habit, and an MSI repair would put back an exe that
+self-update had replaced.
+
+The fixed `AppId` `{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}` is load-bearing twice. Re-running a newer setup
+finds the existing install through it and upgrades in place. And Inno records the install under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}_is1`,
+whose `InstallLocation` is how Globlin recognises an installed copy: `install::setup_managed()` is true
+when `current_exe`'s directory equals it, compared component-wise and case-insensitively by
+`install::is_setup_path`, so the trailing backslash Inno writes does not matter.
+
+Unlike winget, the installer does not take self-update away — the directory is the user's and writable,
+and a second installer cannot race the swap. Two things change for an installed copy instead:
+
+- **Config lives in `%LOCALAPPDATA%\globlin\`**, as for winget (`config::exe_dir` returns `None`). The
+  program directory holds only `globlin.exe` and Inno's uninstaller, and uninstalling leaves settings and
+  logs behind for a reinstall, which is the convention.
+- **`DisplayVersion` follows self-update.** After a successful swap, `selfupdate::apply` writes the new
+  version into the uninstall key, so *Settings → Apps* does not keep showing the version that was
+  installed. A failed write lands in `self-update.log`; it never fails the update.
+
+The autostart task writes the same `HKCU\…\Run\globlin` = `"<exe>"` the tray toggle writes, so the two
+read one value. A second `[Registry]` entry with `ValueType: none; Flags: uninsdeletevalue` deletes it on
+uninstall whoever created it. Setup and uninstall both `taskkill /F /IM globlin.exe` first, because the
+exe is locked while it runs; the single-instance mutex means there is at most one to stop.
+
+`ci.yml` proves the round trip on every push: the Windows x64 job compiles the x64 setup, installs it
+silently with the autostart task, checks the exe, `InstallLocation`, `DisplayVersion` and the Run value,
+uninstalls silently, and checks that the exe, the Apps entry and the Run value are gone
+(`.github/installer-smoke.ps1`). The uninstaller re-launches itself from `%TEMP%` and returns at once,
+which is why the script polls for the removal instead of trusting `-Wait`.
+
 ## Tests
 
 ```
@@ -587,13 +626,18 @@ determining versions.
   suite on five runners — Windows x64 and ARM64, macOS ARM64, Linux x64 and ARM64 (see
   [Other platforms](#other-platforms)). The two Windows runners also build the release binary and attach
   it to the run as an artifact (`globlin.exe-<sha>`, `globlin-arm64.exe-<sha>`). `windows-11-arm` ships
-  no Rust, so that job installs it with `rustup-init` first. The `#[ignore]`d tests never run here.
+  no Rust, so that job installs it with `rustup-init` first. The x64 job also builds the installer and
+  runs it through a silent install and uninstall (see
+  [When the installer owns the directory](#when-the-installer-owns-the-directory)). The `#[ignore]`d tests
+  never run here.
 - **`release.yml`** — a `v*` tag only. A `build` matrix on `windows-latest` and `windows-11-arm` tests,
   builds, names the binary for its architecture (`globlin.exe`, `globlin-arm64.exe`), writes its
   `.sha256`, and uploads it to VirusTotal for a **Virus scan** section named after the file — see below.
   The `publish` job then refuses to continue if the tag does not match the `version` in `Cargo.toml`, so
-  a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, and creates one
-  GitHub Release with all four files.
+  a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
+  `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
+  on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), checksums and scans
+  them too, and creates one GitHub Release with all eight files.
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
