@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use crate::config::Config;
 use crate::model::{BlockedScript, Installed, SourceKind, KINDS};
+use crate::process;
 use crate::Result;
 
 mod brew;
@@ -103,13 +104,28 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
     })
 }
 
+pub(crate) fn run_listing(command: &mut Command) -> Result<Output> {
+    Ok(process::output_within(command, process::LISTING_LIMIT)?)
+}
+
+pub(crate) fn stdout_text(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+pub(crate) fn listed<T>(rows: Vec<T>, command: &str, output: &Output) -> Result<Vec<T>> {
+    if rows.is_empty() && !output.status.success() {
+        return Err(silent_listing(command, output).into());
+    }
+    Ok(rows)
+}
+
 pub(crate) fn silent_listing(command: &str, output: &Output) -> String {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr = stderr.trim();
     if stderr.is_empty() {
-        format!("{command} printed nothing and {}", output.status)
+        format!("{command} listed nothing and {}", output.status)
     } else {
-        format!("{command} printed nothing and {}: {stderr}", output.status)
+        format!("{command} listed nothing and {}: {stderr}", output.status)
     }
 }
 

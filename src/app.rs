@@ -452,7 +452,7 @@ impl App {
         if !skipped.is_empty() {
             let body = skipped.join("\n");
             diagnostics::record_note(&format!("could not list every source:\n{body}\n\n"));
-            platform::notify("Globlin — some packages are missing", &body).ok();
+            platform::notify("Globlin — some packages could not be checked", &body).ok();
         }
         self.skipped = skipped;
     }

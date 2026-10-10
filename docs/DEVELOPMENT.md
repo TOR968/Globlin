@@ -43,12 +43,33 @@ version to compare against come from, and what does its absence mean?*
 | `PyPi` | pipx | `registry::pypi_latest`, the RSS release feed | `registry::numeric_is_newer` |
 | `NuGet` | dotnet | `registry::nuget_latest`, the flat-container `index.json` | `registry::numeric_is_newer` |
 | `PsGallery` | psgallery | `registry::psgallery_latest`, the package endpoint's redirect | `registry::numeric_is_newer` |
-| `SelfResolved` | uv, scoop, go, gem, brew | the source fills `Installed.available` | string equality |
+| `SelfResolved` | uv, scoop, go, gem, brew | the source fills `Installed.available` | `registry::is_newer`, falling back to inequality |
 | `SelfReported` | winget, choco | the source fills `Installed.available` | presence |
 
 The first five are remote: the source reports only what is installed, and `check.rs` asks the registry
 for the union of names in that catalog. A name the registry did not answer for is `Unknown`, never
 `Current`. `check.rs` must never send a winget id to registry.npmjs.org — `Git.Git` is not a package there.
+
+**An unreachable registry is a skipped source, not a failed check.** Each `registry::*_latest` returns
+`Err("<host> could not be reached")` only when it was asked about at least one name and *no* request got
+any HTTP answer at all — a 404 counts as an answer, because a private package that npmjs has never heard
+of must stay a quiet `Unknown`, not an alarm. `check.rs` moves that error into `Report.skipped` beside
+the sources that could not be listed, so the icon turns red and one notification names the host, while
+every other catalog's packages are still shown. Before this, `npm_latest` alone could fail the whole
+check: one private npm global, or a blocked registry.npmjs.org, hid pipx, scoop, winget and the rest.
+
+**Every child process has a deadline.** `process::output_within` runs a command with piped output and
+kills it — on Windows with `taskkill /T`, so the `node` behind a `.cmd` shim goes too — once
+`LISTING_LIMIT` (two minutes, for listings and `npm config`) or `CHANGE_LIMIT` (thirty minutes, for
+updates and uninstalls, because `cargo install` compiles) runs out. `Activity` is the global busy lock and
+only a worker's terminal message clears it, so one hung child used to disable Check, Update and Uninstall
+until Globlin was restarted. The go source also sets `GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never`,
+so `go list -m <private module>@latest` fails at once instead of waiting on a credential prompt.
+
+**A failed listing is an error, not an empty source.** `source::listed` turns a listing whose command
+exited non-zero *and* produced no rows into `"<command> listed nothing and <status>: <stderr>"`, which
+`check.rs` reports as skipped. Rows from a command that exited badly are kept — `npm ls -g` and
+`winget list` both exit non-zero on a usable reply.
 
 **The last two differ only in what `None` means.** For `SelfReported`, `available: None` means the tool
 looked and found no upgrade — `winget list` simply has no `Available` cell for that row. For
@@ -59,7 +80,11 @@ outdated packages: a failed run and an up-to-date machine would otherwise print 
 Both sources therefore run the plain listing and the outdated report separately, and a non-zero exit
 from the report leaves every package unresolved. scoop resolves against the local bucket manifest and go
 against `go list -m <module>@latest`; a missing manifest or an offline proxy is `None` for the same
-reason.
+reason. A resolved version that differs from the installed one is `Outdated` only when it is not older:
+`registry::is_newer` compares as semver (a leading `v` stripped) and then numerically, and an install
+that is ahead — a go pseudo-version built from `master`, an `-rc` — reads `Current`, because **Update**
+would otherwise be a downgrade. Versions neither comparison understands (`7.1_1`, a cask's `latest`)
+still read `Outdated` when they differ, since the tool itself reported them.
 
 **Why each remote endpoint is the one it is.** Every choice here is the smallest reply that still names
 the newest stable release, because the check runs every six hours in the background.
@@ -78,8 +103,9 @@ the newest stable release, because the check runs every six hours in the backgro
   to `…/packages/<id>.<version>.nupkg`, so `registry::gallery_newest_release` sends one request with
   `max_redirects(0)` and reads the version out of the `Location` header. No body is ever downloaded.
 
-`numeric_is_newer` compares dot-separated segments as numbers and answers `None` when either side has a
-non-numeric segment. PEP 440 and NuGet versions are not semver (`2025.9.5`, `1.2.3.4`), and a prerelease
+`numeric_is_newer` compares dot-separated segments as numbers, padding the shorter side with zeros so
+`1.0` and `1.0.0` are equal in both directions, and answers `None` when either side has a non-numeric
+segment. PEP 440 and NuGet versions are not semver (`2025.9.5`, `1.2.3.4`), and a prerelease
 or post-release is reported as `Unknown` rather than guessed at.
 
 That fork is also why package versions are `String` in `model.rs` rather than `semver::Version`. winget
@@ -608,7 +634,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-468 tests on Windows: 439 run by default (no network, no side effects), 29 `#[ignore]`d because they
+481 tests on Windows: 452 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit

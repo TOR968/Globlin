@@ -9,6 +9,7 @@ mod install;
 mod model;
 mod notice;
 mod platform;
+mod process;
 mod progress;
 mod registry;
 mod remove;

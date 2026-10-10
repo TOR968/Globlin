@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, node_modules_listing, PackageSource};
+use super::{
+    find_on_path, hidden_command, node_modules_listing, run_listing, stdout_text, PackageSource,
+};
 use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
 use crate::Result;
@@ -19,14 +21,11 @@ impl Yarn {
     }
 
     fn global_dir(&self) -> Option<PathBuf> {
-        let output = hidden_command(&self.command)
-            .args(["global", "dir"])
-            .output()
-            .ok()?;
+        let output = run_listing(hidden_command(&self.command).args(["global", "dir"])).ok()?;
         if !output.status.success() {
             return None;
         }
-        parse_global_dir(&String::from_utf8_lossy(&output.stdout))
+        parse_global_dir(&stdout_text(&output))
     }
 }
 

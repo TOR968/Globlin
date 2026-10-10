@@ -4,7 +4,7 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, silent_listing, PackageSource};
+use super::{find_on_path, hidden_command, run_listing, silent_listing, PackageSource};
 use crate::model::{BlockedScript, Installed, SourceKind};
 use crate::Result;
 
@@ -35,9 +35,8 @@ impl PackageSource for Npm {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = hidden_command(&self.command)
-            .args(["ls", "-g", "--json", "--depth=0"])
-            .output()?;
+        let output =
+            run_listing(hidden_command(&self.command).args(["ls", "-g", "--json", "--depth=0"]))?;
         if output.stdout.trim_ascii().is_empty() {
             return Err(silent_listing("npm ls -g", &output).into());
         }
@@ -64,14 +63,12 @@ impl PackageSource for Npm {
     fn approve_scripts(&self, scripts: &[BlockedScript]) -> Result<()> {
         let configured = self.allow_scripts_config()?;
         let merged = merge_allow_list(&configured, scripts.iter().map(BlockedScript::package));
-        let output = hidden_command(&self.command)
-            .args([
-                "config",
-                "set",
-                &format!("allow-scripts={merged}"),
-                "--location=user",
-            ])
-            .output()?;
+        let output = run_listing(hidden_command(&self.command).args([
+            "config",
+            "set",
+            &format!("allow-scripts={merged}"),
+            "--location=user",
+        ]))?;
         if output.status.success() {
             return Ok(());
         }
@@ -85,9 +82,12 @@ impl PackageSource for Npm {
 
 impl Npm {
     fn allow_scripts_config(&self) -> Result<String> {
-        let output = hidden_command(&self.command)
-            .args(["config", "get", "allow-scripts", "-g"])
-            .output()?;
+        let output = run_listing(hidden_command(&self.command).args([
+            "config",
+            "get",
+            "allow-scripts",
+            "-g",
+        ]))?;
         if !output.status.success() {
             return Err(format!(
                 "npm config get allow-scripts failed: {}",

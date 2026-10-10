@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 468 tests (439 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 481 tests (452 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -115,7 +115,11 @@ updates fine but has no uninstall, so the window draws **Uninstall** from `remov
 `Status` per package. `update.rs` = run the update command per target, announcing `Progress` between
 each. `model.rs` holds the vocabulary both speak (`Package`, `Status`, `UpdateTarget`, `Activity`).
 `Status::Unknown` (registry did not answer) is distinct from `Status::Current` everywhere and must stay
-that way — a network failure must never render as "everything is fine". An npm update refused with
+that way — a network failure must never render as "everything is fine". The headline says
+`N packages, K not checked` rather than `up to date` while any package is `Unknown`, and a registry that
+could not be reached at all lands in `Report.skipped` (red icon, one notification) instead of failing
+the whole check. Every child process runs through `process::output_within` with a deadline — a hung
+child would otherwise hold `Activity` forever. An npm update refused with
 `ESTRICTALLOWSCRIPTS` is `Outcome.blocked`, not `failed`; `App.approvals` holds it until the window's
 approval dialog approves (`approve:` id, persisted to the user `.npmrc`) or dismisses (`dismiss:`) it.
 

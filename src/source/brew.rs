@@ -3,7 +3,7 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, run_listing, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -32,10 +32,7 @@ impl PackageSource for Brew {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = self
-            .brew()
-            .args(["info", "--json=v2", "--installed"])
-            .output()?;
+        let output = run_listing(self.brew().args(["info", "--json=v2", "--installed"]))?;
         if !output.status.success() {
             return Err(format!(
                 "brew info failed: {}",

@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::diagnostics;
 use crate::model::RemoveTarget;
+use crate::process;
 use crate::source::{self, PackageSource};
 
 pub fn run(config: &Config, target: &RemoveTarget) -> bool {
@@ -17,24 +18,20 @@ fn apply(config: &Config, target: &RemoveTarget) -> std::result::Result<(), Stri
     let sources = source::enabled(config)
         .map_err(|error| format!("{}: no package source is available: {error}\n", target.name))?;
     let source = find(&sources, target)?;
-    let output = source
-        .uninstall_command(&target.name)
-        .ok_or_else(|| {
-            format!(
-                "{}: the {} source is read-only
-",
-                target.name,
-                target.source.label()
-            )
-        })?
-        .output()
-        .map_err(|error| {
-            format!(
-                "{}: could not start {}: {error}\n",
-                target.name,
-                target.source.label()
-            )
-        })?;
+    let mut command = source.uninstall_command(&target.name).ok_or_else(|| {
+        format!(
+            "{}: the {} source is read-only\n",
+            target.name,
+            target.source.label()
+        )
+    })?;
+    let output = process::output_within(&mut command, process::CHANGE_LIMIT).map_err(|error| {
+        format!(
+            "{}: could not start {}: {error}\n",
+            target.name,
+            target.source.label()
+        )
+    })?;
 
     if output.status.success() {
         return Ok(());

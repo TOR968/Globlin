@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -24,10 +24,8 @@ impl PackageSource for Pipx {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = hidden_command(&self.command)
-            .args(["list", "--short"])
-            .output()?;
-        Ok(parse_listing(&String::from_utf8_lossy(&output.stdout)))
+        let output = run_listing(hidden_command(&self.command).args(["list", "--short"]))?;
+        listed(parse_listing(&stdout_text(&output)), "pipx list", &output)
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
