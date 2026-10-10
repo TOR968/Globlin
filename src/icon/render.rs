@@ -10,6 +10,7 @@ pub const DESIGN: f32 = 32.0;
 pub const BUSY_FRAMES: u32 = 8;
 
 const SUPERSAMPLE: u32 = 4;
+const ANGLE_TOLERANCE: f32 = 1e-4;
 
 const EMERALD: [u8; 3] = [0x10, 0xb9, 0x81];
 const AMBER: [u8; 3] = [0xf5, 0x9e, 0x0b];
@@ -177,8 +178,9 @@ impl Shape {
                 if (distance - r).abs() > width / 2.0 {
                     return false;
                 }
-                let angle = dy.atan2(dx).rem_euclid(std::f32::consts::TAU);
-                (angle - start).rem_euclid(std::f32::consts::TAU) <= end - start
+                let offset = (dy.atan2(dx) - start).rem_euclid(std::f32::consts::TAU);
+                offset <= end - start + ANGLE_TOLERANCE
+                    || std::f32::consts::TAU - offset <= ANGLE_TOLERANCE
             }
         }
     }

@@ -189,6 +189,10 @@ fn a_source_toggle_id_round_trips() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "muda builds menus only on the main thread on macOS and libtest runs tests on worker threads; covered on Windows and Linux"
+)]
 fn the_tray_menu_no_longer_lists_packages() {
     let packages = vec![
         behind("prettier", "2.0.0"),
@@ -206,6 +210,10 @@ fn the_tray_menu_no_longer_lists_packages() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "muda builds menus only on the main thread on macOS and libtest runs tests on worker threads; covered on Windows and Linux"
+)]
 fn update_all_counts_only_what_globlin_can_actually_update() {
     let packages = vec![
         behind("prettier", "2.0.0"),
@@ -231,6 +239,10 @@ fn update_all_counts_only_what_globlin_can_actually_update() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "muda builds menus only on the main thread on macOS and libtest runs tests on worker threads; covered on Windows and Linux"
+)]
 fn a_read_only_source_offers_no_update_all_row_of_its_own() {
     let packages = vec![Package {
         name: "Git.Git".to_string(),
@@ -482,6 +494,10 @@ fn the_self_update_row_names_both_versions() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "muda builds menus only on the main thread on macOS and libtest runs tests on worker threads; covered on Windows and Linux"
+)]
 fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_version() {
     let release = crate::selfupdate::Release {
         version: semver::Version::parse("9.9.9").unwrap(),
@@ -533,6 +549,10 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "muda builds menus only on the main thread on macOS and libtest runs tests on worker threads; covered on Windows and Linux"
+)]
 fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
     let winget_view = View {
         packages: &[],

@@ -418,10 +418,11 @@ fn a_package_that_failed_for_another_reason_keeps_its_approval_entry() {
 
 #[test]
 fn a_failure_report_names_both_versions_and_the_source() {
-    let output = std::process::Command::new("cmd")
-        .args(["/C", "exit 3"])
-        .output()
-        .unwrap();
+    let output = std::process::Output {
+        status: std::process::ExitStatus::default(),
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+    };
     let report = describe_failure(&target("prettier"), &output);
 
     assert!(
