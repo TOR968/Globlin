@@ -32,7 +32,7 @@ fn embed_windows_resource() {
     winresource::WindowsResource::new()
         .set_icon(path.to_str().expect("the icon path should be valid UTF-8"))
         .set("ProductName", "Globlin")
-        .set("FileDescription", "Globlin - npm and bun package monitor")
+        .set("FileDescription", "Globlin - global package monitor")
         .set("CompanyName", "TOR968")
         .set("LegalCopyright", "Copyright (C) 2026 TOR968")
         .set("OriginalFilename", "globlin.exe")
