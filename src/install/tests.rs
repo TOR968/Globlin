@@ -1,4 +1,6 @@
-use super::{is_setup_path, is_system_package_path, is_winget_path, Manager};
+#[cfg(windows)]
+use super::{is_setup_path, is_winget_path};
+use super::{is_system_package_path, Manager};
 use std::path::Path;
 
 #[cfg(windows)]
