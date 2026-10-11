@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::{
-    find_on_path, hidden_command, manifest_names, node_modules_listing, pinned_to, PackageSource,
+    find_on_path, hidden_command, manifest_names, node_modules_listing, not_on_path, pinned_to,
+    PackageSource,
 };
 use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
@@ -21,7 +22,7 @@ impl Bun {
     pub fn new() -> Result<Self> {
         let command = find_on_path(EXECUTABLE)
             .or_else(default_location)
-            .ok_or("bun was not found on PATH")?;
+            .ok_or_else(|| not_on_path("bun"))?;
         Ok(Self {
             command,
             global_dir: resolve_global_dir(&candidates()),

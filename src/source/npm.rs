@@ -4,7 +4,10 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, pinned_to, run_listing, silent_listing, PackageSource};
+use super::{
+    find_on_path, hidden_command, not_installed, pinned_to, run_listing, silent_listing,
+    PackageSource,
+};
 use crate::model::{BlockedScript, Installed, SourceKind};
 use crate::Result;
 
@@ -40,7 +43,9 @@ impl Npm {
         let command = find_on_path(EXECUTABLE)
             .or_else(default_location)
             .ok_or_else(|| {
-                format!("{EXECUTABLE} was not found on PATH; set \"npm_cmd\" in the config file")
+                not_installed(format!(
+                    "{EXECUTABLE} was not found on PATH; set \"npm_cmd\" in the config file"
+                ))
             })?;
         Ok(Self { command })
     }

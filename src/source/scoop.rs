@@ -4,7 +4,7 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, not_on_path, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -17,7 +17,7 @@ pub struct Scoop {
 
 impl Scoop {
     pub fn new() -> Result<Self> {
-        let command = find_on_path(EXECUTABLE).ok_or("scoop was not found on PATH")?;
+        let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("scoop"))?;
         let root = root().ok_or("the scoop directory has no apps to read")?;
         Ok(Self { command, root })
     }

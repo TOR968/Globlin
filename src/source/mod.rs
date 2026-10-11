@@ -68,26 +68,55 @@ pub trait PackageSource {
     }
 }
 
+#[derive(Debug)]
+pub struct NotInstalled(String);
+
+impl std::fmt::Display for NotInstalled {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for NotInstalled {}
+
+pub(crate) fn not_on_path(program: &str) -> crate::Error {
+    not_installed(format!("{program} was not found on PATH"))
+}
+
+pub(crate) fn not_installed(message: String) -> crate::Error {
+    Box::new(NotInstalled(message))
+}
+
 pub fn enabled(config: &Config) -> Result<Vec<Box<dyn PackageSource>>> {
+    assemble(
+        KINDS
+            .into_iter()
+            .filter(|kind| kind.available() && config.source_enabled(*kind))
+            .map(|kind| build(kind, config)),
+    )
+}
+
+fn assemble(
+    built: impl IntoIterator<Item = Result<Box<dyn PackageSource>>>,
+) -> Result<Vec<Box<dyn PackageSource>>> {
     let mut sources: Vec<Box<dyn PackageSource>> = Vec::new();
     let mut failures = Vec::new();
+    let mut attempted = false;
 
-    for kind in KINDS {
-        if !kind.available() || !config.source_enabled(kind) {
-            continue;
-        }
-        match build(kind, config) {
+    for result in built {
+        attempted = true;
+        match result {
             Ok(source) => sources.push(source),
+            Err(error) if error.is::<NotInstalled>() => {}
             Err(error) => failures.push(error.to_string()),
         }
     }
 
-    if sources.is_empty() {
-        return Err(if failures.is_empty() {
-            "no package sources are enabled in the config".into()
-        } else {
-            failures.join("; ").into()
-        });
+    if !attempted {
+        return Err("no package sources are enabled in the config".into());
+    }
+    if sources.is_empty() && !failures.is_empty() {
+        return Err(failures.join("; ").into());
     }
     Ok(sources)
 }

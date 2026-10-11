@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 556 tests (526 run, 30 ignored) on Windows, no network, no side effects
+cargo test                     # 560 tests (530 run, 30 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -131,7 +131,11 @@ approval dialog approves (`approve:` id, persisted to the user `.npmrc`) or dism
 
 **Sources are a trait.** `PackageSource` (`src/source/mod.rs`) = kind + installed list + optional update
 and uninstall `Command`s. `source::enabled` walks `model::KINDS` in order, skips what the config turns
-off, and fails only when *no* source could be built; one broken source does not sink a working one.
+off, and fails only when *no* source could be built and at least one installed source broke; one broken
+source does not sink a working one. A program that is simply not installed is `source::NotInstalled`,
+not a failure — a machine with none of the enabled managers gets an empty check ("nothing found"), not a
+red icon and a toast listing fifteen missing programs. Every source's "not on PATH" error must be built
+with `not_on_path`/`not_installed`, or a missing CLI turns back into a failure.
 Adding a source means a `SourceKind` variant, a module, a `build` arm, and a `Sources` field — the
 `KINDS` array and the tests that iterate it will tell you what you missed.
 

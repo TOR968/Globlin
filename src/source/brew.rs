@@ -3,7 +3,7 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, run_listing, PackageSource};
+use super::{find_on_path, hidden_command, not_on_path, run_listing, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -15,7 +15,7 @@ pub struct Brew {
 
 impl Brew {
     pub fn new() -> Result<Self> {
-        let command = find_on_path(EXECUTABLE).ok_or("brew was not found on PATH")?;
+        let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("brew"))?;
         Ok(Self { command })
     }
 

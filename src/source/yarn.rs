@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use super::{
-    find_on_path, hidden_command, node_modules_listing, pinned_to, run_listing, stdout_text,
-    PackageSource,
+    find_on_path, hidden_command, node_modules_listing, not_on_path, pinned_to, run_listing,
+    stdout_text, PackageSource,
 };
 use crate::diagnostics;
 use crate::model::{Installed, SourceKind};
@@ -17,7 +17,7 @@ pub struct Yarn {
 
 impl Yarn {
     pub fn new() -> Result<Self> {
-        let command = find_on_path(EXECUTABLE).ok_or("yarn was not found on PATH")?;
+        let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("yarn"))?;
         Ok(Self { command })
     }
 

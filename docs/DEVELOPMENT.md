@@ -789,7 +789,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-556 tests on Windows: 526 run by default (no network, no side effects), 30 `#[ignore]`d because they
+560 tests on Windows: 530 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

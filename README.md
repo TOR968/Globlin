@@ -259,7 +259,8 @@ updated and one `… N more` line; the full queue is in the window.
 | **choco** | `choco list -r` + `choco outdated -r` | choco's own report | read-only |
 
 Everything except psgallery, winget and choco is on by default. A source whose CLI isn't installed simply
-reports nothing — it is not an error, and one broken source never sinks the others. psgallery is off
+reports nothing — it is not an error, not even when none of them is installed, and one broken source never
+sinks the others. psgallery is off
 because it has to start PowerShell on every check, which costs about a second; winget and choco are off
 because both are slower to list and neither can be updated from an unelevated app. Turn any of them on
 from the window's Settings, or in `globlin.json`.
