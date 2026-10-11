@@ -1,3 +1,4 @@
+use minisign_verify::{PublicKey, Signature};
 use semver::Version;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -13,12 +14,14 @@ use crate::{diagnostics, install, platform, Result};
 const X64_ASSET: &str = "globlin.exe";
 const ARM64_ASSET: &str = "globlin-arm64.exe";
 const MACOS_ARM64_ASSET: &str = "globlin-macos-arm64";
+const RELEASE_PUBLIC_KEY: &str = "RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
     pub version: Version,
     pub exe_url: String,
     pub sha_url: String,
+    pub sig_url: String,
 }
 
 #[derive(Deserialize)]
@@ -43,6 +46,7 @@ fn offer(body: &str, current: &Version, asset: &str) -> Option<Release> {
         version,
         exe_url: asset_url(&release.assets, asset)?,
         sha_url: asset_url(&release.assets, &checksum_asset(asset))?,
+        sig_url: asset_url(&release.assets, &signature_asset(asset))?,
     })
 }
 
@@ -72,6 +76,19 @@ fn asset_for(os: &str, arch: &str) -> Option<&'static str> {
 
 fn checksum_asset(asset: &str) -> String {
     format!("{asset}.sha256")
+}
+
+fn signature_asset(asset: &str) -> String {
+    format!("{asset}.minisig")
+}
+
+fn verify_signature(bytes: &[u8], signature: &str, public_key: &str) -> Result<()> {
+    let key = PublicKey::from_base64(public_key)
+        .map_err(|error| format!("the embedded release key is unusable: {error}"))?;
+    let signature = Signature::decode(signature)
+        .map_err(|error| format!("the release signature is unreadable: {error}"))?;
+    key.verify(bytes, &signature, false)
+        .map_err(|error| format!("the release signature does not match: {error}").into())
 }
 
 fn running_asset() -> Result<&'static str> {
@@ -173,6 +190,8 @@ pub fn apply(release: &Release) -> Result<Version> {
     clean_stale();
     let binary = get(&agent(DOWNLOAD_TIMEOUT), &release.exe_url)?.read_to_vec()?;
     let checksum = get(&agent(TIMEOUT), &release.sha_url)?.read_to_string()?;
+    let signature = get(&agent(TIMEOUT), &release.sig_url)?.read_to_string()?;
+    verify_signature(&binary, &signature, RELEASE_PUBLIC_KEY)?;
     verify(&binary, &checksum, running_asset()?)?;
 
     let current = std::env::current_exe()?;
@@ -222,6 +241,7 @@ pub fn relaunch() -> Result<()> {
 fn agent(timeout: Duration) -> Agent {
     Agent::config_builder()
         .timeout_global(Some(timeout))
+        .https_only(true)
         .build()
         .into()
 }
