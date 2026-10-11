@@ -7,6 +7,16 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.13](https://github.com/TOR968/Globlin/compare/v0.3.12...v0.3.13) - 2026-10-11
+
+### Fixed
+
+- show the Mac window in the Dock, keep the tray menu short and open the log mid-batch ([#75](https://github.com/TOR968/Globlin/pull/75))
+
+### Other
+
+- bump the actions group with 2 updates ([#74](https://github.com/TOR968/Globlin/pull/74))
+
 ## [0.3.12](https://github.com/TOR968/Globlin/compare/v0.3.11...v0.3.12) - 2026-10-11
 
 ### Added
