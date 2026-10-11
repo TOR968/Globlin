@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -81,8 +82,8 @@ pub fn record_installed_version(_version: &str) -> Result<()> {
     Err(NOT_INSTALLED_BY_SETUP.into())
 }
 
-pub fn open_in_shell(path: &Path) -> Result<()> {
-    Command::new("open").arg(path).spawn()?;
+pub fn open_in_shell(target: &OsStr) -> Result<()> {
+    Command::new("open").arg(target).spawn()?;
     Ok(())
 }
 

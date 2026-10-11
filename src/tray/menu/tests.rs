@@ -687,6 +687,11 @@ fn the_monochrome_icon_id_parses_back_to_its_action() {
 }
 
 #[test]
+fn the_patreon_id_parses_back_to_its_action() {
+    assert_eq!(Action::from_key(ID_OPEN_PATREON), Some(Action::OpenPatreon));
+}
+
+#[test]
 fn the_auto_approve_id_parses_back_to_its_action() {
     assert_eq!(
         Action::from_key(ID_AUTO_APPROVE),

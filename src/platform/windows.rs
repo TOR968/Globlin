@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -228,8 +229,8 @@ pub fn record_installed_version(version: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn open_in_shell(path: &Path) -> Result<()> {
-    Command::new("explorer").arg(path).spawn()?;
+pub fn open_in_shell(target: &OsStr) -> Result<()> {
+    Command::new("explorer").arg(target).spawn()?;
     Ok(())
 }
 

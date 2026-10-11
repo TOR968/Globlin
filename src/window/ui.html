@@ -785,6 +785,30 @@
         flex: 1;
       }
 
+      footer .dot {
+        color: var(--faint);
+      }
+
+      .support {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn.support {
+        gap: 8px;
+      }
+
+      .support .heart {
+        color: var(--red);
+        flex: none;
+      }
+
+      .support svg:not(.heart) {
+        color: var(--muted);
+        flex: none;
+      }
+
       #settings-view {
         display: flex;
         min-height: 0;
@@ -1064,6 +1088,7 @@
         <button type="button" data-section="general" aria-current="true">General</button>
         <button type="button" data-section="sources">Sources</button>
         <button type="button" data-section="diagnostics">Diagnostics</button>
+        <button type="button" data-section="about">About</button>
       </nav>
       <div class="scroll">
         <div class="settings-body">
@@ -1120,11 +1145,26 @@
               </div>
               <button id="settings-log" class="btn" type="button">Open last log</button>
             </div>
+          </section>
+
+          <section id="about" aria-labelledby="about-title">
+            <h2 id="about-title">About</h2>
             <div class="setting">
               <div class="setting-text">
                 <span class="setting-label">Version</span>
                 <span id="settings-version" class="setting-note mono"></span>
               </div>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <span class="setting-label" id="support-label">Support Globlin</span>
+                <span class="setting-note">Globlin is free and open source. A pledge on Patreon keeps it maintained.</span>
+              </div>
+              <button id="settings-patreon" class="btn support" type="button" aria-describedby="support-label">
+                <svg class="heart" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path></svg>
+                Support on Patreon
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5h5v5M19 5l-8 8M18 14v5H5V6h5"></path></svg>
+              </button>
             </div>
           </section>
         </div>
@@ -1135,6 +1175,11 @@
       <span id="version"></span>
       <button id="footer-self" class="link blue" type="button" hidden></button>
       <span class="spacer"></span>
+      <button id="footer-patreon" class="link support" type="button">
+        <svg class="heart" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path></svg>
+        Support on Patreon
+      </button>
+      <span class="dot" aria-hidden="true">·</span>
       <button id="open-log" class="link blue" type="button">Open last log</button>
     </footer>
 
@@ -1706,6 +1751,8 @@
         state.selected.clear();
       };
       el("open-log").onclick = () => send("open-log");
+      el("footer-patreon").onclick = () => send("open-patreon");
+      el("settings-patreon").onclick = () => send("open-patreon");
       el("settings-log").onclick = () => send("open-log");
       el("autostart").onclick = () => send("autostart");
       el("auto-update").onclick = () => send("auto-update");
