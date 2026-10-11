@@ -126,6 +126,7 @@ pub struct Installed {
     pub version: String,
     pub source: SourceKind,
     pub available: Option<String>,
+    pub external: bool,
 }
 
 impl Installed {
@@ -135,12 +136,19 @@ impl Installed {
             version: version.into(),
             source,
             available: None,
+            external: false,
         }
     }
 
     #[must_use]
     pub fn with_available(mut self, available: Option<String>) -> Self {
         self.available = available;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_external(mut self, external: bool) -> Self {
+        self.external = external;
         self
     }
 }

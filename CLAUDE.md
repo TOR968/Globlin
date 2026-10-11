@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 486 tests (457 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 498 tests (469 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -165,6 +165,9 @@ encoder in `src/icon/png.rs`. Regenerate them, never hand-edit them; see
   the first `[changelog] commit_parsers` entry, which skips anything scoped `(site)` so the landing page
   stays out of a changelog that documents the application. Both key on the scope, so a site-only commit
   must be `chore(site):` or `docs(site):` — unscoped, it ships a release to every user for a copy edit.
+- A test that fakes a package manager must never be able to reach the real one. The npm fakes are files
+  named `npm`/`npm.cmd` in a directory of their own, because a refused `npm_cmd` is an error, never a
+  fallback to `PATH` — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#tests).
 - Test names are full sentences describing the rule being pinned
   (`a_package_missing_from_the_registry_reply_is_unknown_not_current`).
 - Tests live in a sibling child-module file, not inline: `foo.rs` carries `#[cfg(test)] mod tests;` and

@@ -123,6 +123,7 @@ fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> V
     installed
         .iter()
         .filter(|item| item.source.catalog() == catalog)
+        .filter(|item| !item.external)
         .filter(|item| !config.is_ignored(&item.name))
         .map(|item| item.name.clone())
         .collect::<BTreeSet<String>>()
@@ -133,6 +134,8 @@ fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> V
 fn classify(installed: Installed, config: &Config, latest: &Latest) -> Package {
     let status = if config.is_ignored(&installed.name) {
         Status::Ignored
+    } else if installed.external {
+        Status::Unknown
     } else {
         match installed.source.catalog() {
             Catalog::SelfReported => self_reported(installed.available.as_deref()),

@@ -4,7 +4,9 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
+use super::{
+    find_on_path, hidden_command, listed, pinned_to, run_listing, stdout_text, PackageSource,
+};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -33,8 +35,12 @@ impl PackageSource for Pnpm {
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        self.update_to(name, "latest")
+    }
+
+    fn update_to(&self, name: &str, version: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
-        command.args(["add", "-g", &format!("{name}@latest")]);
+        command.args(["add", "-g", &pinned_to(name, version)]);
         Some(command)
     }
 

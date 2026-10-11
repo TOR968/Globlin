@@ -1,9 +1,9 @@
 use tao::dpi::LogicalSize;
 use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
 use tao::window::{Icon, Window as HostWindow, WindowBuilder, WindowId};
-use wry::{WebView, WebViewBuilder};
+use wry::{NewWindowResponse, WebView, WebViewBuilder};
 
-use super::{script, tick_script, Snapshot, Tick, HEIGHT, TITLE, UI, WIDTH};
+use super::{is_own_page, script, tick_script, Snapshot, Tick, HEIGHT, TITLE, UI, WIDTH};
 use crate::icon::{self, IconState};
 use crate::{Message, Result};
 
@@ -30,8 +30,13 @@ impl Window {
             .build(target)?;
         let builder = WebViewBuilder::new()
             .with_html(UI)
+            .with_navigation_handler(|uri| is_own_page(&uri))
+            .with_new_window_req_handler(|_, _| NewWindowResponse::Deny)
+            .with_drag_drop_handler(|_| true)
             .with_ipc_handler(move |request| {
-                proxy.send_event(Message::Ipc(request.into_body())).ok();
+                if is_own_page(&request.uri().to_string()) {
+                    proxy.send_event(Message::Ipc(request.into_body())).ok();
+                }
             });
         let webview = attach(builder, &host)?;
         Ok(Self { host, webview })
