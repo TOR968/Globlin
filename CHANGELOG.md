@@ -7,6 +7,23 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12](https://github.com/TOR968/Globlin/compare/v0.3.11...v0.3.12) - 2026-10-11
+
+### Added
+
+- sign every release file and refuse an unsigned self-update ([#72](https://github.com/TOR968/Globlin/pull/72))
+
+### Fixed
+
+- never offer a public package as the update of a private, linked or git install ([#70](https://github.com/TOR968/Globlin/pull/70))
+- recheck after an auto-approved retry and save the config atomically ([#69](https://github.com/TOR968/Globlin/pull/69))
+- show every source even when a registry or a package manager fails ([#68](https://github.com/TOR968/Globlin/pull/68))
+
+### Other
+
+- pin actions to commit SHAs and drop write access where it is not needed ([#71](https://github.com/TOR968/Globlin/pull/71))
+- bring the README and developer notes up to date with the ports ([#67](https://github.com/TOR968/Globlin/pull/67))
+
 ## [0.3.11](https://github.com/TOR968/Globlin/compare/v0.3.10...v0.3.11) - 2026-10-10
 
 ### Fixed
