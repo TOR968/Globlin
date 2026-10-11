@@ -7,6 +7,16 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14](https://github.com/TOR968/Globlin/compare/v0.3.13...v0.3.14) - 2026-10-11
+
+### Added
+
+- uninstall go tools by deleting their binary ([#79](https://github.com/TOR968/Globlin/pull/79))
+
+### Fixed
+
+- hide sources a platform cannot have and treat dotnet without an SDK as empty ([#77](https://github.com/TOR968/Globlin/pull/77))
+
 ## [0.3.13](https://github.com/TOR968/Globlin/compare/v0.3.12...v0.3.13) - 2026-10-11
 
 ### Fixed
