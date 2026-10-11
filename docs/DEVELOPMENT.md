@@ -567,6 +567,11 @@ shipped first, the beacon was blocked, the analytics panel showed zero visits wi
 and Lighthouse marked the console error down to 92 on Best Practices. A blocked beacon is silent, so
 the symptom to look for is missing data rather than a failure.
 
+Images under `/img/` are cached for a day, and every reference to one in `index.html` carries a
+`?v=<version>` query. They were cached for a year as `immutable` until the goblin replaced the `G` logo:
+the files are regenerated in place under the same names, so browsers kept showing the old logo with no
+way to refresh it. Bump the `?v=` value whenever the dump tests rewrite `site/img/`.
+
 `site/llms.txt` describes the project for AI agents, in the format Lighthouse's agentic-browsing
 category checks for: a title, a one-line summary, a few paragraphs of prose, and link sections pointing
 at the releases, the README, the development notes and the repository. Keep it in step with the
