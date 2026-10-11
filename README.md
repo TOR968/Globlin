@@ -137,7 +137,11 @@ since — the package-list window links WebView2's glue in — and ships at abou
 it further from the shape that was flagged, not closer.
 
 Microsoft flags some builds and not others, because an unsigned binary of this shape sits close to the
-model's line. If yours objects:
+model's line. The installers are a separate case: every release, three or four machine-learning engines
+(Arctic Wolf, DeepInstinct, SecureAge, Skyhigh) flag `globlin-setup-*.exe` while the portable `.exe`
+beside it scans clean. They object to the unsigned Inno Setup wrapper — a program that unpacks and
+starts another program — not to Globlin; an installer built without compression drew the same verdicts.
+If yours objects:
 
 1. **Update your definitions** from an elevated PowerShell and rescan. Microsoft has reviewed Globlin
    before and removed the detection on request.

@@ -903,7 +903,7 @@ tag exists and has nothing to do.
 
 ### The VirusTotal scan
 
-Every release uploads both binaries, `globlin.exe` and `globlin-arm64.exe`, to VirusTotal and links each
+Every release uploads both binaries, `globlin.exe` and `globlin-arm64.exe`, and both installers to VirusTotal and links each
 report from the release notes under a **Virus scan — <file>** heading, because
 an unsigned binary that writes an autostart key, spawns `npm` and rewrites its own `.exe` is flagged by
 machine-learning heuristics on a regular basis. Defender has quarantined the download as
@@ -930,6 +930,21 @@ Three things about it are deliberate:
   which buys a single-pass notes file rather than creating the release and editing it afterwards.
 - **A timed-out analysis still publishes the link.** The report URL is `gui/file/<sha256>` and is valid
   the moment the upload lands, so the section is emitted saying the analysis was still running.
+
+**The explanation follows the verdict.** A clean scan gets the bare report line; a flagged one gets a
+paragraph, and which paragraph depends on `-Installer`, which the publish job passes for the two
+`globlin-setup-*.exe` files. Until 2026-10 every section carried the binary's explanation, so a clean
+`globlin.exe` was followed by a paragraph on why it trips heuristics, and the installers — the only files
+actually flagged — were blamed on the autostart key and `npm` rather than on what the engines object to.
+
+**The installers are flagged every release; the portable binaries usually are not.** From v0.4.0 to
+v0.4.6 both `globlin-setup-*.exe` drew 3–4 of 71 every time (`obfuscatedpoly`: Arctic Wolf, DeepInstinct,
+SecureAge, Skyhigh) while `globlin.exe` and `globlin-arm64.exe` drew none. VirusTotal tags the installer
+`overlay`, which suggested Inno's LZMA2-compressed payload. A one-off A/B on 2026-10-11 built the same
+exe into two installers in CI and scanned both: `Compression=lzma2` (3.5 MB) drew 4 of 71,
+`Compression=none` (6.1 MB) drew 3 of 71, the bare exe 1 of 70. Compression is not the cause — the
+unsigned Inno Setup wrapper is, a loader that unpacks and starts another program — so `globlin.iss` keeps
+`lzma2`. What would change the verdict is an Authenticode signature, not an installer setting.
 
 The key is a free VirusTotal Community API key (`VIRUSTOTAL_API_KEY` in repository secrets), whose 4
 requests/minute and 500/day are far more than one upload plus a handful of polls per release. Note that
