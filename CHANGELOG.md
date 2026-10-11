@@ -7,6 +7,14 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/TOR968/Globlin/compare/v0.3.15...v0.4.0) - 2026-10-11
+
+### Added
+
+- [**breaking**] update through one signed SHA256SUMS and ship the Mac as one zip ([#85](https://github.com/TOR968/Globlin/pull/85))
+- a redesigned package window that puts updates first ([#84](https://github.com/TOR968/Globlin/pull/84))
+- draw the goblin as an anime sticker ([#82](https://github.com/TOR968/Globlin/pull/82))
+
 ## [0.3.15](https://github.com/TOR968/Globlin/compare/v0.3.14...v0.3.15) - 2026-10-11
 
 ### Added
