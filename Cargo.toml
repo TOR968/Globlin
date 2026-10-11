@@ -44,7 +44,7 @@ pedantic = { level = "warn", priority = -1 }
 
 [dependencies]
 tao = "0.37"
-tray-icon = "0.24"
+tray-icon = { version = "0.24", default-features = false, features = ["gtk"] }
 ureq = "3.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

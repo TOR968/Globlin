@@ -419,7 +419,7 @@ switched to `globlin.exe`: the old config file (`npm-globals-tray.json`), the ol
 
 On Windows, a Rust toolchain (MSVC) plus Microsoft C++ Build Tools and the Windows SDK. On macOS, a Rust
 toolchain and the Xcode command-line tools. On Debian or Ubuntu, a Rust toolchain plus
-`libgtk-3-dev libxdo-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev`.
+`libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev`.
 
 ```
 cargo build --release
