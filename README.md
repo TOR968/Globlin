@@ -456,6 +456,38 @@ next to itself. The macOS `.app` bundle and the Linux packages are assembled by 
 For architecture notes, the verified environment workarounds, tests, lints, and the CI/release pipeline,
 see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
+## Code signing policy
+
+The Windows builds are not code-signed yet. Free signing through
+[SignPath Foundation](https://signpath.org) has been applied for; once it is granted, this applies:
+free code signing provided by [SignPath.io](https://signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
+
+- **What is signed:** only the files `.github/workflows/release.yml` builds from a tagged commit of this
+  repository on GitHub-hosted runners — `globlin.exe`, `globlin-arm64.exe`, `globlin-setup-x64.exe` and
+  `globlin-setup-arm64.exe`. Nothing built anywhere else, and no third-party binaries. The macOS and Linux
+  builds are outside this policy; every release file is also listed in the minisign-signed `SHA256SUMS`.
+- **Team roles:** committers and reviewers — [TOR968](https://github.com/TOR968); approvers —
+  [TOR968](https://github.com/TOR968). Every signing request is approved by hand.
+- **Multi-factor authentication** is required for every role, on GitHub and on SignPath.
+- **Uninstalling:** the installer registers an uninstaller under *Settings → Apps*; the portable build
+  and everything Globlin writes are covered in *Diagnostics & removing it* above.
+
+### Privacy
+
+Globlin has no telemetry, no analytics, no crash reports and no account, and sends no identifier of any kind. It
+goes on the network only to do what it is for, and every request it makes names Globlin in its user agent:
+
+- **Version lookups:** the names of your installed packages are sent to the public registry of their
+  package manager — `registry.npmjs.org` (npm, bun, pnpm, yarn), `pypi.org` (pipx), `crates.io` (cargo),
+  `api.nuget.org` (dotnet) and `www.powershellgallery.com` (PowerShell Gallery). Switching a source off in
+  Settings stops its lookups, and ignored packages are never looked up. An npm, bun, pnpm or yarn package
+  installed from git, a local path, a link or a private registry is never sent to the public registry.
+- **Its own updates:** `api.github.com` is asked for the latest Globlin release, and an update is
+  downloaded from GitHub's release storage. Builds owned by winget or a system package manager skip this.
+- **The package managers themselves** contact their own servers when Globlin runs their list, outdated,
+  update and uninstall commands; what they send is governed by their own privacy policies.
+
 ## License
 
 Copyright (C) 2026 TOR968.
