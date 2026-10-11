@@ -831,7 +831,7 @@
               <svg class="os-icon" aria-hidden="true"><use href="#os-windows"></use></svg>
               Windows
             </a>
-            <a class="button button-ghost" data-os="macos" href="https://github.com/TOR968/Globlin/releases/latest/download/Globlin-macos-arm64.zip" data-file="Globlin-macos-arm64.zip" rel="nofollow">
+            <a class="button button-ghost" data-os="macos" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-macos-apple-silicon.zip" data-file="globlin-macos-apple-silicon.zip" rel="nofollow">
               <svg class="os-icon" aria-hidden="true"><use href="#os-apple"></use></svg>
               macOS
             </a>
@@ -842,7 +842,7 @@
           </div>
           <p class="download-note">
             <span id="download-file">globlin-setup-x64.exe</span> · <span data-version>latest</span> ·
-            <a id="download-sha" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-setup-x64.exe.sha256" rel="nofollow">SHA-256</a> ·
+            <a href="https://github.com/TOR968/Globlin/releases/latest">checksums</a> ·
             <a href="#install">every download</a>
           </p>
           <p class="beta-note">
@@ -1023,8 +1023,8 @@
           <p class="eyebrow">Install</p>
           <h2>Pick the build for your machine</h2>
           <p class="lede">
-            The same app for every platform, all of it beta. Each file has a SHA-256 checksum beside it on
-            the <a href="https://github.com/TOR968/Globlin/releases/latest">release page</a>.
+            The same app for every platform, all of it beta. Checksums and the signature that covers them are
+            on the <a href="https://github.com/TOR968/Globlin/releases/latest">release page</a>.
           </p>
           <div class="platforms">
             <article class="platform">
@@ -1065,7 +1065,7 @@
                 <li>System Settings → Privacy &amp; Security → Open Anyway. It is signed ad hoc, not notarised, so this is needed once.</li>
               </ol>
               <div class="platform-actions">
-                <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases/latest/download/Globlin-macos-arm64.zip" rel="nofollow">
+                <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-macos-apple-silicon.zip" rel="nofollow">
                   <svg class="os-icon" aria-hidden="true"><use href="#os-apple"></use></svg>
                   Download .zip
                 </a>
@@ -1191,7 +1191,6 @@
       (function () {
         var base = "https://github.com/TOR968/Globlin/releases/latest/download/";
         var file = document.getElementById("download-file");
-        var sha = document.getElementById("download-sha");
         var data = navigator.userAgentData;
         var platform = (data && data.platform) || navigator.platform || "";
 
@@ -1209,11 +1208,10 @@
           chosen.href = base + name;
           chosen.dataset.file = name;
           file.textContent = name;
-          sha.href = base + name + ".sha256";
         }
 
         if (/mac/i.test(platform)) {
-          choose("macos", "Globlin-macos-arm64.zip");
+          choose("macos", "globlin-macos-apple-silicon.zip");
         } else if (/linux/i.test(platform) && !/android/i.test(platform)) {
           choose("linux", /aarch64|arm/i.test(platform) ? "globlin-arm64.deb" : "globlin-amd64.deb");
         } else if (data && data.getHighEntropyValues) {

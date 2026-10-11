@@ -706,9 +706,9 @@ fn dump_window_screenshots() {
 
     let release = crate::selfupdate::Release {
         version: semver::Version::new(0, 4, 0),
-        exe_url: String::new(),
-        sha_url: String::new(),
-        sig_url: String::new(),
+        asset_url: String::new(),
+        sums_url: String::new(),
+        sums_signature_url: String::new(),
     };
     let settings_view = View {
         self_update: SelfUpdate::Own {

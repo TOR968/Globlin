@@ -9,9 +9,8 @@ work="$(mktemp -d)"
 app="$work/Globlin.app"
 
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$out_dir"
-cp "$binary" "$out_dir/globlin-macos-arm64"
 cp "$binary" "$app/Contents/MacOS/globlin"
-chmod 755 "$app/Contents/MacOS/globlin" "$out_dir/globlin-macos-arm64"
+chmod 755 "$app/Contents/MacOS/globlin"
 
 GLOBLIN_ICONSET="$work/Globlin.iconset" cargo test -- --ignored --exact icon::tests::dump_macos_iconset
 iconutil -c icns "$work/Globlin.iconset" -o "$app/Contents/Resources/Globlin.icns"
@@ -51,5 +50,5 @@ plutil -lint "$app/Contents/Info.plist"
 codesign --force --sign - --identifier dev.globlin.app "$app"
 codesign --verify --strict --verbose=2 "$app"
 
-ditto -c -k --keepParent "$app" "$out_dir/Globlin-macos-arm64.zip"
+ditto -c -k --keepParent "$app" "$out_dir/globlin-macos-apple-silicon.zip"
 ls -l "$out_dir"

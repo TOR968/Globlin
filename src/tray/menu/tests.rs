@@ -497,9 +497,9 @@ fn a_package_batch_and_a_self_update_never_share_a_headline() {
 fn the_self_update_row_names_both_versions() {
     let release = crate::selfupdate::Release {
         version: semver::Version::parse("0.2.0").unwrap(),
-        exe_url: String::new(),
-        sha_url: String::new(),
-        sig_url: String::new(),
+        asset_url: String::new(),
+        sums_url: String::new(),
+        sums_signature_url: String::new(),
     };
     assert_eq!(
         self_update_text(&release),
@@ -515,9 +515,9 @@ fn the_self_update_row_names_both_versions() {
 fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_version() {
     let release = crate::selfupdate::Release {
         version: semver::Version::parse("9.9.9").unwrap(),
-        exe_url: String::new(),
-        sha_url: String::new(),
-        sig_url: String::new(),
+        asset_url: String::new(),
+        sums_url: String::new(),
+        sums_signature_url: String::new(),
     };
     let pending_restart = Version::parse("9.9.9").unwrap();
     let self_view = View {

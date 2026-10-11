@@ -124,8 +124,8 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'macOS'
         with:
-          name: Globlin-macos-arm64-${{ github.sha }}
-          path: macos-out/Globlin-macos-arm64.zip
+          name: globlin-macos-apple-silicon-${{ github.sha }}
+          path: macos-out/globlin-macos-apple-silicon.zip
           if-no-files-found: error
 
       - name: Build the release binary

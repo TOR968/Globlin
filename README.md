@@ -51,8 +51,7 @@ running every time you log in.
 Apple Silicon (M1 and later), macOS 11 or newer. The app is signed ad hoc, not notarised, so macOS asks
 you to allow it once:
 
-1. Download **`Globlin-macos-arm64.zip`** — not `globlin-macos-arm64` without an extension, which is the
-   bare binary the installed app updates itself from and which macOS will not run on its own.
+1. Download **`globlin-macos-apple-silicon.zip`**.
 2. Unzip it and drag **Globlin.app** into *Applications*.
 3. Open Globlin.app. macOS answers *"Globlin" Not Opened — Apple could not verify…*; choose **Done**, not
    *Move to Trash*.
@@ -133,11 +132,13 @@ model's line. If yours objects:
    Update-MpSignature
    ```
 
-2. **Check the hash and the signature.** Every release publishes `globlin.exe.sha256` beside the
-   `.exe`. Run `Get-FileHash globlin.exe` and compare — a match means nothing altered the download.
-   `globlin.exe.minisig` is a [minisign](https://jedisct1.github.io/minisign/) signature by the Globlin
-   release key, which proves the file came from this project's release pipeline:
-   `minisign -Vm globlin.exe -P RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`.
+2. **Check the hash and the signature.** Every release publishes `SHA256SUMS`, the SHA-256 of every
+   file in it, and `SHA256SUMS.minisig`, a [minisign](https://jedisct1.github.io/minisign/) signature
+   of that list by the Globlin release key. Run `Get-FileHash` on your download and find the same hash
+   in `SHA256SUMS` — a match means nothing altered the download. The signature proves the list came
+   from this project's release pipeline:
+   `minisign -Vm SHA256SUMS -P RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`. The release
+   notes open with the exact commands.
 3. **Read the VirusTotal report** linked from that release's notes. CI uploads every build as it is
    published, so you get the full engine spread rather than one engine's guess.
 4. **Build it yourself** — see *Building from source* below. The source is all here and
@@ -286,6 +287,9 @@ The tray icon is drawn from code, not an image file, so its colour always matche
 | <img src="docs/img/icon-busy.png" width="24" height="24" alt="busy icon"> | **Busy** — sky blue | a check or an update is running, filling like a glass |
 
 ## Keeping itself updated
+
+> **Upgrading from 0.3.x:** 0.4.0 changed how updates are signed and named, so a 0.3.x build cannot
+> update itself to it. Install 0.4.0 by hand once — from then on it keeps itself updated as below.
 
 Globlin also checks its own [GitHub releases](https://github.com/TOR968/Globlin/releases) on the same
 schedule as the package check. The `Globlin v<current>` submenu names the build that is running, so you
