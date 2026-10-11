@@ -49,6 +49,14 @@ const FACE_CENTRE: (f32, f32) = (16.0, 17.5);
 const SPARKLES: [(f32, f32, f32); 2] = [(28.5, 22.0, 2.4), (3.0, 23.5, 1.7)];
 const SWEAT: [(f32, f32); 4] = [(25.5, 8.5), (26.9, 11.2), (25.5, 12.6), (24.1, 11.2)];
 
+const EMPTY_GLASS: f32 = 0.35;
+const BADGE: (f32, f32) = (26.0, 25.5);
+const BADGE_RADIUS: f32 = 4.5;
+const BADGE_GAP: f32 = 1.5;
+const ALERT_STEM: [(f32, f32); 2] = [(26.0, 22.75), (26.0, 25.75)];
+const ALERT_STEM_WIDTH: f32 = 1.75;
+const ALERT_DOT: (f32, f32, f32) = (26.0, 28.25, 1.0);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconState {
     Idle,
@@ -117,6 +125,13 @@ pub fn rgba(state: IconState, frame: u32, level: f32, size: u32) -> Vec<u8> {
     composite(&layers(state, frame, level, Detail::for_size(size)), size)
 }
 
+pub fn mono(state: IconState, frame: u32, level: f32, size: u32, ink: [u8; 3]) -> Vec<u8> {
+    composite(
+        &mono_layers(state, frame, level, Detail::for_size(size), ink),
+        size,
+    )
+}
+
 fn layers(state: IconState, frame: u32, level: f32, detail: Detail) -> Vec<Layer> {
     match state {
         IconState::Idle => still(EMERALD, detail, false),
@@ -141,22 +156,117 @@ fn still(color: [u8; 3], detail: Detail, worried: bool) -> Vec<Layer> {
 }
 
 fn working(frame: u32, level: f32, detail: Detail) -> Vec<Layer> {
-    let phase = std::f32::consts::TAU * (frame % BUSY_FRAMES) as f32 / BUSY_FRAMES as f32;
-    let swing = EAR_SWING * phase.sin();
-    let hop = MOUTH_HOP * phase.sin().max(0.0);
-    let mut layers = outline(detail, swing);
-    layers.extend(painted(silhouette(swing), DEEP));
-    layers.push(Layer {
-        shape: Shape::Polygon(head()),
-        color: SKY,
-        alpha: 1.0,
-        clip: Some(Wave { level, phase }),
-    });
-    layers.extend(features(detail, hop));
+    let motion = Motion::at(frame);
+    let mut layers = outline(detail, motion.swing);
+    layers.extend(painted(silhouette(motion.swing), DEEP));
+    layers.push(water(level, motion.phase, SKY));
+    layers.extend(features(detail, motion.hop));
     if detail == Detail::Sticker {
-        layers.extend(painted(sparkles(phase), WHITE));
+        layers.extend(painted(sparkles(motion.phase), WHITE));
     }
     layers
+}
+
+fn mono_layers(
+    state: IconState,
+    frame: u32,
+    level: f32,
+    detail: Detail,
+    ink: [u8; 3],
+) -> Vec<Layer> {
+    match state {
+        IconState::Idle => mono_still(detail, ink),
+        IconState::Updates => {
+            let mut layers = mono_still(detail, ink);
+            layers.extend(badge(ink, false));
+            layers
+        }
+        IconState::Error => {
+            let mut layers = mono_still(detail, ink);
+            layers.extend(badge(ink, true));
+            layers
+        }
+        IconState::Busy => mono_working(frame, level, detail, ink),
+    }
+}
+
+fn mono_still(detail: Detail, ink: [u8; 3]) -> Vec<Layer> {
+    let mut layers = painted(silhouette(0.0), ink);
+    layers.extend(carved_face(detail, 0.0, ink));
+    layers
+}
+
+fn mono_working(frame: u32, level: f32, detail: Detail, ink: [u8; 3]) -> Vec<Layer> {
+    let motion = Motion::at(frame);
+    let mut layers = tinted(silhouette(motion.swing), ink, EMPTY_GLASS);
+    layers.push(water(level, motion.phase, ink));
+    layers.extend(carved_face(detail, motion.hop, ink));
+    layers
+}
+
+fn carved_face(detail: Detail, hop: f32, ink: [u8; 3]) -> Vec<Layer> {
+    let mut layers = erased(face_ink(detail, hop));
+    layers.extend(painted(face_glints(detail), ink));
+    layers
+}
+
+fn badge(ink: [u8; 3], alert: bool) -> Vec<Layer> {
+    let (cx, cy) = BADGE;
+    let mut layers = erased(vec![Shape::Disc {
+        cx,
+        cy,
+        r: BADGE_RADIUS + BADGE_GAP,
+    }]);
+    layers.extend(painted(
+        vec![Shape::Disc {
+            cx,
+            cy,
+            r: BADGE_RADIUS,
+        }],
+        ink,
+    ));
+    if alert {
+        let (dot_x, dot_y, dot_r) = ALERT_DOT;
+        layers.extend(erased(vec![
+            Shape::Segment {
+                from: ALERT_STEM[0],
+                to: ALERT_STEM[1],
+                width: ALERT_STEM_WIDTH,
+            },
+            Shape::Disc {
+                cx: dot_x,
+                cy: dot_y,
+                r: dot_r,
+            },
+        ]));
+    }
+    layers
+}
+
+struct Motion {
+    phase: f32,
+    swing: f32,
+    hop: f32,
+}
+
+impl Motion {
+    fn at(frame: u32) -> Self {
+        let phase = std::f32::consts::TAU * (frame % BUSY_FRAMES) as f32 / BUSY_FRAMES as f32;
+        Self {
+            phase,
+            swing: EAR_SWING * phase.sin(),
+            hop: MOUTH_HOP * phase.sin().max(0.0),
+        }
+    }
+}
+
+fn water(level: f32, phase: f32, color: [u8; 3]) -> Layer {
+    Layer {
+        shape: Shape::Polygon(head()),
+        paint: Paint::Color(color),
+        alpha: 1.0,
+        clip: Some(Wave { level, phase }),
+    }
 }
 
 fn outline(detail: Detail, swing: f32) -> Vec<Layer> {
@@ -174,12 +284,24 @@ fn outline(detail: Detail, swing: f32) -> Vec<Layer> {
 }
 
 fn painted(shapes: Vec<Shape>, color: [u8; 3]) -> Vec<Layer> {
+    tinted(shapes, color, 1.0)
+}
+
+fn tinted(shapes: Vec<Shape>, color: [u8; 3], alpha: f32) -> Vec<Layer> {
+    layered(shapes, Paint::Color(color), alpha)
+}
+
+fn erased(shapes: Vec<Shape>) -> Vec<Layer> {
+    layered(shapes, Paint::Erase, 1.0)
+}
+
+fn layered(shapes: Vec<Shape>, paint: Paint, alpha: f32) -> Vec<Layer> {
     shapes
         .into_iter()
         .map(|shape| Layer {
             shape,
-            color,
-            alpha: 1.0,
+            paint,
+            alpha,
             clip: None,
         })
         .collect()
@@ -194,6 +316,12 @@ fn silhouette(swing: f32) -> Vec<Shape> {
 }
 
 fn features(detail: Detail, hop: f32) -> Vec<Layer> {
+    let mut layers = painted(face_ink(detail, hop), INK);
+    layers.extend(painted(face_glints(detail), WHITE));
+    layers
+}
+
+fn face_ink(detail: Detail, hop: f32) -> Vec<Shape> {
     let face = Face::for_detail(detail);
     let (rx, ry) = face.eye_size;
     let mut ink: Vec<Shape> = face
@@ -214,14 +342,15 @@ fn features(detail: Detail, hop: f32) -> Vec<Layer> {
             width,
         });
     }
-    let glints = face
+    ink
+}
+
+fn face_glints(detail: Detail) -> Vec<Shape> {
+    Face::for_detail(detail)
         .glints
         .iter()
         .map(|&(cx, cy, r)| Shape::Disc { cx, cy, r })
-        .collect();
-    let mut layers = painted(ink, INK);
-    layers.extend(painted(glints, WHITE));
-    layers
+        .collect()
 }
 
 fn sparkles(phase: f32) -> Vec<Shape> {
@@ -295,9 +424,15 @@ impl Wave {
 
 struct Layer {
     shape: Shape,
-    color: [u8; 3],
+    paint: Paint,
     alpha: f32,
     clip: Option<Wave>,
+}
+
+#[derive(Clone, Copy)]
+enum Paint {
+    Color([u8; 3]),
+    Erase,
 }
 
 enum Shape {
@@ -377,7 +512,10 @@ fn composite(layers: &[Layer], size: u32) -> Vec<u8> {
             for layer in layers {
                 let alpha = coverage(layer, x, y, scale) * layer.alpha;
                 if alpha > 0.0 {
-                    accumulated = source_over(layer.color, alpha, accumulated);
+                    accumulated = match layer.paint {
+                        Paint::Color(color) => source_over(color, alpha, accumulated),
+                        Paint::Erase => destination_out(alpha, accumulated),
+                    };
                 }
             }
             let offset = ((y * size + x) * 4) as usize;
@@ -423,6 +561,14 @@ fn source_over(color: [u8; 3], alpha: f32, destination: [f32; 4]) -> [f32; 4] {
         mix(color[2] as f32 / 255.0, destination[2]),
         combined,
     ]
+}
+
+fn destination_out(alpha: f32, destination: [f32; 4]) -> [f32; 4] {
+    let remaining = destination[3] * (1.0 - alpha);
+    if remaining <= 0.0 {
+        return [0.0; 4];
+    }
+    [destination[0], destination[1], destination[2], remaining]
 }
 
 fn to_byte(value: f32) -> u8 {

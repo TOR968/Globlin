@@ -193,9 +193,9 @@ The window puts updates first:
 - A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
   the same three packages every six hours.
 
-![Globlin's Settings view: Run at startup, Approve npm install scripts automatically, Update Globlin automatically and an available Globlin update under General, then one switch per source with its package count](docs/img/window-settings.png)
+![Globlin's Settings view: Run at startup, Monochrome tray icon, Approve npm install scripts automatically, Update Globlin automatically and an available Globlin update under General, then one switch per source with its package count](docs/img/window-settings.png)
 
-**Settings**, behind the button at the top right, holds the rest: *Run at startup*, *Approve npm install
+**Settings**, behind the button at the top right, holds the rest: *Run at startup*, *Monochrome tray icon*, *Approve npm install
 scripts automatically*, *Update Globlin automatically* (greyed out with the manager's name when winget
 or the installer keeps Globlin up to date) and, when a release is waiting, **Update now**. Under
 *Sources* every package manager this platform can have gets a switch and a one-line status — *13
@@ -286,6 +286,12 @@ The tray icon is drawn from code, not an image file, so its colour always matche
 | <img src="docs/img/icon-error.png" width="24" height="24" alt="error icon"> | **Error** — red | the last check failed, a source could not be listed, or a registry could not be reached (the notification and *Open last log* name it) |
 | <img src="docs/img/icon-busy.png" width="24" height="24" alt="busy icon"> | **Busy** — sky blue | a check or an update is running, filling like a glass |
 
+If the coloured goblin stands out too much next to the system icons, switch on **Monochrome tray icon** in
+the window's Settings. The goblin is then drawn in one colour with its face cut out — white on a dark
+taskbar, near-black on a light one, and on macOS a template image the menu bar tints itself. Colour can't
+carry the state any more, so a dot beside the head means updates are waiting, a dot with an exclamation
+mark means something went wrong, and while a job runs the dim outline fills solid from the bottom up.
+
 ## Keeping itself updated
 
 > **Upgrading from 0.3.x:** 0.4.0 changed how updates are signed and named, so a 0.3.x build cannot
@@ -347,6 +353,7 @@ edits are never silently overwritten.
   "npm_cmd": null,
   "auto_update": false,
   "auto_approve_scripts": false,
+  "monochrome_icon": false,
   "last_self_notice": null
 }
 ```
@@ -365,6 +372,8 @@ edits are never silently overwritten.
 - **`auto_update`** — see [Keeping itself updated](#keeping-itself-updated).
 - **`auto_approve_scripts`** — the **Approve npm install scripts automatically** switch in the window's
   Settings; see [Using it](#using-it).
+- **`monochrome_icon`** — the **Monochrome tray icon** switch in the window's Settings; see
+  [Icon states](#icon-states).
 - **`last_self_notice`** — the version string of the last self-update failure a toast was already raised
   for, so retrying the same failing version doesn't notify twice.
 

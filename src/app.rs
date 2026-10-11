@@ -51,9 +51,10 @@ impl App {
     pub fn new(proxy: EventLoopProxy<Message>) -> Result<Self> {
         let (config, warning) = Config::load();
         let next_check = Instant::now() + config.interval();
+        let tray = Tray::new(config.monochrome_icon)?;
         let app = Self {
             config,
-            tray: Tray::new()?,
+            tray,
             packages: Vec::new(),
             available_release: None,
             blocked_self: None,
@@ -168,6 +169,7 @@ impl App {
             }
             Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::ToggleAutoApprove => self.toggle_auto_approve(),
+            Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
             Action::OpenLog => open_log(),
             Action::OpenSelfLog => open_self_log(),
         }
@@ -337,6 +339,11 @@ impl App {
 
     fn toggle_auto_approve(&mut self) {
         self.config.auto_approve_scripts = !self.config.auto_approve_scripts;
+        self.save_setting();
+    }
+
+    fn toggle_monochrome_icon(&mut self) {
+        self.config.monochrome_icon = !self.config.monochrome_icon;
         self.save_setting();
     }
 
@@ -578,7 +585,9 @@ impl App {
             self.frame,
             self.elapsed(),
         );
-        self.tray.render(&view, state, level).ok();
+        self.tray
+            .render(&view, state, level, self.config.monochrome_icon)
+            .ok();
         if let Some(window) = self.window.as_ref().filter(|window| window.visible()) {
             window.render(&window::snapshot(&view, &self.config));
         }

@@ -458,6 +458,16 @@ fn a_source_globlin_can_uninstall_from_says_so() {
 }
 
 #[test]
+fn the_monochrome_icon_setting_reaches_the_window_from_the_config() {
+    let mut config = config();
+    assert!(!snapshot(&view(&[], None), &config).monochrome_icon);
+
+    config.monochrome_icon = true;
+
+    assert!(snapshot(&view(&[], None), &config).monochrome_icon);
+}
+
+#[test]
 fn the_auto_approve_setting_reaches_the_window_from_the_config() {
     let mut config = config();
     assert!(!snapshot(&view(&[], None), &config).auto_approve);

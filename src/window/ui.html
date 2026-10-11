@@ -1078,6 +1078,13 @@
             </div>
             <div class="setting">
               <div class="setting-text">
+                <span class="setting-label" id="monochrome-icon-label">Monochrome tray icon</span>
+                <span class="setting-note">Draws the goblin in one colour that matches the system icons beside it. A dot means updates are waiting; an exclamation mark means something went wrong.</span>
+              </div>
+              <button id="monochrome-icon" class="switch" type="button" aria-pressed="false" aria-labelledby="monochrome-icon-label"></button>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
                 <span class="setting-label" id="auto-approve-label">Approve npm install scripts automatically</span>
                 <span class="setting-note warn">Skips the approval dialog. Any dependency’s install scripts then run without you seeing them.</span>
               </div>
@@ -1578,6 +1585,7 @@
         const snapshot = state.snapshot;
         setSwitch(el("autostart"), snapshot.autostart);
         setSwitch(el("auto-approve"), snapshot.auto_approve);
+        setSwitch(el("monochrome-icon"), snapshot.monochrome_icon);
         setSwitch(el("auto-update"), snapshot.auto_update);
         el("auto-update").disabled = Boolean(snapshot.managed_by);
         el("auto-update-note").textContent = snapshot.managed_by
@@ -1702,6 +1710,7 @@
       el("autostart").onclick = () => send("autostart");
       el("auto-update").onclick = () => send("auto-update");
       el("auto-approve").onclick = () => send("auto-approve");
+      el("monochrome-icon").onclick = () => send("monochrome-icon");
       el("self-update").onclick = () => send("update-self");
       el("footer-self").onclick = () => send("update-self");
       el("open-settings").onclick = () => openSettings();

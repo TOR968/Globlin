@@ -113,6 +113,7 @@ fn an_older_config_file_without_the_new_fields_still_loads() {
     let config: Config = serde_json::from_str(raw).unwrap();
     assert_eq!(config.check_interval_hours, 3);
     assert!(!config.auto_update);
+    assert!(!config.monochrome_icon);
 }
 
 #[test]

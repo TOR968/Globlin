@@ -230,3 +230,90 @@ fn the_ears_swing_and_the_mouth_hops_while_busy() {
         LEFT_EAR.to_vec()
     );
 }
+
+const MONO_INK: [u8; 3] = [0x1f, 0x1f, 0x1f];
+
+fn mono_at(state: IconState, frame: u32, level: f32) -> Vec<u8> {
+    mono(state, frame, level, 32, MONO_INK)
+}
+
+#[test]
+fn a_monochrome_icon_paints_nothing_but_the_ink_colour() {
+    for state in STATES {
+        for frame in [0, BUSY_FRAMES / 2] {
+            let pixels = mono_at(state, frame, 0.5);
+            for pixel in pixels.as_chunks::<4>().0 {
+                if pixel[3] > 0 {
+                    assert_eq!(pixel[..3], MONO_INK, "{state:?} frame {frame}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_monochrome_face_is_cut_out_so_the_tray_shows_through_the_eyes() {
+    let pixels = mono_at(IconState::Idle, 0, 0.0);
+
+    assert_eq!(alpha_at(&pixels, 32, 10, 17), 0);
+    assert_eq!(alpha_at(&pixels, 32, 16, 12), 255);
+}
+
+#[test]
+fn every_monochrome_state_renders_a_distinct_image() {
+    let rendered: Vec<Vec<u8>> = STATES.iter().map(|state| mono_at(*state, 0, 0.0)).collect();
+
+    for left in 0..rendered.len() {
+        for right in left + 1..rendered.len() {
+            assert_ne!(
+                rendered[left], rendered[right],
+                "states {left} and {right} match"
+            );
+        }
+    }
+}
+
+#[test]
+fn monochrome_updates_add_a_badge_set_apart_from_the_head_by_a_gap() {
+    let idle = mono_at(IconState::Idle, 0, 0.0);
+    let updates = mono_at(IconState::Updates, 0, 0.0);
+
+    assert_eq!(alpha_at(&updates, 32, 26, 25), 255);
+    assert_eq!(alpha_at(&idle, 32, 20, 25), 255);
+    assert!(alpha_at(&updates, 32, 20, 25) < 64);
+}
+
+#[test]
+fn a_monochrome_error_cuts_an_exclamation_mark_into_the_badge() {
+    let updates = mono_at(IconState::Updates, 0, 0.0);
+    let error = mono_at(IconState::Error, 0, 0.0);
+
+    assert_eq!(alpha_at(&updates, 32, 26, 24), 255);
+    assert_eq!(alpha_at(&error, 32, 26, 24), 0);
+}
+
+fn solid_pixels(level: f32) -> usize {
+    mono_at(IconState::Busy, 0, level)
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .filter(|pixel| pixel[3] == 255)
+        .count()
+}
+
+#[test]
+fn the_monochrome_glass_fills_with_solid_ink_as_the_level_rises() {
+    let empty = solid_pixels(0.0);
+    let half = solid_pixels(0.5);
+    let full = solid_pixels(1.0);
+
+    assert!(half > empty, "half {half} !> empty {empty}");
+    assert!(full > half, "full {full} !> half {half}");
+}
+
+#[test]
+fn still_monochrome_states_ignore_the_frame_counter() {
+    for state in [IconState::Idle, IconState::Updates, IconState::Error] {
+        assert_eq!(mono_at(state, 0, 0.0), mono_at(state, 5, 0.0));
+    }
+}

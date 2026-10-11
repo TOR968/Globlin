@@ -29,9 +29,22 @@ fn every_state_and_frame_yields_a_usable_tray_icon() {
         IconState::Busy,
     ] {
         for frame in 0..BUSY_FRAMES {
-            assert!(tray(state, frame, 0.5).is_ok());
+            assert!(tray(state, frame, 0.5, Look::Colour).is_ok());
+            assert!(tray(state, frame, 0.5, Look::Mono(INK_ON_DARK)).is_ok());
         }
     }
+}
+
+#[test]
+fn the_colour_goblin_stays_unless_monochrome_is_asked_for() {
+    assert_eq!(look(false, false), Look::Colour);
+    assert_eq!(look(false, true), Look::Colour);
+}
+
+#[test]
+fn a_monochrome_icon_is_dark_on_a_light_tray_and_light_on_a_dark_one() {
+    assert_eq!(look(true, true), Look::Mono(INK_ON_LIGHT));
+    assert_eq!(look(true, false), Look::Mono(INK_ON_DARK));
 }
 
 #[test]
