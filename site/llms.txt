@@ -12,7 +12,7 @@ Globlin needs no runtime of its own — it drives whatever package managers are 
 
 ## Download
 
-- [Latest release](https://github.com/TOR968/Globlin/releases/latest): `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` (installer), `globlin.exe` and `globlin-arm64.exe` (portable), `Globlin-macos-arm64.zip` (macOS), `globlin-amd64.deb`, `globlin-arm64.deb`, `globlin-x86_64.rpm` and `globlin-aarch64.rpm` (Linux), each with its `.sha256`
+- [Latest release](https://github.com/TOR968/Globlin/releases/latest): `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` (installer), `globlin.exe` and `globlin-arm64.exe` (portable), `Globlin-macos-arm64.zip` (macOS), `globlin-amd64.deb`, `globlin-arm64.deb`, `globlin-x86_64.rpm` and `globlin-aarch64.rpm` (Linux), and `globlin-bin.PKGBUILD` (Arch); `SHA256SUMS` lists the SHA-256 of every file and `SHA256SUMS.minisig` signs it
 - [All releases](https://github.com/TOR968/Globlin/releases)
 
 ## Documentation
