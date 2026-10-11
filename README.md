@@ -133,11 +133,13 @@ model's line. If yours objects:
    Update-MpSignature
    ```
 
-2. **Check the hash and the signature.** Every release publishes `globlin.exe.sha256` beside the
-   `.exe`. Run `Get-FileHash globlin.exe` and compare — a match means nothing altered the download.
-   `globlin.exe.minisig` is a [minisign](https://jedisct1.github.io/minisign/) signature by the Globlin
-   release key, which proves the file came from this project's release pipeline:
-   `minisign -Vm globlin.exe -P RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`.
+2. **Check the hash and the signature.** Every release publishes `SHA256SUMS`, the SHA-256 of every
+   file in it, and `SHA256SUMS.minisig`, a [minisign](https://jedisct1.github.io/minisign/) signature
+   of that list by the Globlin release key. Run `Get-FileHash` on your download and find the same hash
+   in `SHA256SUMS` — a match means nothing altered the download. The signature proves the list came
+   from this project's release pipeline:
+   `minisign -Vm SHA256SUMS -P RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`. The release
+   notes open with the exact commands.
 3. **Read the VirusTotal report** linked from that release's notes. CI uploads every build as it is
    published, so you get the full engine spread rather than one engine's guess.
 4. **Build it yourself** — see *Building from source* below. The source is all here and

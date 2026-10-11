@@ -595,10 +595,18 @@ still holding while it shuts down, then raises a `Globlin — updated / now runn
 ### The release signature
 
 A checksum published in the same release as the binary proves the download is intact, not that the
-project published it: whoever can edit a release can edit both. So every release file also gets a
-minisign signature, `<file>.minisig`, and self-update refuses a binary whose signature does not verify
-against `RELEASE_PUBLIC_KEY` in `selfupdate.rs` (`RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`). `offer` does not even offer a
+project published it: whoever can edit a release can edit both. So each binary self-update downloads
+(`globlin.exe`, `globlin-arm64.exe`, `globlin-macos-arm64`) gets a minisign signature, `<file>.minisig`,
+and self-update refuses a binary whose signature does not verify against `RELEASE_PUBLIC_KEY` in
+`selfupdate.rs` (`RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`). `offer` does not even offer a
 release that lacks the `.minisig` for the running asset, and the download agent is `https_only`.
+
+Every other release file is covered by one signature instead: `SHA256SUMS` lists the SHA-256 of all
+eleven release files and `SHA256SUMS.minisig` signs that list, so `minisign -Vm SHA256SUMS` followed by
+`sha256sum -c --ignore-missing SHA256SUMS` proves any download as strongly as a per-file signature would,
+for two assets instead of twenty. The three self-update binaries appear in `SHA256SUMS` too, but their
+own `.sha256` and `.minisig` stay — installed copies from before this layout fetch exactly those names, and
+dropping them would strand every one of them on its current version.
 
 `.github/minisign-sign.py` writes the prehashed (`ED`, BLAKE2b-512) format `minisign -V` and the
 `minisign-verify` crate read, from the `MINISIGN_SECRET_KEY` repository secret — base64 of an 8-byte key
@@ -753,12 +761,23 @@ determining versions.
   The `publish` job then refuses to continue if the tag does not match the `version` in `Cargo.toml`, so
   a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
   `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
-  on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), checksums and scans
-  them too, and creates one GitHub Release with thirty-two files — the eight Windows ones; the
-  `build-macos` job's `Globlin-macos-arm64.zip` and bare `globlin-macos-arm64`; the `build-linux` jobs'
-  two `.deb` and two `.rpm` files, each of those with its `.sha256` (no VirusTotal scan for the macOS and
-  Linux files); and `globlin-bin.PKGBUILD`, rendered from the release's own checksums — plus a
-  `.minisig` signature for each of the eleven (see [The release signature](#the-release-signature)).
+  on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), scans them too,
+  and creates one GitHub Release with nineteen files. Eleven are the release proper: the two installers
+  and the two portable `.exe`s; the `build-macos` job's `Globlin-macos-arm64.zip` and bare
+  `globlin-macos-arm64`; the `build-linux` jobs' two `.deb` and two `.rpm` files (no VirusTotal scan for
+  the macOS and Linux files); and `globlin-bin.PKGBUILD`, rendered from the two debs' hashes. Six are the
+  `.sha256` and `.minisig` of the three binaries self-update downloads — `globlin.exe`,
+  `globlin-arm64.exe`, `globlin-macos-arm64` — which installed copies look up by exact name, so those
+  names and formats are frozen. The last two are `SHA256SUMS`, one `<hex>  <file>` line (two spaces, the
+  `sha256sum` format) for each of the eleven, and its `SHA256SUMS.minisig` (see
+  [The release signature](#the-release-signature)). Up to v0.3.15 every one of the eleven carried its own
+  `.sha256` and `.minisig`, thirty-two files in all, and the asset list GitHub shows — alphabetical, with
+  no way to hide or reorder an entry — was too long for anyone to find the file they needed. The release
+  notes now open with a *Which file do I need?* table instead: `.github/release-notes.md` is a template,
+  `@TAG@` becomes the tag so its links point at this release's files, and `@CHANGELOG@` becomes this
+  version's `CHANGELOG.md` section (cut by `changelog-section.ps1`) under *What's changed*, so the table
+  and the verify commands come first and the changes right after them. The step throws if the
+  `@CHANGELOG@` line goes missing rather than silently dropping the changelog.
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
@@ -972,8 +991,9 @@ PKGBUILD downloads the release's deb for the machine's architecture, checks its 
 `data.tar` into the package — the same binary, desktop file and icons, with Arch package names for the
 dependencies. `ci.yml` proves it on every push: `.github/aur-smoke.sh` renders the PKGBUILD around the
 freshly built deb and, in an `archlinux:base-devel` container, runs `makepkg --syncdeps --install`, checks
-the files, and removes the package again. `release.yml`'s `aur` job renders it from the published
-`.sha256` files and pushes it to `ssh://aur@aur.archlinux.org/globlin-bin.git` with
+the files, and removes the package again. `release.yml`'s `aur` job renders it from the two deb lines
+of the published `SHA256SUMS` — and fails rather than render an empty checksum if either is missing —
+and pushes it to `ssh://aur@aur.archlinux.org/globlin-bin.git` with
 `KSXGitHub/github-actions-deploy-aur` — but only when the `AUR_SSH_KEY` secret exists; without it the job
 does nothing. To switch it on: create an account on aur.archlinux.org, add an SSH public key to it, store
 the private key as the repository secret `AUR_SSH_KEY`, and optionally set the repository variable
