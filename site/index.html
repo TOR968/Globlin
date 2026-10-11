@@ -427,6 +427,15 @@
         flex: 1;
       }
 
+      ol.platform-text {
+        margin: 0;
+        padding-left: 1.2em;
+        color: var(--muted);
+        font-size: 0.95rem;
+        display: grid;
+        gap: 4px;
+      }
+
       .lede a {
         color: var(--text);
       }
@@ -1050,17 +1059,18 @@
                   <p class="platform-meta">macOS 11 or later · Apple Silicon</p>
                 </div>
               </div>
-              <p class="platform-text">
-                Unzip and move Globlin.app to Applications. It is signed ad hoc, not notarised, so allow the
-                first launch under System Settings → Privacy &amp; Security → Open Anyway.
-              </p>
+              <ol class="platform-text">
+                <li>Download the .zip, unzip it, drag Globlin.app into Applications.</li>
+                <li>Open it. When macOS says it could not verify Globlin, choose Done.</li>
+                <li>System Settings → Privacy &amp; Security → Open Anyway. It is signed ad hoc, not notarised, so this is needed once.</li>
+              </ol>
               <div class="platform-actions">
                 <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases/latest/download/Globlin-macos-arm64.zip" rel="nofollow">
                   <svg class="os-icon" aria-hidden="true"><use href="#os-apple"></use></svg>
                   Download .zip
                 </a>
               </div>
-              <p class="platform-alt">Lives in the menu bar, with no Dock icon.</p>
+              <p class="platform-alt">Lives in the menu bar; in the Dock only while its window is open.</p>
             </article>
             <article class="platform">
               <div class="platform-head">

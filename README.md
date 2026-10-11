@@ -48,13 +48,31 @@ running every time you log in.
 
 ### macOS (experimental)
 
-Apple Silicon only. Download `Globlin-macos-arm64.zip`, unzip it, and move **Globlin.app** to
-*Applications*. The app is signed ad hoc, not notarised, so the first launch is blocked: open
-*System Settings → Privacy & Security* and choose **Open Anyway**, or run
-`xattr -dr com.apple.quarantine /Applications/Globlin.app` once. After that it lives in the menu bar — no
-Dock icon — and updates itself like the Windows builds. Its settings and logs are in
-`~/Library/Application Support/globlin/`; *Run at startup* writes
-`~/Library/LaunchAgents/dev.globlin.app.plist`. It is new and tested on one Mac so far — please
+Apple Silicon (M1 and later), macOS 11 or newer. The app is signed ad hoc, not notarised, so macOS asks
+you to allow it once:
+
+1. Download **`Globlin-macos-arm64.zip`** — not `globlin-macos-arm64` without an extension, which is the
+   bare binary the installed app updates itself from and which macOS will not run on its own.
+2. Unzip it and drag **Globlin.app** into *Applications*.
+3. Open Globlin.app. macOS answers *"Globlin" Not Opened — Apple could not verify…*; choose **Done**, not
+   *Move to Trash*.
+4. Open *System Settings → Privacy & Security*, scroll to the bottom and choose **Open Anyway** next to
+   Globlin, then confirm. The button only shows for about an hour after the blocked launch. If it is not
+   there, run this once in Terminal and open the app again:
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/Globlin.app
+   ```
+
+5. Globlin now sits in the menu bar at the top right. While its window is open it also shows in the
+   Dock and in ⌘-Tab; closing the window sends it back to the menu bar only.
+6. Optional: allow its notifications under *System Settings → Notifications → Globlin*, and tick **Run at
+   startup** in the window's footer or the menu.
+
+After that it updates itself like the Windows builds — no need to repeat the steps. Its settings and logs
+are in `~/Library/Application Support/globlin/`; *Run at startup* writes
+`~/Library/LaunchAgents/dev.globlin.app.plist`. Homebrew packages are compared with your local taps, so run
+`brew update` now and then. It is new and tested on one Mac so far — please
 [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
 ### Linux (experimental)
@@ -356,8 +374,8 @@ edits are never silently overwritten.
 
 In `%LOCALAPPDATA%\globlin\`: **`last-check.txt`** (every package from the most recent check with its
 state — look here first when the window shows something surprising), **`last-run.log`** (stdout/stderr of
-the most recent *failed* package update, and the reason a source could not be listed, reachable from
-*Open last log*), **`self-update.log`** (the
+the failed package updates of the most recent batch, written as soon as each one fails, and the reason a
+source could not be listed, reachable from *Open last log*), **`self-update.log`** (the
 error from the most recent *failed* self-update lookup, kept separate so an offline run doesn't overwrite
 the log *Open last log* reads), and **`app.ico`** (the notification artwork).
 

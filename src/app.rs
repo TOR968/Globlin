@@ -104,9 +104,10 @@ impl App {
         Control::Continue
     }
 
-    pub fn close_window(&mut self, id: WindowId) {
+    pub fn close_window(&mut self, id: WindowId, target: &EventLoopWindowTarget<Message>) {
         if let Some(window) = self.window.as_ref().filter(|window| window.id() == id) {
             window.hide();
+            window::show_in_dock(target, false);
         }
     }
 
@@ -205,6 +206,7 @@ impl App {
             }
         }
         if let Some(window) = self.window.as_ref() {
+            window::show_in_dock(target, true);
             window.show();
         }
         self.render_window();
@@ -638,10 +640,15 @@ fn open_self_log() {
 }
 
 fn open_diagnostic(path: &Path, empty: &str) {
-    if path.is_file() {
-        platform::open_in_shell(path).ok();
-    } else {
-        platform::notify("Globlin", empty).ok();
+    if !path.is_file() {
+        std::fs::write(path, format!("{empty}\n")).ok();
+    }
+    if let Err(error) = platform::open_in_shell(path) {
+        platform::notify(
+            "Globlin",
+            &format!("Could not open {}: {error}", path.display()),
+        )
+        .ok();
     }
 }
 

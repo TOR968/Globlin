@@ -8,7 +8,7 @@ use crate::tray::{self, SelfUpdate, View};
 
 mod shell;
 
-pub use shell::Window;
+pub use shell::{show_in_dock, Window};
 
 pub const TITLE: &str = "Globlin";
 pub const WIDTH: f64 = 960.0;
