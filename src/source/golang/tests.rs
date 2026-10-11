@@ -46,6 +46,90 @@ fn the_module_is_kept_apart_from_the_package_because_only_it_can_be_queried() {
 }
 
 #[test]
+fn the_binary_file_is_read_from_the_header_line_of_a_windows_listing() {
+    let binaries = parse_listing(LISTING);
+
+    assert_eq!(
+        binaries[0].file,
+        PathBuf::from(r"C:\Users\x\go\bin\goimports.exe")
+    );
+    assert_eq!(
+        binaries[1].file,
+        PathBuf::from(r"C:\Users\x\go\bin\gopls.exe")
+    );
+}
+
+#[test]
+fn the_binary_file_is_read_from_the_header_line_of_a_unix_listing() {
+    let listing = "/home/x/go/bin/gopls: go1.22.2
+	path	golang.org/x/tools/gopls
+	mod	golang.org/x/tools/gopls	v0.15.3	h1:abc=
+";
+
+    assert_eq!(
+        parse_listing(listing)[0].file,
+        PathBuf::from("/home/x/go/bin/gopls")
+    );
+}
+
+fn binary(file: &Path, package: &str) -> Binary {
+    Binary {
+        file: file.to_path_buf(),
+        package: package.to_string(),
+        module: package.to_string(),
+        version: "1.0.0".to_string(),
+    }
+}
+
+#[test]
+fn a_binary_inside_the_bin_directory_is_located_by_its_package() {
+    let bin = std::env::temp_dir().join("globlin-test-go-locate");
+    std::fs::create_dir_all(&bin).unwrap();
+    let file = bin.join("gopls");
+    let binaries = vec![binary(&file, "golang.org/x/tools/gopls")];
+
+    assert_eq!(
+        locate(&binaries, &bin, "golang.org/x/tools/gopls").unwrap(),
+        file
+    );
+}
+
+#[test]
+fn a_package_missing_from_the_bin_directory_is_reported_not_found() {
+    let bin = std::env::temp_dir().join("globlin-test-go-missing");
+    let binaries = vec![binary(&bin.join("gopls"), "golang.org/x/tools/gopls")];
+
+    let error = locate(&binaries, &bin, "example.com/other").unwrap_err();
+
+    assert!(error
+        .to_string()
+        .contains("example.com/other was not found in"));
+}
+
+#[test]
+fn a_binary_outside_the_bin_directory_is_never_deleted() {
+    let bin = std::env::temp_dir().join("globlin-test-go-bin");
+    let elsewhere = std::env::temp_dir().join("globlin-test-go-elsewhere");
+    let binaries = vec![binary(&elsewhere.join("gopls"), "golang.org/x/tools/gopls")];
+
+    let error = locate(&binaries, &bin, "golang.org/x/tools/gopls").unwrap_err();
+
+    assert!(error.to_string().contains("was left alone"));
+}
+
+#[test]
+fn go_removes_its_binaries_itself_instead_of_through_a_command() {
+    let go = Go {
+        command: PathBuf::from("globlin-test-no-such-go"),
+    };
+
+    assert!(go
+        .remove_directly("golang.org/x/tools/gopls")
+        .unwrap()
+        .is_err());
+}
+
+#[test]
 fn the_leading_v_is_dropped_so_versions_render_like_every_other_source() {
     assert_eq!(parse_listing(LISTING)[1].version, "0.15.3");
 }

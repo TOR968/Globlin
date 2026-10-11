@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::diagnostics;
 use crate::model::RemoveTarget;
-use crate::source;
+use crate::source::{self, PackageSource};
 
 pub fn run(config: &Config, target: &RemoveTarget) -> bool {
     match apply(config, target) {
@@ -16,7 +16,23 @@ pub fn run(config: &Config, target: &RemoveTarget) -> bool {
 fn apply(config: &Config, target: &RemoveTarget) -> std::result::Result<(), String> {
     let sources = source::enabled(config)
         .map_err(|error| format!("{}: no package source is available: {error}\n", target.name))?;
-    let source = source::source_for(&sources, &target.name, target.source)?;
+    remove_from(&sources, target)
+}
+
+fn remove_from(
+    sources: &[Box<dyn PackageSource>],
+    target: &RemoveTarget,
+) -> std::result::Result<(), String> {
+    let source = source::source_for(sources, &target.name, target.source)?;
+    if let Some(removed) = source.remove_directly(&target.name) {
+        return removed.map_err(|error| {
+            format!(
+                "removing {} via {} failed: {error}\n",
+                target.name,
+                target.source.label()
+            )
+        });
+    }
     let output = source::run_change(
         source.uninstall_command(&target.name),
         &target.name,

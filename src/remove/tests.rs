@@ -68,3 +68,58 @@ fn a_source_that_cannot_be_started_fails_instead_of_reporting_success() {
 
     assert!(!removed);
 }
+
+struct DirectRemover {
+    outcome: fn() -> crate::Result<()>,
+}
+
+impl PackageSource for DirectRemover {
+    fn kind(&self) -> SourceKind {
+        SourceKind::Go
+    }
+
+    fn installed(&self) -> crate::Result<Vec<crate::model::Installed>> {
+        Ok(Vec::new())
+    }
+
+    fn update_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn uninstall_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn remove_directly(&self, _name: &str) -> Option<crate::Result<()>> {
+        Some((self.outcome)())
+    }
+}
+
+fn go_target() -> RemoveTarget {
+    RemoveTarget {
+        name: "golang.org/x/tools/gopls".to_string(),
+        source: SourceKind::Go,
+    }
+}
+
+#[test]
+fn a_source_that_removes_the_package_itself_needs_no_uninstall_command() {
+    let sources: Vec<Box<dyn PackageSource>> = vec![Box::new(DirectRemover { outcome: || Ok(()) })];
+
+    assert!(remove_from(&sources, &go_target()).is_ok());
+}
+
+#[test]
+fn a_direct_removal_that_fails_reports_the_source_and_the_reason() {
+    let sources: Vec<Box<dyn PackageSource>> = vec![Box::new(DirectRemover {
+        outcome: || Err("access denied".into()),
+    })];
+
+    let report = remove_from(&sources, &go_target()).unwrap_err();
+
+    assert_eq!(
+        report,
+        "removing golang.org/x/tools/gopls via go failed: access denied
+"
+    );
+}

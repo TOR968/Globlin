@@ -270,8 +270,9 @@ Apps installed with `scoop install -g` live under `C:\ProgramData\scoop` and are
 before most installs). Both formulae and casks are listed.
 
 **cargo and go build from source.** Their **Update** runs a real compile, which can take minutes; the row
-keeps spinning until it finishes. Go has no uninstall command, so go rows offer no **Uninstall** —
-delete the binary from your Go bin directory yourself.
+keeps spinning until it finishes. Go has no uninstall command, so **Uninstall** on a go
+row deletes the binary from your Go bin directory itself, after finding it with `go version -m`, and refuses
+to touch anything outside that directory.
 
 The same package can be installed under several managers and stays distinguishable: the window shows the
 source in its own column, and menu and notification text suffix it — `typescript (pnpm)`.

@@ -55,6 +55,10 @@ pub trait PackageSource {
 
     fn uninstall_command(&self, name: &str) -> Option<Command>;
 
+    fn remove_directly(&self, _name: &str) -> Option<Result<()>> {
+        None
+    }
+
     fn blocked_scripts(&self, _stderr: &str) -> Option<Vec<BlockedScript>> {
         None
     }

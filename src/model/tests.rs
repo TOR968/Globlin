@@ -260,6 +260,17 @@ fn only_the_sources_that_need_elevation_are_read_only() {
 }
 
 #[test]
+fn only_winget_and_choco_cannot_be_removed() {
+    let not_removable: Vec<&str> = KINDS
+        .iter()
+        .filter(|kind| !kind.removable())
+        .map(|kind| kind.label())
+        .collect();
+
+    assert_eq!(not_removable, vec!["winget", "choco"]);
+}
+
+#[test]
 fn only_winget_choco_and_scoop_are_windows_only() {
     let windows_only: Vec<&str> = KINDS
         .iter()
