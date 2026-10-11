@@ -45,7 +45,7 @@ fn only_the_latest_tag_is_read() {
 #[test]
 fn an_empty_request_needs_no_network() {
     assert!(npm_latest(&[]).unwrap().is_empty());
-    assert!(pypi_latest(&[]).is_empty());
+    assert!(pypi_latest(&[]).unwrap().is_empty());
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn a_version_that_is_not_a_run_of_numbers_cannot_be_compared() {
 #[test]
 #[ignore = "hits the real PyPI feed: cargo test -- --ignored --exact registry::tests::the_real_pypi_feed_still_answers_with_a_version"]
 fn the_real_pypi_feed_still_answers_with_a_version() {
-    let found = pypi_latest(&["black".to_string()]);
+    let found = pypi_latest(&["black".to_string()]).unwrap();
 
     assert!(numeric(&found["black"]).is_some());
 }
@@ -142,7 +142,7 @@ fn a_crate_with_only_prereleases_has_no_stable_version_to_offer() {
 
 #[test]
 fn an_empty_crates_request_needs_no_network() {
-    assert!(crates_latest(&[]).is_empty());
+    assert!(crates_latest(&[]).unwrap().is_empty());
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn the_nuget_index_is_read_from_the_end_because_it_is_sorted_oldest_first() {
 
 #[test]
 fn an_empty_nuget_request_needs_no_network() {
-    assert!(nuget_latest(&[]).is_empty());
+    assert!(nuget_latest(&[]).unwrap().is_empty());
 }
 
 #[test]
@@ -217,13 +217,13 @@ fn a_prerelease_or_foreign_redirect_is_not_a_version() {
 
 #[test]
 fn an_empty_gallery_request_needs_no_network() {
-    assert!(psgallery_latest(&[]).is_empty());
+    assert!(psgallery_latest(&[]).unwrap().is_empty());
 }
 
 #[test]
 #[ignore = "hits the real NuGet index: cargo test -- --ignored --exact registry::tests::the_real_nuget_index_still_answers_with_a_version"]
 fn the_real_nuget_index_still_answers_with_a_version() {
-    let found = nuget_latest(&["dotnetsay".to_string()]);
+    let found = nuget_latest(&["dotnetsay".to_string()]).unwrap();
 
     assert!(numeric(&found["dotnetsay"]).is_some());
 }
@@ -231,7 +231,7 @@ fn the_real_nuget_index_still_answers_with_a_version() {
 #[test]
 #[ignore = "hits the real PowerShell Gallery: cargo test -- --ignored --exact registry::tests::the_real_gallery_redirect_still_names_a_version"]
 fn the_real_gallery_redirect_still_names_a_version() {
-    let found = psgallery_latest(&["Pester".to_string()]);
+    let found = psgallery_latest(&["Pester".to_string()]).unwrap();
 
     assert!(numeric(&found["Pester"]).is_some());
 }
@@ -239,7 +239,60 @@ fn the_real_gallery_redirect_still_names_a_version() {
 #[test]
 #[ignore = "hits the real crates.io: cargo test -- --ignored --exact registry::tests::the_real_crates_io_still_answers_for_a_batch"]
 fn the_real_crates_io_still_answers_for_a_batch() {
-    let found = crates_latest(&["ripgrep".to_string(), "serde".to_string()]);
+    let found = crates_latest(&["ripgrep".to_string(), "serde".to_string()]).unwrap();
 
     assert_eq!(found.len(), 2);
+}
+
+#[test]
+fn a_trailing_zero_never_makes_a_version_newer_in_either_direction() {
+    assert_eq!(numeric_is_newer("1.0.0", "1.0"), Some(false));
+    assert_eq!(numeric_is_newer("1.0", "1.0.0"), Some(false));
+    assert_eq!(numeric_is_newer("1.0.1", "1.0"), Some(true));
+}
+
+#[test]
+fn versions_compare_as_semver_first_and_numerically_otherwise() {
+    assert_eq!(
+        is_newer("v1.2.0", "v1.2.1-0.20240101000000-abcdef123456"),
+        Some(false)
+    );
+    assert_eq!(is_newer("1.4.2", "1.3.3"), Some(true));
+    assert_eq!(is_newer("2024.01.15", "2024.01.16"), Some(false));
+    assert_eq!(is_newer("1.2.3_1", "1.2.3"), None);
+}
+
+#[test]
+fn a_registry_that_answered_nothing_at_all_is_reported_as_unreachable() {
+    let client = Client::new();
+
+    let error = client
+        .verdict::<String>(NPM_HOST, HashMap::new())
+        .unwrap_err()
+        .to_string();
+
+    assert_eq!(error, "registry.npmjs.org could not be reached");
+}
+
+#[test]
+fn a_registry_that_answered_but_knew_none_of_the_names_is_not_an_error() {
+    let client = Client::new();
+    client.answered::<()>(Err(ureq::Error::StatusCode(404)));
+
+    assert!(client
+        .verdict::<String>(NPM_HOST, HashMap::new())
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn a_name_cannot_change_the_path_or_the_query_of_a_registry_request() {
+    assert_eq!(
+        dist_tags_url("../x?y=1#z"),
+        "https://registry.npmjs.org/-/package/..%2fx%3fy%3d1%23z/dist-tags"
+    );
+    assert_eq!(
+        feed_url("a/b&c"),
+        "https://pypi.org/rss/project/a%2fb%26c/releases.xml"
+    );
 }

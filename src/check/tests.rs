@@ -393,3 +393,70 @@ fn sources_that_list_nothing_without_failing_are_an_empty_success() {
     assert!(listing.installed.is_empty());
     assert!(listing.skipped.is_empty());
 }
+
+#[test]
+fn an_install_ahead_of_its_resolved_version_is_current_not_a_downgrade() {
+    let package = classify(
+        Installed::new(
+            "golang.org/x/tools/gopls",
+            "1.2.1-0.20240101000000-abcdef123456",
+            SourceKind::Go,
+        )
+        .with_available(Some("1.2.0".to_string())),
+        &Config::default(),
+        &Latest::default(),
+    );
+
+    assert_eq!(package.status, Status::Current);
+}
+
+#[test]
+fn a_resolved_version_that_cannot_be_compared_still_reads_outdated() {
+    let package = classify(
+        Installed::new("ffmpeg", "7.1_1", SourceKind::Brew)
+            .with_available(Some("7.1_2".to_string())),
+        &Config::default(),
+        &Latest::default(),
+    );
+
+    assert_eq!(
+        package.status,
+        Status::Outdated {
+            latest: "7.1_2".to_string()
+        }
+    );
+}
+
+#[test]
+fn an_unreachable_registry_is_skipped_instead_of_failing_the_check() {
+    let mut skipped = Vec::new();
+
+    let found: HashMap<String, String> = reachable(
+        Err("registry.npmjs.org could not be reached".into()),
+        &mut skipped,
+    );
+
+    assert!(found.is_empty());
+    assert_eq!(skipped, ["registry.npmjs.org could not be reached"]);
+}
+
+#[test]
+fn a_package_installed_from_outside_its_registry_is_never_looked_up_or_offered() {
+    let linked = installed("internal-tool", "1.0.0").with_external(true);
+    let mut latest = Latest::default();
+    latest.npm.insert(
+        "internal-tool".to_string(),
+        Version::parse("99.0.0").unwrap(),
+    );
+
+    assert!(lookup_names(
+        std::slice::from_ref(&linked),
+        &Config::default(),
+        Catalog::Npm
+    )
+    .is_empty());
+    assert_eq!(
+        classify(linked, &Config::default(), &latest).status,
+        Status::Unknown
+    );
+}

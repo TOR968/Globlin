@@ -18,7 +18,9 @@ struct UnrunnableNpm {
 
 impl UnrunnableNpm {
     fn new(label: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("globlin-fake-npm-{label}"));
+        let dir = std::env::temp_dir().join(format!("globlin-fake-npm-{label}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("npm");
         std::fs::write(&path, b"not an executable").unwrap();
         Self {
             config: Config {
@@ -193,7 +195,7 @@ fn updates_a_package_for_real() {
     let outcome = run(&Config::default(), &targets, &[], |_| {});
 
     assert!(outcome.failed.is_empty(), "failed: {:?}", outcome.failed);
-    assert_eq!(outcome.updated, vec![name]);
+    assert_eq!(outcome.updated, targets);
 }
 
 #[test]
@@ -235,7 +237,9 @@ struct FakeNpmRun {
 #[cfg(windows)]
 impl FakeNpmRun {
     fn new(label: &str, script: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("globlin-fake-npm-run-{label}.cmd"));
+        let dir = std::env::temp_dir().join(format!("globlin-fake-npm-run-{label}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("npm.cmd");
         std::fs::write(&path, script).unwrap();
         Self {
             config: Config {
@@ -397,13 +401,26 @@ fn a_package_blocked_again_replaces_its_older_approval_entry() {
 fn a_package_that_updated_leaves_the_approvals() {
     let mut approvals = vec![blocked("alpha", SourceKind::Npm)];
     let outcome = Outcome {
-        updated: vec!["alpha".to_string()],
+        updated: vec![blocked("alpha", SourceKind::Npm).target],
         ..Outcome::default()
     };
 
     settle(&mut approvals, &outcome);
 
     assert!(approvals.is_empty());
+}
+
+#[test]
+fn updating_a_namesake_from_another_source_keeps_the_approval() {
+    let mut approvals = vec![blocked("alpha", SourceKind::Npm)];
+    let outcome = Outcome {
+        updated: vec![blocked("alpha", SourceKind::Pnpm).target],
+        ..Outcome::default()
+    };
+
+    settle(&mut approvals, &outcome);
+
+    assert_eq!(approvals, vec![blocked("alpha", SourceKind::Npm)]);
 }
 
 #[test]
@@ -449,7 +466,7 @@ fn a_batch_where_every_target_was_blocked_changed_nothing_worth_rechecking() {
 #[test]
 fn a_batch_with_an_updated_or_failed_target_changed_packages() {
     let updated = Outcome {
-        updated: vec!["alpha".to_string()],
+        updated: vec![blocked("alpha", SourceKind::Npm).target],
         blocked: vec![blocked("beta", SourceKind::Npm)],
         ..Outcome::default()
     };

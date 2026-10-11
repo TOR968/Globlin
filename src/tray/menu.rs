@@ -388,7 +388,13 @@ fn summary(packages: &[Package]) -> String {
         return "Globlin — nothing found".to_string();
     }
     match model::outdated(packages).len() {
-        0 => format!("Globlin — {} packages, up to date", packages.len()),
+        0 => match model::unchecked(packages).len() {
+            0 => format!("Globlin — {} packages, up to date", packages.len()),
+            unchecked => format!(
+                "Globlin — {} packages, {unchecked} not checked",
+                packages.len()
+            ),
+        },
         1 => "Globlin — 1 update available".to_string(),
         count => format!("Globlin — {count} updates available"),
     }

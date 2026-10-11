@@ -52,17 +52,23 @@ pub fn run(config: &Config) -> Report {
 
 fn collect_packages(config: &Config) -> Result<(Vec<Package>, Vec<String>)> {
     let sources = source::enabled(config)?;
-    let Listing { installed, skipped } = collect(&sources)?;
+    let Listing {
+        installed,
+        mut skipped,
+    } = collect(&sources)?;
+    let names = |catalog| lookup_names(&installed, config, catalog);
     let latest = Latest {
-        npm: registry::npm_latest(&lookup_names(&installed, config, Catalog::Npm))?,
-        pypi: registry::pypi_latest(&lookup_names(&installed, config, Catalog::PyPi)),
-        crates: registry::crates_latest(&lookup_names(&installed, config, Catalog::Crates)),
-        nuget: registry::nuget_latest(&lookup_names(&installed, config, Catalog::NuGet)),
-        psgallery: registry::psgallery_latest(&lookup_names(
-            &installed,
-            config,
-            Catalog::PsGallery,
-        )),
+        npm: reachable(registry::npm_latest(&names(Catalog::Npm)), &mut skipped),
+        pypi: reachable(registry::pypi_latest(&names(Catalog::PyPi)), &mut skipped),
+        crates: reachable(
+            registry::crates_latest(&names(Catalog::Crates)),
+            &mut skipped,
+        ),
+        nuget: reachable(registry::nuget_latest(&names(Catalog::NuGet)), &mut skipped),
+        psgallery: reachable(
+            registry::psgallery_latest(&names(Catalog::PsGallery)),
+            &mut skipped,
+        ),
     };
     let packages: Vec<Package> = installed
         .into_iter()
@@ -70,6 +76,16 @@ fn collect_packages(config: &Config) -> Result<(Vec<Package>, Vec<String>)> {
         .collect();
     diagnostics::record_snapshot(&packages);
     Ok((packages, skipped))
+}
+
+fn reachable<T>(
+    lookup: Result<HashMap<String, T>>,
+    skipped: &mut Vec<String>,
+) -> HashMap<String, T> {
+    lookup.unwrap_or_else(|error| {
+        skipped.push(error.to_string());
+        HashMap::new()
+    })
 }
 
 fn look_up_release(outcome: Result<Option<Release>>) -> Option<Release> {
@@ -107,6 +123,7 @@ fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> V
     installed
         .iter()
         .filter(|item| item.source.catalog() == catalog)
+        .filter(|item| !item.external)
         .filter(|item| !config.is_ignored(&item.name))
         .map(|item| item.name.clone())
         .collect::<BTreeSet<String>>()
@@ -117,6 +134,8 @@ fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> V
 fn classify(installed: Installed, config: &Config, latest: &Latest) -> Package {
     let status = if config.is_ignored(&installed.name) {
         Status::Ignored
+    } else if installed.external {
+        Status::Unknown
     } else {
         match installed.source.catalog() {
             Catalog::SelfReported => self_reported(installed.available.as_deref()),
@@ -161,10 +180,13 @@ fn from_registry(installed: &Installed, latest: &HashMap<String, Version>) -> St
 fn from_resolved(installed: &Installed) -> Status {
     match installed.available.as_deref() {
         None => Status::Unknown,
-        Some(indexed) if indexed != installed.version => Status::Outdated {
-            latest: indexed.to_string(),
+        Some(indexed) if indexed == installed.version => Status::Current,
+        Some(indexed) => match registry::is_newer(indexed, &installed.version) {
+            Some(false) => Status::Current,
+            Some(true) | None => Status::Outdated {
+                latest: indexed.to_string(),
+            },
         },
-        Some(_) => Status::Current,
     }
 }
 

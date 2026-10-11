@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 460 tests (431 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 498 tests (469 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -51,7 +51,7 @@ serves all three — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#other-platf
 state and lives inside the closure. Work that can block — a check, an update run — is spawned on a plain
 `std::thread` with a *clone* of `Config`, and reports back by sending a `Message` through
 `EventLoopProxy`. There are no locks and no shared state; anything a worker learns must travel as a
-`Message` variant (`main.rs:27`). Menu clicks arrive the same way: `tray_icon`'s global handler is
+`Message` variant (`main.rs:36`). Menu clicks arrive the same way: `tray_icon`'s global handler is
 forwarded into the same queue.
 
 **`Activity` is the concurrency guard.** `App.activity: Option<Activity>` doubles as (a) the "a job is in
@@ -115,7 +115,11 @@ updates fine but has no uninstall, so the window draws **Uninstall** from `remov
 `Status` per package. `update.rs` = run the update command per target, announcing `Progress` between
 each. `model.rs` holds the vocabulary both speak (`Package`, `Status`, `UpdateTarget`, `Activity`).
 `Status::Unknown` (registry did not answer) is distinct from `Status::Current` everywhere and must stay
-that way — a network failure must never render as "everything is fine". An npm update refused with
+that way — a network failure must never render as "everything is fine". The headline says
+`N packages, K not checked` rather than `up to date` while any package is `Unknown`, and a registry that
+could not be reached at all lands in `Report.skipped` (red icon, one notification) instead of failing
+the whole check. Every child process runs through `process::output_within` with a deadline — a hung
+child would otherwise hold `Activity` forever. An npm update refused with
 `ESTRICTALLOWSCRIPTS` is `Outcome.blocked`, not `failed`; `App.approvals` holds it until the window's
 approval dialog approves (`approve:` id, persisted to the user `.npmrc`) or dismisses (`dismiss:`) it.
 
@@ -161,6 +165,9 @@ encoder in `src/icon/png.rs`. Regenerate them, never hand-edit them; see
   the first `[changelog] commit_parsers` entry, which skips anything scoped `(site)` so the landing page
   stays out of a changelog that documents the application. Both key on the scope, so a site-only commit
   must be `chore(site):` or `docs(site):` — unscoped, it ships a release to every user for a copy edit.
+- A test that fakes a package manager must never be able to reach the real one. The npm fakes are files
+  named `npm`/`npm.cmd` in a directory of their own, because a refused `npm_cmd` is an error, never a
+  fallback to `PATH` — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#tests).
 - Test names are full sentences describing the rule being pinned
   (`a_package_missing_from_the_registry_reply_is_unknown_not_current`).
 - Tests live in a sibling child-module file, not inline: `foo.rs` carries `#[cfg(test)] mod tests;` and

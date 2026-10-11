@@ -178,8 +178,89 @@ fn an_empty_listing_names_the_command_and_carries_its_stderr() {
     let message = silent_listing("npm ls -g", &output);
 
     assert!(
-        message.starts_with("npm ls -g printed nothing and "),
+        message.starts_with("npm ls -g listed nothing and "),
         "{message}"
     );
     assert!(message.ends_with(": npm error code EBUSY"), "{message}");
+}
+
+fn finished(code_zero: bool) -> std::process::Output {
+    #[cfg(not(windows))]
+    use std::os::unix::process::ExitStatusExt;
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
+
+    #[cfg(windows)]
+    let status = std::process::ExitStatus::from_raw(u32::from(!code_zero));
+    #[cfg(not(windows))]
+    let status = std::process::ExitStatus::from_raw(i32::from(!code_zero) << 8);
+    std::process::Output {
+        status,
+        stdout: Vec::new(),
+        stderr: b"source not reachable".to_vec(),
+    }
+}
+
+#[test]
+fn a_failed_command_that_listed_nothing_is_an_error_not_an_empty_source() {
+    let error = listed(Vec::<String>::new(), "pnpm ls -g", &finished(false))
+        .unwrap_err()
+        .to_string();
+
+    assert!(
+        error.starts_with("pnpm ls -g listed nothing and "),
+        "{error}"
+    );
+    assert!(error.ends_with(": source not reachable"), "{error}");
+}
+
+#[test]
+fn a_successful_command_that_listed_nothing_is_an_empty_source() {
+    assert!(listed(Vec::<String>::new(), "pnpm ls -g", &finished(true))
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn rows_from_a_command_that_exited_badly_are_still_kept() {
+    assert_eq!(
+        listed(vec!["a".to_string()], "winget list", &finished(false)).unwrap(),
+        ["a"]
+    );
+}
+
+#[test]
+fn a_source_that_is_not_built_is_reported_by_name() {
+    let sources: Vec<Box<dyn PackageSource>> = Vec::new();
+
+    let error = source_for(&sources, "prettier", SourceKind::Pnpm)
+        .err()
+        .unwrap();
+
+    assert_eq!(error, "prettier: the pnpm source is not available\n");
+}
+
+#[test]
+fn a_read_only_source_runs_nothing() {
+    let error = run_change(None, "Git.Git", SourceKind::Winget).unwrap_err();
+
+    assert_eq!(error, "Git.Git: the winget source is read-only\n");
+}
+
+#[test]
+fn a_manifest_spec_that_names_a_path_a_link_a_git_url_or_an_alias_is_another_origin() {
+    for spec in [
+        "file:../tool",
+        "link:tool",
+        "github:me/tool",
+        "me/tool",
+        "git+https://example.com/tool.git",
+        "https://example.com/tool.tgz",
+        "npm:other@1.0.0",
+    ] {
+        assert!(names_another_origin(spec), "{spec}");
+    }
+    for spec in ["^1.2.3", "1.2.3", "latest", "*", ">=1 <2", "1.x"] {
+        assert!(!names_another_origin(spec), "{spec}");
+    }
 }

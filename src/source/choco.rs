@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -21,10 +21,8 @@ impl Choco {
     }
 
     fn run(&self, arguments: &[&str]) -> String {
-        hidden_command(&self.command)
-            .args(arguments)
-            .output()
-            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+        run_listing(hidden_command(&self.command).args(arguments))
+            .map(|output| stdout_text(&output))
             .unwrap_or_default()
     }
 
@@ -43,9 +41,13 @@ impl PackageSource for Choco {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let listing = self.run(&self.list_arguments());
+        let listing = run_listing(hidden_command(&self.command).args(self.list_arguments()))?;
         let outdated = self.run(&["outdated", "-r", "--ignore-pinned"]);
-        Ok(merge(&listing, &outdated))
+        listed(
+            merge(&stdout_text(&listing), &outdated),
+            "choco list",
+            &listing,
+        )
     }
 
     fn update_command(&self, _name: &str) -> Option<Command> {

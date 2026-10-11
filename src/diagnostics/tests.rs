@@ -91,3 +91,56 @@ fn a_test_build_never_writes_into_the_users_data_directory() {
         self_update_log_path().display()
     );
 }
+
+#[test]
+fn the_same_note_is_written_to_the_log_only_once() {
+    let path = std::env::temp_dir().join("globlin-note-once.log");
+    std::fs::remove_file(&path).ok();
+
+    append_once(&path, "bun: no global package.json found\n");
+    append_once(&path, "bun: no global package.json found\n");
+    append_once(&path, "yarn: yarn 2+ removed global installs\n");
+
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "bun: no global package.json found\nyarn: yarn 2+ removed global installs\n"
+    );
+}
+
+#[test]
+fn a_command_report_carries_the_action_the_status_and_both_streams() {
+    let output = std::process::Output {
+        status: std::process::ExitStatus::default(),
+        stdout: b"some out".to_vec(),
+        stderr: b"some err".to_vec(),
+    };
+
+    let report = command_report("removing @scope/tool via npm", &output);
+
+    assert!(
+        report.starts_with("removing @scope/tool via npm exited with "),
+        "{report}"
+    );
+    assert!(report.contains("--- stdout ---\nsome out\n"), "{report}");
+    assert!(report.contains("--- stderr ---\nsome err\n"), "{report}");
+}
+
+#[test]
+fn credentials_a_package_manager_echoes_never_reach_the_log() {
+    let report = "npm verbose config //registry.npmjs.org/:_authToken=abc123secret\n\
+                  using npm_0123456789abcdefghijABCDEFGHIJ0123456789 for auth\n\
+                  Authorization: Bearer xyz\n\
+                  prettier 3.9.6 is fine\n";
+
+    let cleaned = redacted(report);
+
+    assert!(!cleaned.contains("abc123secret"), "{cleaned}");
+    assert!(!cleaned.contains("npm_0123456789abcdefghij"), "{cleaned}");
+    assert!(!cleaned.contains("Bearer xyz"), "{cleaned}");
+    assert!(
+        cleaned.contains("//registry.npmjs.org/:_authToken=<redacted>\n"),
+        "{cleaned}"
+    );
+    assert!(cleaned.contains("using <redacted> for auth\n"), "{cleaned}");
+    assert!(cleaned.ends_with("prettier 3.9.6 is fine\n"), "{cleaned}");
+}

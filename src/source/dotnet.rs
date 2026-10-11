@@ -3,7 +3,7 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -19,12 +19,8 @@ impl Dotnet {
         Ok(Self { command })
     }
 
-    fn run(&self, arguments: &[&str]) -> String {
-        hidden_command(&self.command)
-            .args(arguments)
-            .output()
-            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
-            .unwrap_or_default()
+    fn run(&self, arguments: &[&str]) -> Result<std::process::Output> {
+        run_listing(hidden_command(&self.command).args(arguments))
     }
 }
 
@@ -34,11 +30,17 @@ impl PackageSource for Dotnet {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let reported = parse_json(&self.run(&["tool", "list", "--global", "--format", "json"]));
-        if reported.is_empty() {
-            return Ok(parse_table(&self.run(&["tool", "list", "--global"])));
+        let json = self.run(&["tool", "list", "--global", "--format", "json"])?;
+        let reported = parse_json(&stdout_text(&json));
+        if !reported.is_empty() {
+            return Ok(reported);
         }
-        Ok(reported)
+        let table = self.run(&["tool", "list", "--global"])?;
+        listed(
+            parse_table(&stdout_text(&table)),
+            "dotnet tool list --global",
+            &table,
+        )
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {

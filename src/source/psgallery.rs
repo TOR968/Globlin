@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -36,11 +36,16 @@ impl PackageSource for PsGallery {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = self.shell(LISTING).output()?;
-        Ok(parse_listing(&String::from_utf8_lossy(&output.stdout)))
+        let output = run_listing(&mut self.shell(LISTING))?;
+        listed(
+            parse_listing(&stdout_text(&output)),
+            "Get-InstalledModule",
+            &output,
+        )
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        let name = plain_module_name(name)?;
         Some(self.shell(&format!(
             "Update-Module -Name {} -Scope CurrentUser -Force",
             quoted(name)
@@ -48,6 +53,7 @@ impl PackageSource for PsGallery {
     }
 
     fn uninstall_command(&self, name: &str) -> Option<Command> {
+        let name = plain_module_name(name)?;
         Some(self.shell(&format!("Uninstall-Module -Name {}", quoted(name))))
     }
 }
@@ -59,6 +65,14 @@ fn parse_listing(stdout: &str) -> Vec<Installed> {
         .filter(|row| row.len() == 2)
         .map(|row| Installed::new(row[0], row[1], SourceKind::PsGallery))
         .collect()
+}
+
+fn plain_module_name(name: &str) -> Option<&str> {
+    let plain = !name.is_empty()
+        && name
+            .chars()
+            .all(|glyph| glyph.is_ascii_alphanumeric() || matches!(glyph, '.' | '_' | '-'));
+    plain.then_some(name)
 }
 
 fn quoted(name: &str) -> String {

@@ -80,3 +80,18 @@ fn the_real_module_listing_still_parses() {
         .iter()
         .all(|item| !item.name.is_empty() && !item.version.is_empty()));
 }
+
+#[test]
+fn a_module_name_with_anything_but_letters_digits_dots_dashes_and_underscores_runs_nothing() {
+    let gallery = PsGallery {
+        command: PathBuf::from("pwsh"),
+    };
+
+    for name in ["Bad\u{2019}; Remove-Item x", "Pes*", "a b", "", "x$(y)"] {
+        assert!(gallery.update_command(name).is_none(), "{name}");
+        assert!(gallery.uninstall_command(name).is_none(), "{name}");
+    }
+    assert!(gallery
+        .update_command("Microsoft.PowerShell.PSResourceGet")
+        .is_some());
+}

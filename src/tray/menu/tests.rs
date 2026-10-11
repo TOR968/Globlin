@@ -285,6 +285,19 @@ fn an_up_to_date_headline_reports_how_many_are_watched() {
 }
 
 #[test]
+fn packages_nobody_could_check_are_never_summed_up_as_up_to_date() {
+    let packages = vec![
+        package("a", SourceKind::Npm, Status::Current),
+        package("b", SourceKind::Pipx, Status::Unknown),
+    ];
+
+    assert_eq!(
+        headline(&view(&packages, None, 0)),
+        "Globlin — 2 packages, 1 not checked"
+    );
+}
+
+#[test]
 fn the_update_headline_names_the_package_and_both_versions() {
     let activity = updating("prettier", 0, 1);
     let text = headline(&view(&[], Some(&activity), 0));

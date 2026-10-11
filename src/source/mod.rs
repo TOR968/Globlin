@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use crate::config::Config;
 use crate::model::{BlockedScript, Installed, SourceKind, KINDS};
+use crate::process;
 use crate::Result;
 
 mod brew;
@@ -47,6 +48,10 @@ pub trait PackageSource {
     fn installed(&self) -> Result<Vec<Installed>>;
 
     fn update_command(&self, name: &str) -> Option<Command>;
+
+    fn update_to(&self, name: &str, _version: &str) -> Option<Command> {
+        self.update_command(name)
+    }
 
     fn uninstall_command(&self, name: &str) -> Option<Command>;
 
@@ -103,13 +108,51 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
     })
 }
 
+pub(crate) fn source_for<'a>(
+    sources: &'a [Box<dyn PackageSource>],
+    name: &str,
+    kind: SourceKind,
+) -> std::result::Result<&'a dyn PackageSource, String> {
+    sources
+        .iter()
+        .find(|source| source.kind() == kind)
+        .map(AsRef::as_ref)
+        .ok_or_else(|| format!("{name}: the {} source is not available\n", kind.label()))
+}
+
+pub(crate) fn run_change(
+    command: Option<Command>,
+    name: &str,
+    kind: SourceKind,
+) -> std::result::Result<Output, String> {
+    let mut command =
+        command.ok_or_else(|| format!("{name}: the {} source is read-only\n", kind.label()))?;
+    process::output_within(&mut command, process::CHANGE_LIMIT)
+        .map_err(|error| format!("{name}: could not run {}: {error}\n", kind.label()))
+}
+
+pub(crate) fn run_listing(command: &mut Command) -> Result<Output> {
+    Ok(process::output_within(command, process::LISTING_LIMIT)?)
+}
+
+pub(crate) fn stdout_text(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+pub(crate) fn listed<T>(rows: Vec<T>, command: &str, output: &Output) -> Result<Vec<T>> {
+    if rows.is_empty() && !output.status.success() {
+        return Err(silent_listing(command, output).into());
+    }
+    Ok(rows)
+}
+
 pub(crate) fn silent_listing(command: &str, output: &Output) -> String {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr = stderr.trim();
     if stderr.is_empty() {
-        format!("{command} printed nothing and {}", output.status)
+        format!("{command} listed nothing and {}", output.status)
     } else {
-        format!("{command} printed nothing and {}: {stderr}", output.status)
+        format!("{command} listed nothing and {}: {stderr}", output.status)
     }
 }
 
@@ -145,21 +188,35 @@ fn executable_in(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 pub(crate) fn manifest_names(raw: &str) -> Result<Vec<String>> {
+    Ok(manifest_specs(raw)?.into_keys().collect())
+}
+
+fn manifest_specs(raw: &str) -> Result<BTreeMap<String, String>> {
     let manifest: GlobalManifest = serde_json::from_str(raw)?;
-    Ok(manifest.dependencies.into_keys().collect())
+    Ok(manifest.dependencies)
 }
 
 pub(crate) fn node_modules_listing(root: &Path, source: SourceKind) -> Vec<Installed> {
     let Ok(raw) = fs::read_to_string(root.join("package.json")) else {
         return Vec::new();
     };
-    let Ok(names) = manifest_names(&raw) else {
+    let Ok(specs) = manifest_specs(&raw) else {
         return Vec::new();
     };
-    names
+    specs
         .iter()
-        .filter_map(|name| installed_version(root, name, source))
+        .filter_map(|(name, spec)| {
+            Some(installed_version(root, name, source)?.with_external(names_another_origin(spec)))
+        })
         .collect()
+}
+
+pub(crate) fn names_another_origin(spec: &str) -> bool {
+    spec.contains(':') || spec.contains('/')
+}
+
+pub(crate) fn pinned_to(name: &str, version: &str) -> String {
+    format!("{name}@{version}")
 }
 
 pub(crate) fn installed_version(root: &Path, name: &str, source: SourceKind) -> Option<Installed> {

@@ -4,7 +4,9 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{
+    find_on_path, hidden_command, listed, pinned_to, run_listing, stdout_text, PackageSource,
+};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -27,15 +29,18 @@ impl PackageSource for Pnpm {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = hidden_command(&self.command)
-            .args(["ls", "-g", "--json", "--depth=0"])
-            .output()?;
-        Ok(parse_listing(&String::from_utf8_lossy(&output.stdout)))
+        let output =
+            run_listing(hidden_command(&self.command).args(["ls", "-g", "--json", "--depth=0"]))?;
+        listed(parse_listing(&stdout_text(&output)), "pnpm ls -g", &output)
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        self.update_to(name, "latest")
+    }
+
+    fn update_to(&self, name: &str, version: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
-        command.args(["add", "-g", &format!("{name}@latest")]);
+        command.args(["add", "-g", &pinned_to(name, version)]);
         Some(command)
     }
 

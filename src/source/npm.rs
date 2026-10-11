@@ -4,11 +4,14 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use super::{find_on_path, hidden_command, silent_listing, PackageSource};
+use super::{find_on_path, hidden_command, pinned_to, run_listing, silent_listing, PackageSource};
 use crate::model::{BlockedScript, Installed, SourceKind};
 use crate::Result;
 
 const EXECUTABLE: &str = "npm";
+const PUBLIC_REGISTRY: &str = "https://registry.npmjs.org/";
+const LOCKFILE: &str = ".package-lock.json";
+const TRUSTED_STEMS: [&str; 1] = ["npm"];
 
 const STRICT_REFUSAL_CODE: &str = "ESTRICTALLOWSCRIPTS";
 const BLOCKED_LINE_PREFIX: &str = "npm error   ";
@@ -22,9 +25,23 @@ pub struct Npm {
 
 impl Npm {
     pub fn new(configured: Option<&Path>) -> Result<Self> {
-        let command = resolve(configured).ok_or_else(|| {
-            format!("{EXECUTABLE} was not found on PATH; set \"npm_cmd\" in the config file")
-        })?;
+        if let Some(path) = configured.filter(|path| path.is_file()) {
+            if !trusted_override(path) {
+                return Err(format!(
+                    "\"npm_cmd\" {} was refused: it must name npm itself and must not be a downloaded file",
+                    path.display()
+                )
+                .into());
+            }
+            return Ok(Self {
+                command: path.to_path_buf(),
+            });
+        }
+        let command = find_on_path(EXECUTABLE)
+            .or_else(default_location)
+            .ok_or_else(|| {
+                format!("{EXECUTABLE} was not found on PATH; set \"npm_cmd\" in the config file")
+            })?;
         Ok(Self { command })
     }
 }
@@ -35,19 +52,29 @@ impl PackageSource for Npm {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = hidden_command(&self.command)
-            .args(["ls", "-g", "--json", "--depth=0"])
-            .output()?;
+        let output =
+            run_listing(hidden_command(&self.command).args(["ls", "-g", "--json", "--depth=0"]))?;
         if output.stdout.trim_ascii().is_empty() {
             return Err(silent_listing("npm ls -g", &output).into());
         }
-        parse_listing(&output.stdout)
+        let origins = self.origins();
+        Ok(parse_listing(&output.stdout)?
+            .into_iter()
+            .map(|installed| {
+                let external = origins.is_external(&installed.name);
+                installed.with_external(external)
+            })
+            .collect())
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
+        self.update_to(name, "latest")
+    }
+
+    fn update_to(&self, name: &str, version: &str) -> Option<Command> {
         let configured = self.allow_scripts_config().unwrap_or_default();
         let mut command = hidden_command(&self.command);
-        command.args(install_arguments(name, &configured));
+        command.args(install_arguments(name, version, &configured));
         Some(command)
     }
 
@@ -64,14 +91,12 @@ impl PackageSource for Npm {
     fn approve_scripts(&self, scripts: &[BlockedScript]) -> Result<()> {
         let configured = self.allow_scripts_config()?;
         let merged = merge_allow_list(&configured, scripts.iter().map(BlockedScript::package));
-        let output = hidden_command(&self.command)
-            .args([
-                "config",
-                "set",
-                &format!("allow-scripts={merged}"),
-                "--location=user",
-            ])
-            .output()?;
+        let output = run_listing(hidden_command(&self.command).args([
+            "config",
+            "set",
+            &format!("allow-scripts={merged}"),
+            "--location=user",
+        ]))?;
         if output.status.success() {
             return Ok(());
         }
@@ -84,10 +109,32 @@ impl PackageSource for Npm {
 }
 
 impl Npm {
+    fn origins(&self) -> Origins {
+        let root = self.answer(&["root", "-g"]).map(PathBuf::from);
+        let registry = self.answer(&["config", "get", "registry"]);
+        let lock = root
+            .as_deref()
+            .and_then(|root| std::fs::read_to_string(root.join(LOCKFILE)).ok());
+        Origins {
+            root,
+            registry,
+            lock: lock.as_deref().and_then(parse_lock).unwrap_or_default(),
+        }
+    }
+
+    fn answer(&self, arguments: &[&str]) -> Option<String> {
+        let output = run_listing(hidden_command(&self.command).args(arguments)).ok()?;
+        let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        (output.status.success() && !text.is_empty()).then_some(text)
+    }
+
     fn allow_scripts_config(&self) -> Result<String> {
-        let output = hidden_command(&self.command)
-            .args(["config", "get", "allow-scripts", "-g"])
-            .output()?;
+        let output = run_listing(hidden_command(&self.command).args([
+            "config",
+            "get",
+            "allow-scripts",
+            "-g",
+        ]))?;
         if !output.status.success() {
             return Err(format!(
                 "npm config get allow-scripts failed: {}",
@@ -99,17 +146,74 @@ impl Npm {
     }
 }
 
-fn install_arguments(name: &str, configured_allow_scripts: &str) -> Vec<String> {
+fn install_arguments(name: &str, version: &str, configured_allow_scripts: &str) -> Vec<String> {
+    let pinned = pinned_to(name, version);
     vec![
         "install".to_owned(),
         "-g".to_owned(),
-        format!("{name}@latest"),
+        pinned.clone(),
         format!(
             "--allow-scripts={}",
-            merge_allow_list(configured_allow_scripts, [name.to_owned()])
+            merge_allow_list(configured_allow_scripts, [pinned])
         ),
         "--strict-allow-scripts".to_owned(),
     ]
+}
+
+#[derive(Default)]
+struct Origins {
+    root: Option<PathBuf>,
+    registry: Option<String>,
+    lock: BTreeMap<String, LockEntry>,
+}
+
+impl Origins {
+    fn is_external(&self, name: &str) -> bool {
+        match self.lock.get(&format!("node_modules/{name}")) {
+            Some(entry) if entry.link => true,
+            Some(LockEntry {
+                resolved: Some(resolved),
+                ..
+            }) => !self.resolves_through_registry(resolved),
+            Some(_) => false,
+            None => self
+                .root
+                .as_deref()
+                .is_some_and(|root| is_link(&root.join(name))),
+        }
+    }
+
+    fn resolves_through_registry(&self, resolved: &str) -> bool {
+        resolved.starts_with(PUBLIC_REGISTRY)
+            || self.registry.as_deref().is_some_and(|registry| {
+                let registry = registry.trim_end_matches('/');
+                resolved
+                    .strip_prefix(registry)
+                    .is_some_and(|rest| rest.starts_with('/'))
+            })
+    }
+}
+
+fn is_link(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
+}
+
+fn parse_lock(raw: &str) -> Option<BTreeMap<String, LockEntry>> {
+    let lock: Lock = serde_json::from_str(raw).ok()?;
+    Some(lock.packages)
+}
+
+#[derive(Deserialize)]
+struct Lock {
+    #[serde(default)]
+    packages: BTreeMap<String, LockEntry>,
+}
+
+#[derive(Deserialize)]
+struct LockEntry {
+    resolved: Option<String>,
+    #[serde(default)]
+    link: bool,
 }
 
 fn merge_allow_list(configured: &str, additions: impl IntoIterator<Item = String>) -> String {
@@ -170,11 +274,30 @@ fn blocked_line(line: &str) -> Option<BlockedScript> {
     })
 }
 
-fn resolve(configured: Option<&Path>) -> Option<PathBuf> {
-    if let Some(path) = configured.filter(|path| path.is_file()) {
-        return Some(path.to_path_buf());
-    }
-    find_on_path(EXECUTABLE).or_else(default_location)
+fn trusted_override(path: &Path) -> bool {
+    names_npm(path) && !downloaded(path)
+}
+
+fn names_npm(path: &Path) -> bool {
+    path.file_stem()
+        .and_then(|stem| stem.to_str())
+        .is_some_and(|stem| {
+            TRUSTED_STEMS
+                .iter()
+                .any(|trusted| stem.eq_ignore_ascii_case(trusted))
+        })
+}
+
+#[cfg(windows)]
+fn downloaded(path: &Path) -> bool {
+    let mut stream = path.as_os_str().to_owned();
+    stream.push(":Zone.Identifier");
+    Path::new(&stream).exists()
+}
+
+#[cfg(not(windows))]
+fn downloaded(_path: &Path) -> bool {
+    false
 }
 
 #[cfg(windows)]

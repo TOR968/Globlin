@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -21,14 +21,8 @@ impl Gem {
     }
 
     fn run(&self, arguments: &[&str]) -> Option<String> {
-        let output = hidden_command(&self.command)
-            .args(arguments)
-            .output()
-            .ok()?;
-        output
-            .status
-            .success()
-            .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+        let output = run_listing(hidden_command(&self.command).args(arguments)).ok()?;
+        output.status.success().then(|| stdout_text(&output))
     }
 }
 
@@ -38,9 +32,13 @@ impl PackageSource for Gem {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let listing = self.run(&["list", "--local"]).unwrap_or_default();
+        let listing = run_listing(hidden_command(&self.command).args(["list", "--local"]))?;
         let outdated = self.run(&["outdated"]);
-        Ok(merge(&listing, outdated.as_deref()))
+        listed(
+            merge(&stdout_text(&listing), outdated.as_deref()),
+            "gem list --local",
+            &listing,
+        )
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {

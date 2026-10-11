@@ -43,12 +43,33 @@ version to compare against come from, and what does its absence mean?*
 | `PyPi` | pipx | `registry::pypi_latest`, the RSS release feed | `registry::numeric_is_newer` |
 | `NuGet` | dotnet | `registry::nuget_latest`, the flat-container `index.json` | `registry::numeric_is_newer` |
 | `PsGallery` | psgallery | `registry::psgallery_latest`, the package endpoint's redirect | `registry::numeric_is_newer` |
-| `SelfResolved` | uv, scoop, go, gem, brew | the source fills `Installed.available` | string equality |
+| `SelfResolved` | uv, scoop, go, gem, brew | the source fills `Installed.available` | `registry::is_newer`, falling back to inequality |
 | `SelfReported` | winget, choco | the source fills `Installed.available` | presence |
 
 The first five are remote: the source reports only what is installed, and `check.rs` asks the registry
 for the union of names in that catalog. A name the registry did not answer for is `Unknown`, never
 `Current`. `check.rs` must never send a winget id to registry.npmjs.org — `Git.Git` is not a package there.
+
+**An unreachable registry is a skipped source, not a failed check.** Each `registry::*_latest` returns
+`Err("<host> could not be reached")` only when it was asked about at least one name and *no* request got
+any HTTP answer at all — a 404 counts as an answer, because a private package that npmjs has never heard
+of must stay a quiet `Unknown`, not an alarm. `check.rs` moves that error into `Report.skipped` beside
+the sources that could not be listed, so the icon turns red and one notification names the host, while
+every other catalog's packages are still shown. Before this, `npm_latest` alone could fail the whole
+check: one private npm global, or a blocked registry.npmjs.org, hid pipx, scoop, winget and the rest.
+
+**Every child process has a deadline.** `process::output_within` runs a command with piped output and
+kills it — on Windows with `taskkill /T`, so the `node` behind a `.cmd` shim goes too — once
+`LISTING_LIMIT` (two minutes, for listings and `npm config`) or `CHANGE_LIMIT` (thirty minutes, for
+updates and uninstalls, because `cargo install` compiles) runs out. `Activity` is the global busy lock and
+only a worker's terminal message clears it, so one hung child used to disable Check, Update and Uninstall
+until Globlin was restarted. The go source also sets `GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never`,
+so `go list -m <private module>@latest` fails at once instead of waiting on a credential prompt.
+
+**A failed listing is an error, not an empty source.** `source::listed` turns a listing whose command
+exited non-zero *and* produced no rows into `"<command> listed nothing and <status>: <stderr>"`, which
+`check.rs` reports as skipped. Rows from a command that exited badly are kept — `npm ls -g` and
+`winget list` both exit non-zero on a usable reply.
 
 **The last two differ only in what `None` means.** For `SelfReported`, `available: None` means the tool
 looked and found no upgrade — `winget list` simply has no `Available` cell for that row. For
@@ -59,7 +80,29 @@ outdated packages: a failed run and an up-to-date machine would otherwise print 
 Both sources therefore run the plain listing and the outdated report separately, and a non-zero exit
 from the report leaves every package unresolved. scoop resolves against the local bucket manifest and go
 against `go list -m <module>@latest`; a missing manifest or an offline proxy is `None` for the same
-reason.
+reason. A resolved version that differs from the installed one is `Outdated` only when it is not older:
+`registry::is_newer` compares as semver (a leading `v` stripped) and then numerically, and an install
+that is ahead — a go pseudo-version built from `master`, an `-rc` — reads `Current`, because **Update**
+would otherwise be a downgrade. Versions neither comparison understands (`7.1_1`, a cask's `latest`)
+still read `Outdated` when they differ, since the tool itself reported them.
+
+**A package installed from somewhere else is never looked up or updated.** `Installed.external` marks
+an npm-family package that did not come from the registry Globlin would compare it against, and
+`check.rs` leaves it out of the registry request and reads it as `Unknown`, which also means it never
+gets an **Update** button. npm reads `<npm root -g>/.package-lock.json`: an entry marked `link`, or one
+whose `resolved` URL is neither `https://registry.npmjs.org/` nor the configured `npm config get
+registry`, is external (a scoped private registry, a git URL, a tarball, `npm link`, `npm i -g ./dir`);
+with no lockfile entry, a symlink in the global `node_modules` is. bun and yarn read the spec in their
+global `package.json` — anything containing `:` or `/` (`file:`, `link:`, `github:`, `npm:` aliases,
+URLs, `user/repo`) is external. pnpm already drops such entries, because their version is not semver.
+Before this, a public package squatting the name of a private or linked tool at a higher version showed
+as an update, and one click installed it and ran its install scripts. Package names are also
+percent-encoded into every registry URL, so a name cannot change the request's path or query, and the
+PowerShell Gallery source refuses to build a command for a module name with anything but letters,
+digits, `.`, `_` and `-`. `diagnostics::record_failures` runs a failed command's output through
+`redacted` before it reaches `last-run.log`: the rest of a line after `_authToken=`, `_auth=`,
+`_password=` or `Authorization:` and any `npm_…`, `ghp_…` or `github_pat_…` token of 30+ characters
+become `<redacted>`, because a verbose package manager can echo its credentials into stderr.
 
 **Why each remote endpoint is the one it is.** Every choice here is the smallest reply that still names
 the newest stable release, because the check runs every six hours in the background.
@@ -78,8 +121,9 @@ the newest stable release, because the check runs every six hours in the backgro
   to `…/packages/<id>.<version>.nupkg`, so `registry::gallery_newest_release` sends one request with
   `max_redirects(0)` and reads the version out of the `Location` header. No body is ever downloaded.
 
-`numeric_is_newer` compares dot-separated segments as numbers and answers `None` when either side has a
-non-numeric segment. PEP 440 and NuGet versions are not semver (`2025.9.5`, `1.2.3.4`), and a prerelease
+`numeric_is_newer` compares dot-separated segments as numbers, padding the shorter side with zeros so
+`1.0` and `1.0.0` are equal in both directions, and answers `None` when either side has a non-numeric
+segment. PEP 440 and NuGet versions are not semver (`2025.9.5`, `1.2.3.4`), and a prerelease
 or post-release is reported as `Unknown` rather than guessed at.
 
 That fork is also why package versions are `String` in `model.rs` rather than `semver::Version`. winget
@@ -117,7 +161,15 @@ batch rows, mirroring the `Tray::render` / `Tray::animate` split exactly.
 the binary. Everything it needs arrives in the snapshot, already in display order: `window.rs` puts enabled sources
 that found packages first (most outdated, then most packages), empty ones next and switched-off ones
 last, and orders the package list by that same source order with outdated packages first inside each
-source. The page owns filtering, search and the two-click uninstall confirmation, and nothing else. The no-comments rule covers it: no `<!-- -->`, no
+source. The page owns filtering, search and the two-click uninstall confirmation, and nothing else.
+
+**The page is the only document the view will ever show.** `window::is_own_page` accepts `about:blank`
+and `data:text/html…` — what WebView2 reports for `with_html` (navigation is the `data:` URL, IPC
+arrives from `about:blank`; WKWebView and WebKitGTK report `about:blank`). The navigation handler
+cancels everything else, new windows are denied, file and link drops are swallowed by
+`with_drag_drop_handler`, and the IPC handler drops any message whose origin is not the page. Without
+these a link or an `.html` file dragged onto the window became a page with `window.ipc` that could post
+`auto-approve`, `update-all` or `remove:` ids. The no-comments rule covers it: no `<!-- -->`, no
 `/* */`, no `//`.
 
 ### The icon
@@ -292,13 +344,14 @@ Things about the environment the code has to work around, all verified rather th
   `allow-scripts` list has its `postinstall` skipped with only a warning. `@anthropic-ai/claude-code`
   is the case that surfaced it: its `postinstall` copies the native binary over a 500-byte stub in
   `bin/claude.exe`, so a "successful" update left a `claude` that Windows refuses to start. The update
-  command therefore passes `--allow-scripts=<name>`, which approves the scripts of the package the user
-  already chose to install, and `--strict-allow-scripts`, which turns any other blocked script (a
+  command therefore passes `--allow-scripts=<name>@<version>`, which approves the scripts of exactly the
+  release the user chose to install — the one the check showed, which is also the one installed, as
+  `<name>@<version>` rather than `@latest` — and `--strict-allow-scripts`, which turns any other blocked script (a
   dependency's) into `ESTRICTALLOWSCRIPTS` and a non-zero exit. That check runs before the old version
   is touched, so a refused update leaves the working install in place and reports as blocked (see the
   next bullet). A CLI `--allow-scripts` replaces the `.npmrc` list rather than extending it (npm warns
   `.npmrc allow-scripts setting is being ignored`), so the update first reads
-  `npm config get allow-scripts -g` and passes that list with the package name appended. Without that
+  `npm config get allow-scripts -g` and passes that list with the pinned package appended. Without that
   merge a dependency the user approved in `.npmrc` could never be approved at all:
   `@deepseek-ai/dsh` needs `koffi`, `node-pty` and `protobufjs`, and failed every time. The fix for a
   refused update is to append the listed dependencies to the user-level list — npm's own hint,
@@ -525,14 +578,15 @@ still holding while it shuts down, then raises a `Globlin — updated / now runn
 
 ### When winget owns the binary
 
-`install::winget_managed()` answers one question — is this `.exe` running from a directory a package
-manager controls — and two unrelated behaviours hang off it. The predicate is deliberately dumb: the exe
+`install::managed_by()` answers one question — is this `.exe` running from a directory a package
+manager controls, and which one (`Manager::Winget`, or `Manager::SystemPackage` for a Linux binary under
+`/usr`) — and two unrelated behaviours hang off it. The predicate is deliberately dumb: the exe
 path contains the adjacent components `WinGet` and `Packages`, matched case-insensitively. That covers the
 user-scope `%LOCALAPPDATA%\Microsoft\WinGet\Packages\` and the machine-scope
 `%PROGRAMFILES%\WinGet\Packages\` without reading either environment variable, and it deliberately does
 not match the shim in `WinGet\Links\`, which is not where the real binary lives. `is_winget_path` takes
-the path as an argument so all of that is unit-testable; `winget_managed` is the one-line wrapper that
-calls `current_exe`.
+the path as an argument so all of that is unit-testable; `managed_by` is the thin wrapper that calls
+`current_exe`.
 
 **The config would otherwise be destroyed on every upgrade.** Globlin is portable: `config::candidate_paths`
 tries `globlin.json` next to the exe first, for both reading and writing, and falls back to
@@ -549,7 +603,8 @@ the menu says `Installed with winget — run winget upgrade` in place of the upd
 
 That menu change is why `View` carries a `SelfUpdate` enum rather than another `bool`. Adding a fifth flag
 to a struct that already had four tripped `clippy::struct_excessive_bools`, and the lint was right: the two
-cases are alternatives, not independent switches. `SelfUpdate::Winget` has no fields, and
+cases are alternatives, not independent switches. `SelfUpdate::Managed(Manager)` carries only which
+manager to name, and
 `SelfUpdate::Own { release, auto_update, log }` groups the three fields that only mean anything when
 Globlin manages itself — so the auto-update checkbox cannot be rendered in a state where ticking it would
 do nothing.
@@ -589,8 +644,8 @@ build started from the Start menu saw every package. Explorer hands it the same 
 does. Globlin also repairs its own environment on Windows, whoever starts it — see
 `platform::prepare_environment` under [Other platforms](#other-platforms).
 
-The autostart task writes the same `HKCU\…\Run\globlin` = `"<exe>"` the tray toggle writes, so the two
-read one value. A second `[Registry]` entry with `ValueType: none; Flags: uninsdeletevalue` deletes it on
+The autostart task writes the same `HKCU\…\Run\globlin` = `"<exe>" --background` the tray toggle
+writes, so the two read one value. A second `[Registry]` entry with `ValueType: none; Flags: uninsdeletevalue` deletes it on
 uninstall whoever created it. Setup and uninstall both `taskkill /F /IM globlin.exe` first, because the
 exe is locked while it runs; the single-instance mutex means there is at most one to stop.
 
@@ -606,14 +661,15 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-415 tests: 389 run by default (no network, no side effects), 26 `#[ignore]`d because they touch the real
-system — the HKCU Run key, a real toast, a real `npm install -g`, one that runs the real `npm config
-get/set` against a temporary userconfig, two icon/PNG dump tests, two that hit
+498 tests on Windows: 469 run by default (no network, no side effects), 29 `#[ignore]`d because they
+touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
+runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
+the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
 this machine), four that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index and the
-Gallery redirect), and eleven that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
-`cargo`, `go`, `dotnet`, PowerShell and `gem`. Those last eleven exist because
+Gallery redirect), and twelve that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
+`cargo`, `go`, `dotnet`, PowerShell, `gem` and `brew`. Those last twelve exist because
 the parsers below are pinned against captured output, and captured output cannot notice the day a tool
 changes its format — run them after a winget or Chocolatey upgrade. Each carries its own exact invocation
 in its
@@ -622,7 +678,10 @@ installs `$env:UPDATE_TARGET` globally, so point it at something harmless. To se
 demand, downgrade something disposable (`npm i -g npm-check-updates@23.0.0`) and hit *Check now*.
 
 The update orchestration is exercised by pointing `npm_cmd` at a file that cannot be executed, which
-drives the real failure paths without installing anything. The source adapters are tested against
+drives the real failure paths without installing anything. **Every such fake must be named `npm` or
+`npm.cmd`, in a directory of its own.** An override that is refused is an error and never falls back to
+the `npm` on `PATH` — the one time it did (while the name check was being added), the suite ran the
+real `npm install -g` and `npm uninstall -g prettier` on the developer's machine. The source adapters are tested against
 captured stdout — a real `winget list` table, a `choco list -r` listing, a `pnpm ls -g --json` reply —
 rather than by running those tools, so the parsers are pinned without the suite needing them installed.
 
@@ -662,9 +721,10 @@ determining versions.
   a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
   `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
   on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), checksums and scans
-  them too, and creates one GitHub Release with all twelve files — the eight Windows ones plus the
-  `build-macos` job's `Globlin-macos-arm64.zip` and bare `globlin-macos-arm64`, each with its `.sha256`
-  (no VirusTotal scan for those).
+  them too, and creates one GitHub Release with twenty-one files — the eight Windows ones; the
+  `build-macos` job's `Globlin-macos-arm64.zip` and bare `globlin-macos-arm64`; the `build-linux` jobs'
+  two `.deb` and two `.rpm` files, each of those with its `.sha256` (no VirusTotal scan for the macOS and
+  Linux files); and `globlin-bin.PKGBUILD`, rendered from the release's own checksums.
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
@@ -845,7 +905,8 @@ Experimental, x64 and ARM64, shipped as a deb and an rpm.
   fires the shared hook that opens the window (on desktops whose notification server supports actions).
 - **Single instance and "show the window"** — the shared `globlin.lock`, plus a Unix socket,
   `globlin.sock` in the data directory: the running copy listens on it, and a second copy started by hand
-  connects, writes `show` and exits.
+  connects, writes `show` and exits. The socket is chmodded `0600` right after `bind`, so its mode does not
+  depend on the umask; `show` is the only thing a connection can ask for.
 - **Autostart** is `~/.config/autostart/globlin.desktop` (`$XDG_CONFIG_HOME` honoured) with
   `Exec="<exe>" --background`, the path quoted and escaped per the Desktop Entry spec.
 - **PATH** — a desktop session often lacks what `.bashrc` adds (nvm, `~/.cargo/bin`), so Linux adopts the
