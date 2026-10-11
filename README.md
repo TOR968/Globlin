@@ -214,7 +214,9 @@ scripts automatically*, *Update Globlin automatically* (greyed out with the mana
 or the installer keeps Globlin up to date) and, when a release is waiting, **Update now**. Under
 *Sources* every package manager this platform can have gets a switch and a one-line status — *13
 packages · 2 updates*, *No global packages*, *Off*. Switching one goes into `globlin.json` and triggers a
-fresh check. *Diagnostics* opens the last log and shows the version.
+fresh check. *Diagnostics* opens the last log; *About* shows the version and links to
+[Patreon](https://www.patreon.com/c/TOR968), as does *Support on Patreon* beside *Open last log* at the
+foot of the window.
 
 The tray menu stays short — the list lives in the window:
 
@@ -230,6 +232,7 @@ Open last log
 Globlin v0.4.0                        ▸  Update Globlin 0.4.0 → 0.4.1
                                          ☐ Auto-update Globlin
                                          Open Globlin-update log
+Support Globlin on Patreon
 ─────────────────────────────────────
 Quit
 ```

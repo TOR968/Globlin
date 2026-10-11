@@ -26,6 +26,7 @@ const ID_AUTO_UPDATE: &str = "auto-update";
 const ID_AUTO_APPROVE: &str = "auto-approve";
 const ID_MONOCHROME_ICON: &str = "monochrome-icon";
 const ID_OPEN_LOG: &str = "open-log";
+const ID_OPEN_PATREON: &str = "open-patreon";
 const ID_OPEN_SELF_LOG: &str = "open-self-log";
 const ID_QUIT: &str = "quit";
 const UPDATE_PREFIX: &str = "update:";
@@ -59,6 +60,7 @@ pub enum Action {
     ToggleAutoApprove,
     ToggleMonochromeIcon,
     OpenLog,
+    OpenPatreon,
     OpenSelfLog,
     Quit,
 }
@@ -107,6 +109,7 @@ impl Action {
             ID_AUTO_APPROVE => Some(Self::ToggleAutoApprove),
             ID_MONOCHROME_ICON => Some(Self::ToggleMonochromeIcon),
             ID_OPEN_LOG => Some(Self::OpenLog),
+            ID_OPEN_PATREON => Some(Self::OpenPatreon),
             ID_OPEN_SELF_LOG => Some(Self::OpenSelfLog),
             ID_QUIT => Some(Self::Quit),
             other => Self::parse_update(other)
@@ -263,6 +266,12 @@ pub fn build(view: &View) -> Result<Built> {
     built.split()?;
 
     built.item(&self_block(view, busy)?)?;
+    built.item(&MenuItem::with_id(
+        ID_OPEN_PATREON,
+        "Support Globlin on Patreon",
+        true,
+        None,
+    ))?;
     built.split()?;
     built.item(&MenuItem::with_id(ID_QUIT, "Quit", true, None))?;
 

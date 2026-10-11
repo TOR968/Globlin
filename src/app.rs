@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -22,6 +23,7 @@ use crate::window::Window;
 use crate::{diagnostics, notice, platform, progress, window, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
+const PATREON_URL: &str = "https://www.patreon.com/c/TOR968";
 
 pub enum Control {
     Continue,
@@ -171,6 +173,7 @@ impl App {
             Action::ToggleAutoApprove => self.toggle_auto_approve(),
             Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
             Action::OpenLog => open_log(),
+            Action::OpenPatreon => open_patreon(),
             Action::OpenSelfLog => open_self_log(),
         }
         Control::Continue
@@ -635,6 +638,12 @@ impl App {
     }
 }
 
+fn open_patreon() {
+    if let Err(error) = platform::open_in_shell(OsStr::new(PATREON_URL)) {
+        platform::notify("Globlin", &format!("Could not open {PATREON_URL}: {error}")).ok();
+    }
+}
+
 fn open_log() {
     open_diagnostic(
         &diagnostics::log_path(),
@@ -653,7 +662,7 @@ fn open_diagnostic(path: &Path, empty: &str) {
     if !path.is_file() {
         std::fs::write(path, format!("{empty}\n")).ok();
     }
-    if let Err(error) = platform::open_in_shell(path) {
+    if let Err(error) = platform::open_in_shell(path.as_os_str()) {
         platform::notify(
             "Globlin",
             &format!("Could not open {}: {error}", path.display()),
