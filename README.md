@@ -67,7 +67,7 @@ you to allow it once:
 5. Globlin now sits in the menu bar at the top right. While its window is open it also shows in the
    Dock and in ⌘-Tab; closing the window sends it back to the menu bar only.
 6. Optional: allow its notifications under *System Settings → Notifications → Globlin*, and tick **Run at
-   startup** in the window's footer or the menu.
+   startup** in the window's Settings or the menu.
 
 After that it updates itself like the Windows builds — no need to repeat the steps. Its settings and logs
 are in `~/Library/Application Support/globlin/`; *Run at startup* writes
@@ -152,58 +152,54 @@ brings it forward when Globlin is already running; started by *Run at startup* i
 tray. After that, click the tray icon or one of its notifications, or pick **Open Globlin** from the
 right-click menu:
 
-```
-┌─ Globlin ─────────────────────────────────────────────────────────────────┐
-│ Globlin — 3 updates available          🔍 search…         [Check now]     │
-├──────────────┬────────────────────────────────────────────────────────────┤
-│ STATUS       │ ☐ Select all shown              [Update selected] [Update…] │
-│  All      28 ├────────────────────────────────────────────────────────────┤
-│  Outdated  3 │ ☑ ↑  @salesforce/cli    npm      2.145.6 → 2.146.3  Update │
-│  Up to date… │ ☑ ↑  vercel             npm       58.4.4 → 58.9.1   Update │
-│  Not checked │ ☐ ↑  Git.Git            winget    2.44.0 → 2.47.1 read-only │
-│  Ignored   1 │ ☐ ✓  prettier           npm       3.9.6                     │
-│              │ ☐ ✓  vite               pnpm      6.0.1                     │
-│ SOURCES      │ ☐ ·  npm                npm       12.0.2                    │
-│  ☑ npm  12·2↑│ ☐ ?  some-package       bun       1.0.0                     │
-│  ☑ bun     3 │                                                            │
-│  ☑ pnpm    2 │                                                            │
-│  ☐ yarn    0 │                                                            │
-│  ☑ pipx    2 │                                                            │
-│  ☑ scoop   4 │                                                            │
-│  ☑ cargo   3 │                                                            │
-│  ☑ winget 8·1│                                                            │
-├──────────────┴────────────────────────────────────────────────────────────┤
-│ Globlin v0.3.0        ☑ Run at startup  ☐ Auto-update  Open last log       │
-└───────────────────────────────────────────────────────────────────────────┘
-```
+![The Globlin window: a hero card reading "3 updates available" with Update all (3), the outdated packages grouped under npm and bun, and a row of tiles for the sources that are already current](docs/img/window-updates.png)
 
-- `↑` outdated · `✓` current · `·` ignored · `?` the registry hasn't answered yet (never treated as
-  "fine" — the headline counts these as *not checked*). A package installed from a git URL, a local
-  folder, `npm link` or a private registry also shows `?`: Globlin never compares it with the public
-  registry, so a public package with the same name can never be offered as its update.
-- **The sidebar is the grouping.** Status rows filter the list; source rows filter it too, and each shows
-  `total · outdated`. The small `on`/`off` link beside a source switches that source on or off for good —
-  it goes into `globlin.json` and triggers a fresh check.
-- **Search** narrows by name as you type. Filters, search and selection compose.
-- **Update selected** runs the ticked rows as one queue; **Update all** takes every outdated package the
-  current filters are hiding as well. The header shows a `[2/3]` counter while the queue drains, the
-  active row spins with a progress bar, and finished rows show `✓ done` or `✗ failed`.
+The window puts updates first:
+
+- **The hero card** says what needs doing — *3 updates available*, and which sources they come from —
+  with **Update all (N)** beside it. Under it the outdated packages are grouped by source; each group
+  collapses, has its own **Update N** button, and shows five rows until you ask for the rest with
+  **Show N more**. Tick rows and **Update selected** runs just those, as one queue.
+- **Everything else** sits below as one tile per source with its count — *11 current*, *2 current ·
+  1 ignored*. Click a tile to open that source's full list. The heading only says *Everything else is
+  current* when it is: a package the registry hasn't answered for shows `?` and is counted as *not
+  checked*, never as fine. A package installed from a git URL, a local folder, `npm link` or a private
+  registry also shows `?`: Globlin never compares it with the public registry, so a public package with
+  the same name can never be offered as its update.
+- **Search** narrows every list as you type, and the chips above the card — *All*, *Updates*, *Up to
+  date*, *Not checked*, *Ignored* — filter by status. While either is active, every source with a match
+  opens on its own.
 - Per row: **Update** runs `npm install -g <name>@latest` (or the pnpm/yarn/bun equivalent) with no
   console window, then re-checks. **Ignore** removes it from checks and from `Update all` without
-  touching the network — untick it and it's re-checked immediately. **Uninstall** arms into a **Confirm**
-  button and then removes the package with `npm uninstall -g <name>` (or the equivalent). The two clicks
-  are the confirmation; there is no dialog.
+  touching the network — **Unignore** and it's re-checked immediately. **Uninstall** arms into a
+  **Confirm** button and then removes the package with `npm uninstall -g <name>` (or the equivalent). The
+  two clicks are the confirmation; there is no dialog.
+
+![The Globlin window during a batch: "Updating 7 of 12" over a green, red and blue progress bar, with the bun group open showing one failed and one updating row](docs/img/window-batch.png)
+
+- **While a queue runs** the hero card turns into its progress: *Updating 7 of 12*, a bar split into
+  done, failed and running, and the queue grouped by source. The group that is running opens by itself,
+  so does one with a failure, and the rest fold to one line saying *done* or *queued*.
 - If npm 12 refuses an update because a dependency wants to run install scripts you have not approved,
   Globlin opens its window with the list of packages and the exact scripts. **Allow and update** adds
   those exact versions to `allow-scripts` in your user `.npmrc` and runs the update again; **Not now**
-  leaves the old version in place. **Auto-approve npm scripts** in the footer skips the dialog and
-  allows them straight away. It is off by default, because with it on any dependency's install scripts
-  run without you seeing them. If the retry is refused again, the dialog opens as usual.
+  leaves the old version in place. **Approve npm install scripts automatically**, in Settings, skips the
+  dialog and allows them straight away. It is off by default, because with it on any dependency's
+  install scripts run without you seeing them. If the retry is refused again, the dialog opens as usual.
 - **winget and choco rows are read-only.** Both need an elevated process to upgrade anything, and Globlin
-  runs unelevated, so it reports them and leaves the doing to you. Their **Update** button says
-  `read-only` and does nothing.
+  runs unelevated, so it reports them and leaves the doing to you. Their rows say `read-only`, can't be
+  ticked, and never join a queue.
 - A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
   the same three packages every six hours.
+
+![Globlin's Settings view: Run at startup, Approve npm install scripts automatically, Update Globlin automatically and an available Globlin update under General, then one switch per source with its package count](docs/img/window-settings.png)
+
+**Settings**, behind the button at the top right, holds the rest: *Run at startup*, *Approve npm install
+scripts automatically*, *Update Globlin automatically* (greyed out with the manager's name when winget
+or the installer keeps Globlin up to date) and, when a release is waiting, **Update now**. Under
+*Sources* every package manager this platform can have gets a switch and a one-line status — *13
+packages · 2 updates*, *No global packages*, *Off*. Switching one goes into `globlin.json` and triggers a
+fresh check. *Diagnostics* opens the last log and shows the version.
 
 The tray menu stays short — the list lives in the window:
 
@@ -250,7 +246,7 @@ Everything except psgallery, winget and choco is on by default. A source whose C
 reports nothing — it is not an error, and one broken source never sinks the others. psgallery is off
 because it has to start PowerShell on every check, which costs about a second; winget and choco are off
 because both are slower to list and neither can be updated from an unelevated app. Turn any of them on
-from the window's sidebar, or in `globlin.json`.
+from the window's Settings, or in `globlin.json`.
 
 **yarn means yarn classic (v1).** Yarn 2+ removed `yarn global` entirely; on a Berry install the source
 reports zero packages and says so in the log.
@@ -293,8 +289,9 @@ The tray icon is drawn from code, not an image file, so its colour always matche
 Globlin also checks its own [GitHub releases](https://github.com/TOR968/Globlin/releases) on the same
 schedule as the package check. The `Globlin v<current>` submenu names the build that is running, so you
 can always tell which one is live. When a newer one is published the submenu grows an
-`Update Globlin <current> → <new>` row; ticking **Auto-update Globlin** installs it unattended the next
-time one is found, no click needed.
+`Update Globlin <current> → <new>` row; ticking **Auto-update Globlin** (or **Update Globlin
+automatically** in the window's Settings) installs it unattended the next time one is found, no click
+needed.
 
 Before installing anything, the download must carry a valid signature by the Globlin release key, whose
 public half is built into the app, and match its published SHA-256 checksum — a release without a
@@ -361,8 +358,8 @@ edits are never silently overwritten.
   must not be a downloaded file still carrying Windows' *from the internet* mark; otherwise npm is
   skipped rather than run.
 - **`auto_update`** — see [Keeping itself updated](#keeping-itself-updated).
-- **`auto_approve_scripts`** — the window's **Auto-approve npm scripts** switch; see
-  [Using it](#using-it).
+- **`auto_approve_scripts`** — the **Approve npm install scripts automatically** switch in the window's
+  Settings; see [Using it](#using-it).
 - **`last_self_notice`** — the version string of the last self-update failure a toast was already raised
   for, so retrying the same failing version doesn't notify twice.
 
