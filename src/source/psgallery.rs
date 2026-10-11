@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -36,8 +36,12 @@ impl PackageSource for PsGallery {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = self.shell(LISTING).output()?;
-        Ok(parse_listing(&String::from_utf8_lossy(&output.stdout)))
+        let output = run_listing(&mut self.shell(LISTING))?;
+        listed(
+            parse_listing(&stdout_text(&output)),
+            "Get-InstalledModule",
+            &output,
+        )
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {

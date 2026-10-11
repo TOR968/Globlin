@@ -322,6 +322,13 @@ pub fn outdated(packages: &[Package]) -> Vec<&Package> {
         .collect()
 }
 
+pub fn unchecked(packages: &[Package]) -> Vec<&Package> {
+    packages
+        .iter()
+        .filter(|package| package.status == Status::Unknown)
+        .collect()
+}
+
 pub fn updatable(packages: &[Package]) -> Vec<&Package> {
     packages
         .iter()

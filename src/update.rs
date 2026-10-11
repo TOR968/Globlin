@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::diagnostics;
 use crate::model::{Blocked, BlockedScript, UpdateTarget};
+use crate::process;
 use crate::source::{self, PackageSource};
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -162,23 +163,20 @@ fn find_source<'a>(
 fn apply(sources: &[Box<dyn PackageSource>], target: &UpdateTarget) -> Result<(), Failure> {
     let source = find_source(sources, target)?;
 
-    let output = source
-        .update_command(&target.name)
-        .ok_or_else(|| {
-            format!(
-                "{}: the {} source is read-only\n",
-                target.name,
-                target.source.label()
-            )
-        })?
-        .output()
-        .map_err(|error| {
-            format!(
-                "{}: could not start {}: {error}\n",
-                target.name,
-                target.source.label()
-            )
-        })?;
+    let mut command = source.update_command(&target.name).ok_or_else(|| {
+        format!(
+            "{}: the {} source is read-only\n",
+            target.name,
+            target.source.label()
+        )
+    })?;
+    let output = process::output_within(&mut command, process::CHANGE_LIMIT).map_err(|error| {
+        format!(
+            "{}: could not start {}: {error}\n",
+            target.name,
+            target.source.label()
+        )
+    })?;
 
     if output.status.success() {
         return Ok(());

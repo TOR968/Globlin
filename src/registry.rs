@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use semver::Version;
@@ -12,6 +13,11 @@ const FEED: &str = "https://pypi.org/rss/project";
 const CRATES: &str = "https://crates.io/api/v1/crates";
 const NUGET: &str = "https://api.nuget.org/v3-flatcontainer";
 const GALLERY: &str = "https://www.powershellgallery.com/api/v2/package";
+const NPM_HOST: &str = "registry.npmjs.org";
+const PYPI_HOST: &str = "pypi.org";
+const CRATES_HOST: &str = "crates.io";
+const NUGET_HOST: &str = "api.nuget.org";
+const GALLERY_HOST: &str = "www.powershellgallery.com";
 const BATCH: usize = 100;
 const USER_AGENT: &str = concat!(
     "globlin/",
@@ -22,97 +28,130 @@ const WORKERS: usize = 6;
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 pub fn npm_latest(names: &[String]) -> Result<HashMap<String, Version>> {
+    fetch_all(names, NPM_HOST, npm_dist_tag)
+}
+
+pub fn pypi_latest(names: &[String]) -> Result<HashMap<String, String>> {
+    fetch_all(names, PYPI_HOST, pypi_newest_release)
+}
+
+pub fn crates_latest(names: &[String]) -> Result<HashMap<String, Version>> {
     if names.is_empty() {
         return Ok(HashMap::new());
     }
-    let found = fetch_all(names, npm_dist_tag);
-    if found.is_empty() {
-        return Err(format!(
-            "the registry returned no versions for any of the {} packages checked",
-            names.len()
-        )
-        .into());
-    }
-    Ok(found)
-}
-
-pub fn pypi_latest(names: &[String]) -> HashMap<String, String> {
-    if names.is_empty() {
-        return HashMap::new();
-    }
-    fetch_all(names, pypi_newest_release)
-}
-
-pub fn crates_latest(names: &[String]) -> HashMap<String, Version> {
-    if names.is_empty() {
-        return HashMap::new();
-    }
-    let agent = agent();
-    names
+    let client = Client::new();
+    let found = names
         .chunks(BATCH)
-        .filter_map(|chunk| crates_page(&agent, chunk))
+        .filter_map(|chunk| crates_page(&client, chunk))
         .flatten()
-        .collect()
+        .collect();
+    client.verdict(CRATES_HOST, found)
 }
 
-pub fn nuget_latest(names: &[String]) -> HashMap<String, String> {
-    if names.is_empty() {
-        return HashMap::new();
-    }
-    fetch_all(names, nuget_newest_release)
+pub fn nuget_latest(names: &[String]) -> Result<HashMap<String, String>> {
+    fetch_all(names, NUGET_HOST, nuget_newest_release)
 }
 
-pub fn psgallery_latest(names: &[String]) -> HashMap<String, String> {
-    if names.is_empty() {
-        return HashMap::new();
-    }
-    fetch_all(names, gallery_newest_release)
+pub fn psgallery_latest(names: &[String]) -> Result<HashMap<String, String>> {
+    fetch_all(names, GALLERY_HOST, gallery_newest_release)
 }
 
 pub fn numeric_is_newer(latest: &str, current: &str) -> Option<bool> {
-    Some(numeric(latest)? > numeric(current)?)
+    let mut latest = numeric(latest)?;
+    let mut current = numeric(current)?;
+    let width = latest.len().max(current.len());
+    latest.resize(width, 0);
+    current.resize(width, 0);
+    Some(latest > current)
 }
 
-fn agent() -> Agent {
-    Agent::config_builder()
-        .timeout_global(Some(TIMEOUT))
-        .user_agent(USER_AGENT)
-        .build()
-        .into()
+pub fn is_newer(latest: &str, current: &str) -> Option<bool> {
+    let semantic = |raw: &str| Version::parse(raw.trim_start_matches('v')).ok();
+    match (semantic(latest), semantic(current)) {
+        (Some(latest), Some(current)) => Some(latest > current),
+        _ => numeric_is_newer(
+            latest.trim_start_matches('v'),
+            current.trim_start_matches('v'),
+        ),
+    }
+}
+
+struct Client {
+    agent: Agent,
+    reached: AtomicBool,
+}
+
+impl Client {
+    fn new() -> Self {
+        Self {
+            agent: Agent::config_builder()
+                .timeout_global(Some(TIMEOUT))
+                .user_agent(USER_AGENT)
+                .build()
+                .into(),
+            reached: AtomicBool::new(false),
+        }
+    }
+
+    fn answered<T>(&self, reply: std::result::Result<T, ureq::Error>) -> Option<T> {
+        match reply {
+            Ok(value) => {
+                self.reached.store(true, Ordering::Relaxed);
+                Some(value)
+            }
+            Err(ureq::Error::StatusCode(_)) => {
+                self.reached.store(true, Ordering::Relaxed);
+                None
+            }
+            Err(_) => None,
+        }
+    }
+
+    fn verdict<T>(&self, host: &str, found: HashMap<String, T>) -> Result<HashMap<String, T>> {
+        if found.is_empty() && !self.reached.load(Ordering::Relaxed) {
+            return Err(format!("{host} could not be reached").into());
+        }
+        Ok(found)
+    }
 }
 
 fn fetch_all<T: Send>(
     names: &[String],
-    fetch: impl Fn(&Agent, &str) -> Option<T> + Sync,
-) -> HashMap<String, T> {
-    let agent = agent();
+    host: &str,
+    fetch: impl Fn(&Client, &str) -> Option<T> + Sync,
+) -> Result<HashMap<String, T>> {
+    if names.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let client = Client::new();
     let per_worker = names.len().div_ceil(WORKERS);
-    std::thread::scope(|scope| {
+    let found = std::thread::scope(|scope| {
         let workers: Vec<_> = names
             .chunks(per_worker)
-            .map(|chunk| scope.spawn(|| fetch_chunk(&agent, chunk, &fetch)))
+            .map(|chunk| scope.spawn(|| fetch_chunk(&client, chunk, &fetch)))
             .collect();
         workers
             .into_iter()
             .filter_map(|worker| worker.join().ok())
             .flatten()
             .collect()
-    })
+    });
+    client.verdict(host, found)
 }
 
 fn fetch_chunk<T>(
-    agent: &Agent,
+    client: &Client,
     names: &[String],
-    fetch: &impl Fn(&Agent, &str) -> Option<T>,
+    fetch: &impl Fn(&Client, &str) -> Option<T>,
 ) -> Vec<(String, T)> {
     names
         .iter()
-        .filter_map(|name| Some((name.clone(), fetch(agent, name)?)))
+        .filter_map(|name| Some((name.clone(), fetch(client, name)?)))
         .collect()
 }
 
-fn crates_page(agent: &Agent, names: &[String]) -> Option<Vec<(String, Version)>> {
-    let page: CratesPage = serde_json::from_str(&body(agent, &crates_url(names))?).ok()?;
+fn crates_page(client: &Client, names: &[String]) -> Option<Vec<(String, Version)>> {
+    let page: CratesPage = serde_json::from_str(&body(client, &crates_url(names))?).ok()?;
     Some(
         page.crates
             .into_iter()
@@ -131,22 +170,24 @@ fn crates_url(names: &[String]) -> String {
     format!("{CRATES}?per_page={BATCH}&{}", ids.join("&"))
 }
 
-fn nuget_newest_release(agent: &Agent, name: &str) -> Option<String> {
-    let index: NuGetIndex = serde_json::from_str(&body(agent, &nuget_url(name))?).ok()?;
+fn nuget_newest_release(client: &Client, name: &str) -> Option<String> {
+    let index: NuGetIndex = serde_json::from_str(&body(client, &nuget_url(name))?).ok()?;
     index
         .versions
         .into_iter()
         .rfind(|release| numeric(release).is_some())
 }
 
-fn gallery_newest_release(agent: &Agent, name: &str) -> Option<String> {
-    let response = agent
-        .get(format!("{GALLERY}/{name}"))
-        .config()
-        .max_redirects(0)
-        .build()
-        .call()
-        .ok()?;
+fn gallery_newest_release(client: &Client, name: &str) -> Option<String> {
+    let response = client.answered(
+        client
+            .agent
+            .get(format!("{GALLERY}/{name}"))
+            .config()
+            .max_redirects(0)
+            .build()
+            .call(),
+    )?;
     let location = response.headers().get("location")?.to_str().ok()?;
     version_in_package_url(location, name)
 }
@@ -162,17 +203,21 @@ fn nuget_url(name: &str) -> String {
     format!("{NUGET}/{}/index.json", name.to_lowercase())
 }
 
-fn npm_dist_tag(agent: &Agent, name: &str) -> Option<Version> {
-    let tags: DistTags = serde_json::from_str(&body(agent, &dist_tags_url(name))?).ok()?;
+fn npm_dist_tag(client: &Client, name: &str) -> Option<Version> {
+    let tags: DistTags = serde_json::from_str(&body(client, &dist_tags_url(name))?).ok()?;
     Version::parse(&tags.latest).ok()
 }
 
-fn pypi_newest_release(agent: &Agent, name: &str) -> Option<String> {
-    newest_stable(&body(agent, &feed_url(name))?)
+fn pypi_newest_release(client: &Client, name: &str) -> Option<String> {
+    newest_stable(&body(client, &feed_url(name))?)
 }
 
-fn body(agent: &Agent, url: &str) -> Option<String> {
-    agent.get(url).call().ok()?.body_mut().read_to_string().ok()
+fn body(client: &Client, url: &str) -> Option<String> {
+    client
+        .answered(client.agent.get(url).call())?
+        .body_mut()
+        .read_to_string()
+        .ok()
 }
 
 fn dist_tags_url(name: &str) -> String {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -25,11 +25,18 @@ impl Go {
         Ok(Self { command })
     }
 
-    fn run(&self, arguments: &[&str]) -> String {
-        hidden_command(&self.command)
+    fn command(&self, arguments: &[&str]) -> Command {
+        let mut command = hidden_command(&self.command);
+        command
             .args(arguments)
-            .output()
-            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "never");
+        command
+    }
+
+    fn run(&self, arguments: &[&str]) -> String {
+        run_listing(&mut self.command(arguments))
+            .map(|output| stdout_text(&output))
             .unwrap_or_default()
     }
 
@@ -69,21 +76,20 @@ impl PackageSource for Go {
         let Some(bin) = self.bin_dir() else {
             return Ok(Vec::new());
         };
-        let reported = self.run(&["version", "-m", &bin.to_string_lossy()]);
-        Ok(parse_listing(&reported)
+        let output = run_listing(&mut self.command(&["version", "-m", &bin.to_string_lossy()]))?;
+        let installed = parse_listing(&stdout_text(&output))
             .into_iter()
             .map(|binary| {
                 let available = self.latest(&binary.module);
                 Installed::new(binary.package, binary.version, SourceKind::Go)
                     .with_available(available)
             })
-            .collect())
+            .collect();
+        listed(installed, "go version -m", &output)
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
-        let mut command = hidden_command(&self.command);
-        command.args(["install", &format!("{name}@latest")]);
-        Some(command)
+        Some(self.command(&["install", &format!("{name}@latest")]))
     }
 
     fn uninstall_command(&self, _name: &str) -> Option<Command> {

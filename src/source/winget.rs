@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, PackageSource};
+use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -31,14 +31,12 @@ impl PackageSource for Winget {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let output = hidden_command(&self.command)
-            .args([
-                "list",
-                "--disable-interactivity",
-                "--accept-source-agreements",
-            ])
-            .output()?;
-        Ok(parse_table(&String::from_utf8_lossy(&output.stdout)))
+        let output = run_listing(hidden_command(&self.command).args([
+            "list",
+            "--disable-interactivity",
+            "--accept-source-agreements",
+        ]))?;
+        listed(parse_table(&stdout_text(&output)), "winget list", &output)
     }
 
     fn update_command(&self, _name: &str) -> Option<Command> {

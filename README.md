@@ -157,7 +157,8 @@ right-click menu:
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-- `↑` outdated · `✓` current · `·` ignored · `?` the registry hasn't answered yet (never treated as "fine").
+- `↑` outdated · `✓` current · `·` ignored · `?` the registry hasn't answered yet (never treated as
+  "fine" — the headline counts these as *not checked*).
 - **The sidebar is the grouping.** Status rows filter the list; source rows filter it too, and each shows
   `total · outdated`. The small `on`/`off` link beside a source switches that source on or off for good —
   it goes into `globlin.json` and triggers a fresh check.
@@ -261,7 +262,7 @@ The tray icon is drawn from code, not an image file, so its colour always matche
 |---|---|---|
 | <img src="docs/img/icon-idle.png" width="24" height="24" alt="idle icon"> | **Idle** — emerald | everything installed is current |
 | <img src="docs/img/icon-updates.png" width="24" height="24" alt="updates icon"> | **Updates** — amber | one or more packages are behind |
-| <img src="docs/img/icon-error.png" width="24" height="24" alt="error icon"> | **Error** — red | the last check failed, or a source could not be listed (the notification and *Open last log* name it) |
+| <img src="docs/img/icon-error.png" width="24" height="24" alt="error icon"> | **Error** — red | the last check failed, a source could not be listed, or a registry could not be reached (the notification and *Open last log* name it) |
 | <img src="docs/img/icon-busy.png" width="24" height="24" alt="busy icon"> | **Busy** — sky blue | a check or an update is running, filling like a glass |
 
 ## Keeping itself updated
