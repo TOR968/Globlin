@@ -61,8 +61,8 @@ AppIndicator extension to show the tray icon. On Arch, save `globlin-bin.PKGBUIL
 
 - Click the tray icon, or pick *Open Globlin* from its right-click menu, for the window: every package in one list, filtered
   by status or by source, with bulk updates.
-- npm, bun, pnpm and yarn are checked by default. winget and choco are switched off until you turn them
-  on, and are reported rather than updated — both need an elevated process, and Globlin runs unelevated.
+- Every package manager except the PowerShell Gallery, winget and choco is checked by default. winget and
+  choco are reported rather than updated — both need an elevated process, and Globlin runs unelevated.
 - `npm` and `@anthropic-ai/claude-code` are ignored by default, because the first rewrites its own shim
   mid-update on Windows and the second updates itself. Remove them from `ignore` in the config to manage
   them here.
