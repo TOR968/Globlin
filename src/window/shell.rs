@@ -21,13 +21,15 @@ impl Window {
         target: &EventLoopWindowTarget<Message>,
         proxy: EventLoopProxy<Message>,
     ) -> Result<Self> {
-        let host = WindowBuilder::new()
-            .with_title(TITLE)
-            .with_inner_size(LogicalSize::new(WIDTH, HEIGHT))
-            .with_min_inner_size(LogicalSize::new(MIN_WIDTH, MIN_HEIGHT))
-            .with_window_icon(app_icon())
-            .with_visible(false)
-            .build(target)?;
+        let host = with_taskbar_icon(
+            WindowBuilder::new()
+                .with_title(TITLE)
+                .with_inner_size(LogicalSize::new(WIDTH, HEIGHT))
+                .with_min_inner_size(LogicalSize::new(MIN_WIDTH, MIN_HEIGHT))
+                .with_window_icon(app_icon())
+                .with_visible(false),
+        )
+        .build(target)?;
         let builder = WebViewBuilder::new()
             .with_html(UI)
             .with_navigation_handler(|uri| is_own_page(&uri))
@@ -96,6 +98,18 @@ fn attach<'a>(builder: WebViewBuilder<'a>, host: &'a HostWindow) -> Result<WebVi
         .default_vbox()
         .ok_or("the window has no GTK container to hold the page")?;
     Ok(builder.build_gtk(container)?)
+}
+
+#[cfg(windows)]
+fn with_taskbar_icon(builder: WindowBuilder) -> WindowBuilder {
+    use tao::platform::windows::WindowBuilderExtWindows;
+
+    builder.with_taskbar_icon(app_icon())
+}
+
+#[cfg(not(windows))]
+fn with_taskbar_icon(builder: WindowBuilder) -> WindowBuilder {
+    builder
 }
 
 fn app_icon() -> Option<Icon> {
