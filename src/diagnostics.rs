@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Output;
 
 use crate::model::{Package, Status};
 use crate::platform;
@@ -22,7 +23,23 @@ pub fn record_failures(report: &str) {
 }
 
 pub fn record_note(note: &str) {
-    append(&log_path(), note);
+    append_once(&log_path(), note);
+}
+
+pub fn command_report(action: &str, output: &Output) -> String {
+    format!(
+        "{action} exited with {}\n--- stdout ---\n{}\n--- stderr ---\n{}\n\n",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+}
+
+fn append_once(path: &Path, note: &str) {
+    if fs::read_to_string(path).is_ok_and(|log| log.contains(note)) {
+        return;
+    }
+    append(path, note);
 }
 
 fn truncate(path: &Path, text: &str) {

@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -106,7 +106,7 @@ impl Config {
         let body = serde_json::to_string_pretty(self)?;
         let mut last_error = None;
         for path in write_paths() {
-            match fs::write(&path, &body) {
+            match replace_atomically(&path, &body) {
                 Ok(()) => return Ok(()),
                 Err(error) => last_error = Some(error),
             }
@@ -214,6 +214,14 @@ fn quarantine(path: &PathBuf, error: &str) -> String {
             path.display()
         ),
     }
+}
+
+fn replace_atomically(path: &Path, body: &str) -> std::io::Result<()> {
+    let staged = path.with_extension("json.tmp");
+    fs::write(&staged, body)?;
+    fs::rename(&staged, path).inspect_err(|_| {
+        fs::remove_file(&staged).ok();
+    })
 }
 
 #[cfg(test)]

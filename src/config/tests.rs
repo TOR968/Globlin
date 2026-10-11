@@ -114,3 +114,20 @@ fn an_older_config_file_without_the_new_fields_still_loads() {
     assert_eq!(config.check_interval_hours, 3);
     assert!(!config.auto_update);
 }
+
+#[test]
+fn saving_replaces_the_file_whole_and_leaves_no_staging_file_behind() {
+    let dir = std::env::temp_dir().join("globlin-atomic-save");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("globlin.json");
+    std::fs::write(
+        &path,
+        "{ \"old\": true, \"padding\": \"a much longer earlier body\" }",
+    )
+    .unwrap();
+
+    replace_atomically(&path, "{}").unwrap();
+
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "{}");
+    assert!(!dir.join("globlin.json.tmp").exists());
+}

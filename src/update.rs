@@ -1,12 +1,11 @@
 use crate::config::Config;
 use crate::diagnostics;
 use crate::model::{Blocked, BlockedScript, UpdateTarget};
-use crate::process;
 use crate::source::{self, PackageSource};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Outcome {
-    pub updated: Vec<String>,
+    pub updated: Vec<UpdateTarget>,
     pub failed: Vec<String>,
     pub blocked: Vec<Blocked>,
     pub retried: bool,
@@ -82,7 +81,7 @@ pub fn run(
 
         match apply(&sources, target) {
             Ok(()) => {
-                outcome.updated.push(target.name.clone());
+                outcome.updated.push(target.clone());
                 announce(Step::Finished { index, ok: true });
             }
             Err(failure) => {
@@ -107,7 +106,10 @@ pub fn run(
 
 pub fn settle(approvals: &mut Vec<Blocked>, outcome: &Outcome) {
     approvals.retain(|entry| {
-        !outcome.updated.contains(&entry.target.name)
+        !outcome
+            .updated
+            .iter()
+            .any(|done| done.is(&entry.target.name, entry.target.source))
             && !outcome
                 .blocked
                 .iter()
@@ -133,7 +135,7 @@ fn fail_all(targets: &[UpdateTarget], report: &str) -> Outcome {
 }
 
 fn approve(sources: &[Box<dyn PackageSource>], blocked: &Blocked) -> Result<(), String> {
-    find_source(sources, &blocked.target)?
+    source::source_for(sources, &blocked.target.name, blocked.target.source)?
         .approve_scripts(&blocked.scripts)
         .map_err(|error| {
             format!(
@@ -143,40 +145,13 @@ fn approve(sources: &[Box<dyn PackageSource>], blocked: &Blocked) -> Result<(), 
         })
 }
 
-fn find_source<'a>(
-    sources: &'a [Box<dyn PackageSource>],
-    target: &UpdateTarget,
-) -> Result<&'a dyn PackageSource, String> {
-    sources
-        .iter()
-        .find(|source| source.kind() == target.source)
-        .map(AsRef::as_ref)
-        .ok_or_else(|| {
-            format!(
-                "{}: the {} source is not available\n",
-                target.name,
-                target.source.label()
-            )
-        })
-}
-
 fn apply(sources: &[Box<dyn PackageSource>], target: &UpdateTarget) -> Result<(), Failure> {
-    let source = find_source(sources, target)?;
-
-    let mut command = source.update_command(&target.name).ok_or_else(|| {
-        format!(
-            "{}: the {} source is read-only\n",
-            target.name,
-            target.source.label()
-        )
-    })?;
-    let output = process::output_within(&mut command, process::CHANGE_LIMIT).map_err(|error| {
-        format!(
-            "{}: could not start {}: {error}\n",
-            target.name,
-            target.source.label()
-        )
-    })?;
+    let source = source::source_for(sources, &target.name, target.source)?;
+    let output = source::run_change(
+        source.update_command(&target.name),
+        &target.name,
+        target.source,
+    )?;
 
     if output.status.success() {
         return Ok(());
@@ -188,15 +163,15 @@ fn apply(sources: &[Box<dyn PackageSource>], target: &UpdateTarget) -> Result<()
 }
 
 fn describe_failure(target: &UpdateTarget, output: &std::process::Output) -> String {
-    format!(
-        "{} {} → {} via {} exited with {}\n--- stdout ---\n{}\n--- stderr ---\n{}\n\n",
-        target.name,
-        target.from,
-        target.to,
-        target.source.label(),
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    diagnostics::command_report(
+        &format!(
+            "{} {} → {} via {}",
+            target.name,
+            target.from,
+            target.to,
+            target.source.label()
+        ),
+        output,
     )
 }
 
