@@ -4,15 +4,14 @@
 | --- | --- | --- |
 | Windows installer — recommended | [`globlin-setup-x64.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-setup-x64.exe) | [`globlin-setup-arm64.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-setup-arm64.exe) |
 | Windows portable — no install | [`globlin.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin.exe) | [`globlin-arm64.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-arm64.exe) |
-| macOS 11+ (experimental) | — | [`Globlin-macos-arm64.zip`](https://github.com/TOR968/Globlin/releases/download/@TAG@/Globlin-macos-arm64.zip) |
+| macOS 11+ on Apple Silicon (experimental) | — | [`globlin-macos-apple-silicon.zip`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-macos-apple-silicon.zip) |
 | Debian, Ubuntu (experimental) | [`globlin-amd64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-amd64.deb) | [`globlin-arm64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-arm64.deb) |
 | Fedora, openSUSE (experimental) | [`globlin-x86_64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-x86_64.rpm) | [`globlin-aarch64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-aarch64.rpm) |
 | Arch Linux (experimental) | [`globlin-bin.PKGBUILD`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-bin.PKGBUILD) | same file |
 
-Everything else in the list below is not for downloading by hand. `globlin-macos-arm64`, with no extension,
-is the bare binary the installed Mac app updates itself from — macOS will not run it on its own. The
-`.sha256` and `.minisig` files beside `globlin.exe`, `globlin-arm64.exe` and `globlin-macos-arm64` are what
-the app checks before it installs an update of itself.
+The other two files, `SHA256SUMS` and `SHA256SUMS.minisig`, are for checking a download — and they are
+what the app itself checks before it installs an update of itself. Running Globlin 0.3.x? It cannot
+update itself to 0.4.0 or later: install this release by hand once, and it updates itself from then on.
 
 ## Verify the download
 

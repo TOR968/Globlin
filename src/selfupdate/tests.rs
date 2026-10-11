@@ -1,10 +1,5 @@
 use super::*;
 
-const X64_SHA: &str = "globlin.exe.sha256";
-const ARM64_SHA: &str = "globlin-arm64.exe.sha256";
-const X64_SIG: &str = "globlin.exe.minisig";
-const ARM64_SIG: &str = "globlin-arm64.exe.minisig";
-
 #[test]
 fn the_release_endpoint_points_at_this_repository() {
     assert_eq!(
@@ -82,20 +77,26 @@ fn current() -> Version {
 #[test]
 fn a_newer_tag_with_both_assets_is_offered() {
     let release = offer(
-        &body("v0.2.0", &[X64_ASSET, X64_SHA, X64_SIG]),
+        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         X64_ASSET,
     )
     .unwrap();
     assert_eq!(release.version, Version::parse("0.2.0").unwrap());
-    assert_eq!(release.exe_url, format!("https://example.test/{X64_ASSET}"));
-    assert_eq!(release.sha_url, format!("https://example.test/{X64_SHA}"));
+    assert_eq!(
+        release.asset_url,
+        format!("https://example.test/{X64_ASSET}")
+    );
+    assert_eq!(
+        release.sums_url,
+        format!("https://example.test/{SUMS_ASSET}")
+    );
 }
 
 #[test]
 fn a_tag_without_the_v_prefix_is_still_read() {
     let release = offer(
-        &body("0.2.0", &[X64_ASSET, X64_SHA, X64_SIG]),
+        &body("0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         X64_ASSET,
     )
@@ -106,7 +107,7 @@ fn a_tag_without_the_v_prefix_is_still_read() {
 #[test]
 fn the_running_version_is_not_offered_to_itself() {
     assert!(offer(
-        &body("v0.1.1", &[X64_ASSET, X64_SHA, X64_SIG]),
+        &body("v0.1.1", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         X64_ASSET
     )
@@ -116,7 +117,7 @@ fn the_running_version_is_not_offered_to_itself() {
 #[test]
 fn an_older_release_is_not_offered() {
     assert!(offer(
-        &body("v0.1.0", &[X64_ASSET, X64_SHA, X64_SIG]),
+        &body("v0.1.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         X64_ASSET
     )
@@ -125,13 +126,18 @@ fn an_older_release_is_not_offered() {
 
 #[test]
 fn a_release_without_an_exe_asset_is_not_offered() {
-    assert!(offer(&body("v0.2.0", &[X64_SHA, X64_SIG]), &current(), X64_ASSET).is_none());
+    assert!(offer(
+        &body("v0.2.0", &[SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
+        &current(),
+        X64_ASSET
+    )
+    .is_none());
 }
 
 #[test]
 fn a_release_without_a_checksum_asset_is_not_offered() {
     assert!(offer(
-        &body("v0.2.0", &[X64_ASSET, X64_SIG]),
+        &body("v0.2.0", &[X64_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         X64_ASSET
     )
@@ -141,7 +147,7 @@ fn a_release_without_a_checksum_asset_is_not_offered() {
 #[test]
 fn an_unparsable_tag_is_not_offered() {
     assert!(offer(
-        &body("nightly", &[X64_ASSET, X64_SHA, X64_SIG]),
+        &body("nightly", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         X64_ASSET
     )
@@ -342,14 +348,9 @@ fn an_architecture_without_a_published_build_gets_no_asset() {
 }
 
 #[test]
-fn the_checksum_asset_is_named_after_its_binary() {
-    assert_eq!(checksum_asset(ARM64_ASSET), ARM64_SHA);
-}
-
-#[test]
 fn an_arm64_release_is_offered_only_when_its_own_assets_are_published() {
     assert!(offer(
-        &body("v0.2.0", &[X64_ASSET, X64_SHA, X64_SIG]),
+        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         ARM64_ASSET
     )
@@ -358,7 +359,13 @@ fn an_arm64_release_is_offered_only_when_its_own_assets_are_published() {
     let release = offer(
         &body(
             "v0.2.0",
-            &[X64_ASSET, X64_SHA, ARM64_ASSET, ARM64_SHA, ARM64_SIG],
+            &[
+                X64_ASSET,
+                SUMS_ASSET,
+                ARM64_ASSET,
+                SUMS_ASSET,
+                SUMS_SIGNATURE_ASSET,
+            ],
         ),
         &current(),
         ARM64_ASSET,
@@ -366,10 +373,13 @@ fn an_arm64_release_is_offered_only_when_its_own_assets_are_published() {
     .unwrap();
 
     assert_eq!(
-        release.exe_url,
+        release.asset_url,
         format!("https://example.test/{ARM64_ASSET}")
     );
-    assert_eq!(release.sha_url, format!("https://example.test/{ARM64_SHA}"));
+    assert_eq!(
+        release.sums_url,
+        format!("https://example.test/{SUMS_ASSET}")
+    );
 }
 
 #[test]
@@ -387,8 +397,13 @@ fn the_checksum_line_for_the_other_architecture_is_ignored() {
 }
 
 #[test]
-fn an_apple_silicon_build_updates_from_the_bare_macos_binary() {
-    assert_eq!(asset_for("macos", "aarch64"), Some("globlin-macos-arm64"));
+fn an_apple_silicon_build_updates_from_the_app_bundle_archive() {
+    assert_eq!(
+        asset_for("macos", "aarch64"),
+        Some("globlin-macos-apple-silicon.zip")
+    );
+    assert!(is_bundle_archive(MACOS_ASSET));
+    assert!(!is_bundle_archive(X64_ASSET));
 }
 
 const TEST_KEY: &str = "RWQBAgMEBQYHCAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4";
@@ -402,7 +417,7 @@ aP6o1JiJTh21SJbDwfjHHkVkwp6LQ54WlQVNvNQPiJopPRdrxeCHdEMSswrikEsLxuMvw/b6CI2slt12
 #[test]
 fn a_release_without_a_signature_asset_is_not_offered() {
     assert!(offer(
-        &body("v0.2.0", &[X64_ASSET, X64_SHA]),
+        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET]),
         &current(),
         X64_ASSET
     )
@@ -412,13 +427,16 @@ fn a_release_without_a_signature_asset_is_not_offered() {
 #[test]
 fn the_signature_asset_is_offered_beside_the_binary() {
     let release = offer(
-        &body("v0.2.0", &[X64_ASSET, X64_SHA, X64_SIG]),
+        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
         &current(),
         X64_ASSET,
     )
     .unwrap();
 
-    assert_eq!(release.sig_url, format!("https://example.test/{X64_SIG}"));
+    assert_eq!(
+        release.sums_signature_url,
+        format!("https://example.test/{SUMS_SIGNATURE_ASSET}")
+    );
 }
 
 #[test]
@@ -443,4 +461,49 @@ fn a_signature_from_another_key_is_refused() {
 #[test]
 fn the_embedded_release_key_parses() {
     assert!(PublicKey::from_base64(RELEASE_PUBLIC_KEY).is_ok());
+}
+
+const TEST_SUMS: &str =
+    "fd4480655eef515505bce10a51b6fe850aa90f96dc629e1609a9add10dd33ecc  globlin.exe\n";
+const TEST_SUMS_SIGNATURE: &str = "untrusted comment: signature from the Globlin release key
+RUQBAgMEBQYHCK8/wx82j0oHtKJd/99IvK8HBCRioXDJp6e+uOkM31uL78ucoE0i0vevTyT8sasSjYLHpp2skFCb5cNvbso3bAg=
+trusted comment: timestamp:1791688336\tfile:SHA256SUMS\thashed
+7sY4oB6xo6de2DvK2HJoCu/YuGPjFw0oMXkM6MXbmyB4H99/pyNAqsXqGt3kyCE50su2E2kzCyIZSsVWGb1ADg==
+";
+
+#[test]
+fn a_signed_sums_file_vouches_for_the_binary_it_lists() {
+    verify_signature(TEST_SUMS.as_bytes(), TEST_SUMS_SIGNATURE, TEST_KEY).unwrap();
+    verify(TEST_PAYLOAD, TEST_SUMS, X64_ASSET).unwrap();
+}
+
+#[test]
+fn a_sums_file_edited_after_signing_is_refused() {
+    let forged = TEST_SUMS.replace("fd44", "0d44");
+
+    assert!(verify_signature(forged.as_bytes(), TEST_SUMS_SIGNATURE, TEST_KEY).is_err());
+}
+
+#[test]
+fn a_binary_the_sums_file_does_not_list_is_refused() {
+    assert!(verify(TEST_PAYLOAD, TEST_SUMS, ARM64_ASSET).is_err());
+}
+
+#[test]
+fn the_app_bundle_is_found_from_its_executable() {
+    let executable = Path::new("/Applications/Globlin.app/Contents/MacOS/globlin");
+
+    assert_eq!(
+        bundle_of(executable),
+        Some(PathBuf::from("/Applications/Globlin.app"))
+    );
+}
+
+#[test]
+fn an_executable_outside_a_bundle_has_none() {
+    assert_eq!(bundle_of(Path::new("/usr/local/bin/globlin")), None);
+    assert_eq!(
+        bundle_of(Path::new("/Applications/Globlin/Contents/MacOS/globlin")),
+        None
+    );
 }

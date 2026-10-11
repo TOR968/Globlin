@@ -48,7 +48,6 @@ jobs:
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item target/release/globlin.exe dist/${{ matrix.asset }}
           $hash = (Get-FileHash dist/${{ matrix.asset }} -Algorithm SHA256).Hash.ToLower()
-          "$hash  ${{ matrix.asset }}" | Set-Content dist/${{ matrix.asset }}.sha256
           "sha256=$hash" | Add-Content $env:GITHUB_OUTPUT
           $icon = Get-ChildItem target/release/build -Recurse -Filter app.ico |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -88,17 +87,13 @@ jobs:
       - name: Bundle, sign ad hoc and zip
         run: |
           bash .github/bundle-macos.sh target/release/globlin dist
-          cd dist
-          shasum -a 256 globlin-macos-arm64 > globlin-macos-arm64.sha256
-          ls -l
+          ls -l dist
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos
           path: |
-            dist/globlin-macos-arm64
-            dist/globlin-macos-arm64.sha256
-            dist/Globlin-macos-arm64.zip
+            dist/globlin-macos-apple-silicon.zip
           if-no-files-found: error
 
   build-linux:
@@ -192,7 +187,7 @@ jobs:
       - name: Write SHA256SUMS
         shell: pwsh
         run: |
-          $files = 'globlin-setup-x64.exe', 'globlin-setup-arm64.exe', 'globlin.exe', 'globlin-arm64.exe', 'Globlin-macos-arm64.zip', 'globlin-macos-arm64', 'globlin-amd64.deb', 'globlin-arm64.deb', 'globlin-x86_64.rpm', 'globlin-aarch64.rpm', 'globlin-bin.PKGBUILD'
+          $files = 'globlin-setup-x64.exe', 'globlin-setup-arm64.exe', 'globlin.exe', 'globlin-arm64.exe', 'globlin-macos-apple-silicon.zip', 'globlin-amd64.deb', 'globlin-arm64.deb', 'globlin-x86_64.rpm', 'globlin-aarch64.rpm', 'globlin-bin.PKGBUILD'
           $lines = foreach ($name in $files) {
             "$((Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLower())  $name"
           }
@@ -205,7 +200,7 @@ jobs:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
         run: |
           python -m pip install --disable-pip-version-check --quiet "cryptography==50.0.1"
-          python .github/minisign-sign.py dist/globlin.exe dist/globlin-arm64.exe dist/globlin-macos-arm64 dist/SHA256SUMS
+          python .github/minisign-sign.py dist/SHA256SUMS
           if ($LASTEXITCODE -ne 0) { throw "signing failed" }
 
       - name: Assemble the release notes
@@ -240,15 +235,8 @@ jobs:
           dist/globlin-setup-x64.exe
           dist/globlin-setup-arm64.exe
           dist/globlin.exe
-          dist/globlin.exe.sha256
-          dist/globlin.exe.minisig
           dist/globlin-arm64.exe
-          dist/globlin-arm64.exe.sha256
-          dist/globlin-arm64.exe.minisig
-          dist/Globlin-macos-arm64.zip
-          dist/globlin-macos-arm64
-          dist/globlin-macos-arm64.sha256
-          dist/globlin-macos-arm64.minisig
+          dist/globlin-macos-apple-silicon.zip
           dist/globlin-amd64.deb
           dist/globlin-arm64.deb
           dist/globlin-x86_64.rpm

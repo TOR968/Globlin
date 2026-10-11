@@ -549,12 +549,14 @@ so a missing npm, a `PATH` without bun, or an unreachable registry cannot stop t
 installing — its own update. That endpoint always resolves to the newest *published* release; GitHub
 excludes pre-releases and drafts from it, so neither can reach a user by accident. A release is offered
 only when its tag parses as semver strictly newer than the running build, and both the binary for the
-running architecture (`globlin.exe` on x64, `globlin-arm64.exe` on ARM64 — `selfupdate::asset_for`) and
-its `.sha256` are attached — a release missing either asset is skipped rather than half-offered.
+running platform (`globlin.exe` on x64, `globlin-arm64.exe` on ARM64, `globlin-macos-apple-silicon.zip`
+on a Mac — `selfupdate::asset_for`), `SHA256SUMS` and `SHA256SUMS.minisig` are all attached — a release
+missing any of them is skipped rather than half-offered.
 
-Applying an update downloads both assets, hashes the `.exe` with SHA-256, and compares that against the
-published `.sha256`; a mismatch discards the download and reports a failure, and the running binary is
-never touched. Windows will not let a running `.exe` be overwritten, but it will let it be *renamed*, so
+Applying an update downloads all three, verifies the signature on `SHA256SUMS` (see
+[The release signature](#the-release-signature)), hashes the download with SHA-256 and compares it with
+its line in `SHA256SUMS`; any mismatch discards the download and reports a failure, and the running
+binary is never touched. Windows will not let a running `.exe` be overwritten, but it will let it be *renamed*, so
 the swap is: write the new build as `globlin.exe.new` next to the running one, rename the running exe to
 `globlin.exe.old`, then rename `.new` into the live name. If that last rename fails, the `.old` build is
 renamed straight back and the installation is left exactly as it was. In the rare case where that rollback
@@ -595,18 +597,18 @@ still holding while it shuts down, then raises a `Globlin — updated / now runn
 ### The release signature
 
 A checksum published in the same release as the binary proves the download is intact, not that the
-project published it: whoever can edit a release can edit both. So each binary self-update downloads
-(`globlin.exe`, `globlin-arm64.exe`, `globlin-macos-arm64`) gets a minisign signature, `<file>.minisig`,
-and self-update refuses a binary whose signature does not verify against `RELEASE_PUBLIC_KEY` in
-`selfupdate.rs` (`RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`). `offer` does not even offer a
-release that lacks the `.minisig` for the running asset, and the download agent is `https_only`.
+project published it: whoever can edit a release can edit both. So `SHA256SUMS` lists the
+SHA-256 of all ten release files, `SHA256SUMS.minisig` is a minisign signature over that list, and
+self-update refuses a download unless the signature verifies against `RELEASE_PUBLIC_KEY` in
+`selfupdate.rs` (`RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`) and the download's hash
+matches its line. `offer` does not even offer a release that lacks either file, and the download agent is
+`https_only`. The same two files let anyone check any download with `minisign -Vm SHA256SUMS` and
+`sha256sum -c --ignore-missing SHA256SUMS`.
 
-Every other release file is covered by one signature instead: `SHA256SUMS` lists the SHA-256 of all
-eleven release files and `SHA256SUMS.minisig` signs that list, so `minisign -Vm SHA256SUMS` followed by
-`sha256sum -c --ignore-missing SHA256SUMS` proves any download as strongly as a per-file signature would,
-for two assets instead of twenty. The three self-update binaries appear in `SHA256SUMS` too, but their
-own `.sha256` and `.minisig` stay — installed copies from before this layout fetch exactly those names, and
-dropping them would strand every one of them on its current version.
+Up to v0.3.15 each self-update binary carried its own `.sha256` and `.minisig`, and the Mac updated from a
+bare `globlin-macos-arm64`. v0.4.0 dropped all of that in one step, on purpose: copies older than 0.4.0
+look for names that no longer exist and stop finding updates, so they have to install 0.4.0 by hand once;
+everything from 0.4.0 on updates itself through `SHA256SUMS`.
 
 `.github/minisign-sign.py` writes the prehashed (`ED`, BLAKE2b-512) format `minisign -V` and the
 `minisign-verify` crate read, from the `MINISIGN_SECRET_KEY` repository secret — base64 of an 8-byte key
@@ -702,7 +704,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-528 tests on Windows: 499 run by default (no network, no side effects), 29 `#[ignore]`d because they
+532 tests on Windows: 503 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
@@ -762,16 +764,14 @@ determining versions.
   a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
   `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
   on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), scans them too,
-  and creates one GitHub Release with nineteen files. Eleven are the release proper: the two installers
-  and the two portable `.exe`s; the `build-macos` job's `Globlin-macos-arm64.zip` and bare
-  `globlin-macos-arm64`; the `build-linux` jobs' two `.deb` and two `.rpm` files (no VirusTotal scan for
-  the macOS and Linux files); and `globlin-bin.PKGBUILD`, rendered from the two debs' hashes. Six are the
-  `.sha256` and `.minisig` of the three binaries self-update downloads — `globlin.exe`,
-  `globlin-arm64.exe`, `globlin-macos-arm64` — which installed copies look up by exact name, so those
-  names and formats are frozen. The last two are `SHA256SUMS`, one `<hex>  <file>` line (two spaces, the
-  `sha256sum` format) for each of the eleven, and its `SHA256SUMS.minisig` (see
-  [The release signature](#the-release-signature)). Up to v0.3.15 every one of the eleven carried its own
-  `.sha256` and `.minisig`, thirty-two files in all, and the asset list GitHub shows — alphabetical, with
+  and creates one GitHub Release with twelve files. Ten are the release proper: the two installers
+  and the two portable `.exe`s; the `build-macos` job's `globlin-macos-apple-silicon.zip`; the
+  `build-linux` jobs' two `.deb` and two `.rpm` files (no VirusTotal scan for the macOS and Linux files);
+  and `globlin-bin.PKGBUILD`, rendered from the two debs' hashes. The last two are `SHA256SUMS`, one
+  `<hex>  <file>` line (two spaces, the `sha256sum` format) for each of the ten, and its
+  `SHA256SUMS.minisig` (see [The release signature](#the-release-signature)), which is also what
+  self-update checks. Up to v0.3.15 every file carried its own `.sha256` and `.minisig`, thirty-two files
+  in all, and the asset list GitHub shows — alphabetical, with
   no way to hide or reorder an entry — was too long for anyone to find the file they needed. The release
   notes now open with a *Which file do I need?* table instead: `.github/release-notes.md` is a template,
   `@TAG@` becomes the tag so its links point at this release's files, and `@CHANGELOG@` becomes this
@@ -900,7 +900,7 @@ suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
   a Linux binary under `/usr` (the deb and rpm install to `/usr/bin`). Either one skips the release
   lookup and tells the user which tool updates Globlin instead.
 - `selfupdate::asset_for(os, arch)` — `windows/x86_64` → `globlin.exe`, `windows/aarch64` →
-  `globlin-arm64.exe`, `macos/aarch64` → `globlin-macos-arm64`; anything else — Linux included, whose
+  `globlin-arm64.exe`, `macos/aarch64` → `globlin-macos-apple-silicon.zip`; anything else — Linux included, whose
   packages never self-update — has no build, and the lookup logs why instead of offering one. `globlin.exe` stays the x64 name forever: every released version
   looks for it by that exact name, and an x64 build running under emulation on ARM keeps updating to x64.
 - `build.rs` — embeds the Windows resource only when the target is Windows.
@@ -925,9 +925,9 @@ walks users through *Open Anyway*).
 - **Bundle.** `.github/bundle-macos.sh` builds `Globlin.app`: an `Info.plist` with the `Cargo.toml`
   version, `LSUIElement` (no Dock icon, no app menu) and bundle id `dev.globlin.app`; an `.icns` that
   `iconutil` makes from the PNGs the ignored `icon::tests::dump_macos_iconset` renders (so the icon is
-  still code); `codesign --force --sign -`; `ditto` into `Globlin-macos-arm64.zip`. `main.rs` also sets
-  `ActivationPolicy::Accessory`, because self-update relaunches the bare binary rather than going
-  through Launch Services. CI attaches the zip to every run, for testing a branch on a real Mac.
+  still code); `codesign --force --sign -`; `ditto` into `globlin-macos-apple-silicon.zip`. `main.rs`
+  also sets `ActivationPolicy::Accessory`, because self-update relaunches the executable directly rather
+  than going through Launch Services. CI attaches the zip to every run, for testing a branch on a real Mac.
 - **Dock while the window is open.** A menu-bar app whose window has no Dock icon is invisible to ⌘-Tab
   and gets lost behind other windows, so `window::show_in_dock` switches the policy to `Regular` (Dock
   icon, ⌘-Tab, app menu) right before the window is shown and back to `Accessory` when it is closed —
@@ -945,11 +945,15 @@ walks users through *Open Anyway*).
   setting. `SMAppService` would be the modern route, but it needs a properly signed app.
 - **Config** always lives in `~/Library/Application Support/globlin/` — never next to the exe, which is
   inside the bundle.
-- **Self-update** downloads `globlin-macos-arm64`, the bare binary from the same build as the zip, and
-  swaps `Contents/MacOS/globlin` like the Windows exe, setting the execute bit on the staged file because
-  release assets do not carry it. Replacing the main executable breaks the bundle's ad-hoc seal, but the
-  app was approved on first launch and the download carries no quarantine flag, so Gatekeeper does not
-  look again; the binary keeps its own linker signature, which is what the kernel checks.
+- **Self-update** replaces the whole bundle: it downloads `globlin-macos-apple-silicon.zip` (the same
+  file people install from), checks it against the signed `SHA256SUMS`, unpacks it with `ditto -x -k` into
+  `Globlin.app.update` beside the running bundle, and swaps the bundles with the same rename-and-rollback
+  as the Windows exe (`Globlin.app` → `Globlin.app.old`, the unpacked bundle → `Globlin.app`), then
+  relaunches the executable at the same path. Swapping the whole `.app` keeps its ad-hoc seal and its
+  `Info.plist` version consistent, which replacing only `Contents/MacOS/globlin` broke. Files Globlin
+  writes itself carry no quarantine flag, so Gatekeeper does not ask again. `selfupdate::bundle_of` finds
+  the bundle from the executable path; outside a `.app` the Mac build does not update itself, and
+  `clean_stale` deletes `Globlin.app.old` and any leftover `Globlin.app.update` on the next start.
 
 ### Linux
 

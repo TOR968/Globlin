@@ -831,7 +831,7 @@
               <svg class="os-icon" aria-hidden="true"><use href="#os-windows"></use></svg>
               Windows
             </a>
-            <a class="button button-ghost" data-os="macos" href="https://github.com/TOR968/Globlin/releases/latest/download/Globlin-macos-arm64.zip" data-file="Globlin-macos-arm64.zip" rel="nofollow">
+            <a class="button button-ghost" data-os="macos" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-macos-apple-silicon.zip" data-file="globlin-macos-apple-silicon.zip" rel="nofollow">
               <svg class="os-icon" aria-hidden="true"><use href="#os-apple"></use></svg>
               macOS
             </a>
@@ -1065,7 +1065,7 @@
                 <li>System Settings → Privacy &amp; Security → Open Anyway. It is signed ad hoc, not notarised, so this is needed once.</li>
               </ol>
               <div class="platform-actions">
-                <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases/latest/download/Globlin-macos-arm64.zip" rel="nofollow">
+                <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-macos-apple-silicon.zip" rel="nofollow">
                   <svg class="os-icon" aria-hidden="true"><use href="#os-apple"></use></svg>
                   Download .zip
                 </a>
@@ -1211,7 +1211,7 @@
         }
 
         if (/mac/i.test(platform)) {
-          choose("macos", "Globlin-macos-arm64.zip");
+          choose("macos", "globlin-macos-apple-silicon.zip");
         } else if (/linux/i.test(platform) && !/android/i.test(platform)) {
           choose("linux", /aarch64|arm/i.test(platform) ? "globlin-arm64.deb" : "globlin-amd64.deb");
         } else if (data && data.getHighEntropyValues) {

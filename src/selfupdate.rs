@@ -13,15 +13,18 @@ use crate::{diagnostics, install, platform, Result};
 
 const X64_ASSET: &str = "globlin.exe";
 const ARM64_ASSET: &str = "globlin-arm64.exe";
-const MACOS_ARM64_ASSET: &str = "globlin-macos-arm64";
+const MACOS_ASSET: &str = "globlin-macos-apple-silicon.zip";
+const SUMS_ASSET: &str = "SHA256SUMS";
+const SUMS_SIGNATURE_ASSET: &str = "SHA256SUMS.minisig";
+const BUNDLE_STAGING: &str = "update";
 const RELEASE_PUBLIC_KEY: &str = "RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
     pub version: Version,
-    pub exe_url: String,
-    pub sha_url: String,
-    pub sig_url: String,
+    pub asset_url: String,
+    pub sums_url: String,
+    pub sums_signature_url: String,
 }
 
 #[derive(Deserialize)]
@@ -44,9 +47,9 @@ fn offer(body: &str, current: &Version, asset: &str) -> Option<Release> {
     }
     Some(Release {
         version,
-        exe_url: asset_url(&release.assets, asset)?,
-        sha_url: asset_url(&release.assets, &checksum_asset(asset))?,
-        sig_url: asset_url(&release.assets, &signature_asset(asset))?,
+        asset_url: asset_url(&release.assets, asset)?,
+        sums_url: asset_url(&release.assets, SUMS_ASSET)?,
+        sums_signature_url: asset_url(&release.assets, SUMS_SIGNATURE_ASSET)?,
     })
 }
 
@@ -69,17 +72,9 @@ fn asset_for(os: &str, arch: &str) -> Option<&'static str> {
     match (os, arch) {
         ("windows", "x86_64") => Some(X64_ASSET),
         ("windows", "aarch64") => Some(ARM64_ASSET),
-        ("macos", "aarch64") => Some(MACOS_ARM64_ASSET),
+        ("macos", "aarch64") => Some(MACOS_ASSET),
         _ => None,
     }
-}
-
-fn checksum_asset(asset: &str) -> String {
-    format!("{asset}.sha256")
-}
-
-fn signature_asset(asset: &str) -> String {
-    format!("{asset}.minisig")
 }
 
 fn verify_signature(bytes: &[u8], signature: &str, public_key: &str) -> Result<()> {
@@ -165,6 +160,10 @@ fn swap(current: &Path, staged: &Path) -> Result<()> {
 pub fn clean_stale() {
     if let Ok(current) = std::env::current_exe() {
         remove_leftovers(&current);
+        if let Some(bundle) = bundle_of(&current) {
+            fs::remove_dir_all(previous_path(&bundle)).ok();
+            fs::remove_dir_all(sibling(&bundle, BUNDLE_STAGING)).ok();
+        }
     }
 }
 
@@ -188,32 +187,91 @@ pub fn latest() -> Result<Option<Release>> {
 
 pub fn apply(release: &Release) -> Result<Version> {
     clean_stale();
-    let binary = get(&agent(DOWNLOAD_TIMEOUT), &release.exe_url)?.read_to_vec()?;
-    let checksum = get(&agent(TIMEOUT), &release.sha_url)?.read_to_string()?;
-    let signature = get(&agent(TIMEOUT), &release.sig_url)?.read_to_string()?;
-    verify_signature(&binary, &signature, RELEASE_PUBLIC_KEY)?;
-    verify(&binary, &checksum, running_asset()?)?;
+    let asset = running_asset()?;
+    let download = get(&agent(DOWNLOAD_TIMEOUT), &release.asset_url)?.read_to_vec()?;
+    let sums = get(&agent(TIMEOUT), &release.sums_url)?.read_to_string()?;
+    let signature = get(&agent(TIMEOUT), &release.sums_signature_url)?.read_to_string()?;
+    verify_signature(sums.as_bytes(), &signature, RELEASE_PUBLIC_KEY)?;
+    verify(&download, &sums, asset)?;
+    if is_bundle_archive(asset) {
+        install_bundle(&download)?;
+    } else {
+        install_binary(&download)?;
+    }
+    record_installed_version(&release.version);
+    Ok(release.version.clone())
+}
 
+fn is_bundle_archive(asset: &str) -> bool {
+    Path::new(asset)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
+}
+
+fn install_binary(binary: &[u8]) -> Result<()> {
     let current = std::env::current_exe()?;
     let staged = staged_path(&current);
-    fs::write(&staged, &binary)?;
+    fs::write(&staged, binary)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&staged, fs::Permissions::from_mode(0o755))?;
     }
-    match swap(&current, &staged) {
-        Ok(()) => {
-            record_installed_version(&release.version);
-            Ok(release.version.clone())
+    swap(&current, &staged).inspect_err(|_| {
+        if should_discard_staged(&current) {
+            fs::remove_file(&staged).ok();
         }
-        Err(error) => {
-            if should_discard_staged(&current) {
-                fs::remove_file(&staged).ok();
-            }
-            Err(error)
-        }
+    })
+}
+
+#[cfg(target_os = "macos")]
+fn install_bundle(archive: &[u8]) -> Result<()> {
+    let current = std::env::current_exe()?;
+    let bundle = bundle_of(&current).ok_or("Globlin is not running from inside a .app bundle")?;
+    let staging = sibling(&bundle, BUNDLE_STAGING);
+    fs::remove_dir_all(&staging).ok();
+    fs::create_dir_all(&staging)?;
+    let archive_path = staging.join(MACOS_ASSET);
+    fs::write(&archive_path, archive)?;
+    let unpacked = Command::new("/usr/bin/ditto")
+        .args(["-x", "-k"])
+        .arg(&archive_path)
+        .arg(&staging)
+        .status()?;
+    if !unpacked.success() {
+        fs::remove_dir_all(&staging).ok();
+        return Err(format!("ditto could not unpack the update: {unpacked}").into());
     }
+    let staged = unpacked_bundle(&staging)?;
+    let swapped = swap(&bundle, &staged);
+    fs::remove_dir_all(&staging).ok();
+    swapped
+}
+
+#[cfg(not(target_os = "macos"))]
+fn install_bundle(_archive: &[u8]) -> Result<()> {
+    Err("only the macOS build updates itself from an app bundle".into())
+}
+
+#[cfg(target_os = "macos")]
+fn unpacked_bundle(staging: &Path) -> Result<PathBuf> {
+    fs::read_dir(staging)?
+        .filter_map(std::result::Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|extension| extension == "app"))
+        .ok_or_else(|| "the update archive holds no .app bundle".into())
+}
+
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn bundle_of(executable: &Path) -> Option<PathBuf> {
+    let macos = executable.parent()?;
+    let contents = macos.parent()?;
+    let bundle = contents.parent()?;
+    let named = |path: &Path, name: &str| path.file_name().is_some_and(|file| file == name);
+    let is_app = bundle
+        .extension()
+        .is_some_and(|extension| extension == "app");
+    (named(macos, "MacOS") && named(contents, "Contents") && is_app).then(|| bundle.to_path_buf())
 }
 
 fn record_installed_version(version: &Version) {
