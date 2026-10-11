@@ -16,6 +16,8 @@ update itself to 0.4.0 or later: install this release by hand once, and it updat
 
 ## Verify the download
 
+[Code signing policy](https://github.com/TOR968/Globlin#code-signing-policy) · [Privacy](https://github.com/TOR968/Globlin#privacy)
+
 `SHA256SUMS` lists the SHA-256 of every release file, and `SHA256SUMS.minisig` is its
 [minisign](https://jedisct1.github.io/minisign/) signature by the Globlin release key — the same key the app
 checks before it updates itself. Download both next to your file, then check the signature and the hash:
