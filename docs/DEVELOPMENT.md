@@ -177,18 +177,28 @@ these a link or an `.html` file dragged onto the window became a page with `wind
 
 ### The icon
 
-The icon is a goblin's head — a play on the name — whose mouth is an up chevron: a head polygon flattened
-from four quadratic curves, two pointed ears and, at sizes above 20 px, two eyes, all drawn from
-primitives (`Disc`, `Segment`, `Polygon`) in `src/icon/render.rs`, in the state colour with white
-features. At tray size (16–20 px) the eyes are dropped and the chevron thickens, because 1-px eyes only
-blur. There are no image files as sources; `build.rs` renders the same drawing into the `.exe` icon, so
-the two cannot drift apart. It replaced an uppercase `G` in 2026-10, chosen from four directions and six
-goblin variations drawn on a design canvas; the coordinates are the canvas's 64-unit SVG halved into the
-32-unit design space.
+The icon is a chibi goblin — a play on the name — drawn from primitives (`Disc`, `Ellipse`, `Segment`,
+`Polygon`, `Grown`) in `src/icon/render.rs`: a round head flattened from four quadratic curves, two
+pointed ears, big dark eyes with white glints and an up-chevron mouth, the head in the state colour. It
+has three levels of detail, picked by `Detail::for_size`:
 
-While a job runs the goblin becomes a vessel: a dim silhouette fills with water whose surface ripples
-every 120 ms, at a level driven by the batch-share arithmetic in `progress.rs`, while the ears twitch
-(rotated about their base by up to 0.2 rad) and the mouth hops up to 1.2 units over the 8-frame cycle.
+- **Sticker** (48 px and up — the `.exe`/app icon, the macOS iconset, the Linux hicolor icons, the README
+  and the site): a white outline (`Shape::Grown`, the silhouette dilated by 1.25 units) and two gold
+  sparkles, like a laptop sticker.
+- **Tray** (21–47 px, which is what the 32 px tray frames are): no outline or sparkles, smaller eyes, the
+  mouth kept.
+- **Tiny** (20 px and below): only the head, ears and big eyes — a 1-px mouth only blurs.
+
+Error adds a sweat drop and greys the sparkles. There are no image files as sources; `build.rs` renders
+the same drawing into the `.exe` icon, so the two cannot drift apart. It replaced an uppercase `G` in
+2026-10, chosen on a design canvas from four directions, six goblin variations and six anime styles; the
+coordinates are the canvas's 64-unit SVG halved into the 32-unit design space.
+
+While a job runs the goblin becomes a vessel: a dim silhouette whose head fills with water — the ears
+stay out of the fill so they cannot leave a ghost behind when they move — rippling every 120 ms at a
+level driven by the batch-share arithmetic in `progress.rs`, while the ears twitch (rotated about their
+base by up to 0.2 rad), the mouth hops and, at sticker size, the sparkles orbit the face. The other states
+are still.
 
 Every icon is supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px
 frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the
@@ -694,7 +704,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-528 tests on Windows: 499 run by default (no network, no side effects), 29 `#[ignore]`d because they
+532 tests on Windows: 503 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
