@@ -337,6 +337,12 @@ binary and watch the next scan.
 
 Things about the environment the code has to work around, all verified rather than assumed:
 
+- **A batch updates brew and scoop last.** Both install the runtimes other sources run on. On the first
+  real Mac, *Update all* upgraded Homebrew's `ruby` mid-batch, `brew link` failed on a conflicting `erb`,
+  `/opt/homebrew/bin/gem` vanished, and every gem update queued after it failed with
+  `could not run gem: No such file or directory`. `model::in_update_order` (applied in
+  `App::start_update`) stable-sorts `SourceKind::installs_runtimes` targets to the end, so the gems, npm
+  packages and pipx tools are updated while their runtime is still in place.
 - **`npm ls -g --json` exits non-zero when the global tree has problems** (an orphaned directory in
   `node_modules` is enough). The exit code is therefore ignored and stdout is parsed anyway; entries with
   no usable `version` are skipped instead of failing the whole listing.
@@ -678,7 +684,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-507 tests on Windows: 478 run by default (no network, no side effects), 29 `#[ignore]`d because they
+508 tests on Windows: 479 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit

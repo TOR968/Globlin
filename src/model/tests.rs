@@ -280,3 +280,30 @@ fn every_source_is_available_on_windows_and_only_the_portable_ones_elsewhere() {
         );
     }
 }
+
+fn queued(name: &str, source: SourceKind) -> UpdateTarget {
+    UpdateTarget {
+        name: name.to_string(),
+        source,
+        from: "1.0.0".to_string(),
+        to: "2.0.0".to_string(),
+    }
+}
+
+#[test]
+fn runtimes_from_brew_and_scoop_are_updated_after_the_packages_that_run_on_them() {
+    let ordered = in_update_order(vec![
+        queued("ruby", SourceKind::Brew),
+        queued("rdoc", SourceKind::Gem),
+        queued("nodejs", SourceKind::Scoop),
+        queued("prettier", SourceKind::Npm),
+        queued("wget", SourceKind::Brew),
+        queued("ripgrep", SourceKind::Cargo),
+    ]);
+    let names: Vec<&str> = ordered.iter().map(|target| target.name.as_str()).collect();
+
+    assert_eq!(
+        names,
+        ["rdoc", "prettier", "ripgrep", "ruby", "nodejs", "wget"]
+    );
+}

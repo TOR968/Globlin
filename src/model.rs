@@ -91,6 +91,10 @@ impl SourceKind {
         !matches!(self, Self::Go | Self::Winget | Self::Choco)
     }
 
+    pub const fn installs_runtimes(self) -> bool {
+        matches!(self, Self::Brew | Self::Scoop)
+    }
+
     pub const fn windows_only(self) -> bool {
         matches!(self, Self::Scoop | Self::Winget | Self::Choco)
     }
@@ -335,6 +339,11 @@ pub fn unchecked(packages: &[Package]) -> Vec<&Package> {
         .iter()
         .filter(|package| package.status == Status::Unknown)
         .collect()
+}
+
+pub fn in_update_order(mut targets: Vec<UpdateTarget>) -> Vec<UpdateTarget> {
+    targets.sort_by_key(|target| target.source.installs_runtimes());
+    targets
 }
 
 pub fn updatable(packages: &[Package]) -> Vec<&Package> {

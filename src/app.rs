@@ -262,6 +262,7 @@ impl App {
         if targets.is_empty() || self.activity.is_some() {
             return;
         }
+        let targets = model::in_update_order(targets);
         self.begin(Activity::Updating {
             batch: Batch::new(targets.clone()),
         });
