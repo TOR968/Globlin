@@ -126,26 +126,33 @@
 
     <style>
       :root {
-        --bg: #0d1117;
-        --surface: #161b22;
-        --border: #30363d;
-        --text: #e6edf3;
-        --muted: #8b949e;
-        --emerald: #10b981;
-        --amber: #f59e0b;
-        --red: #ef4444;
-        --sky: #38bdf8;
-        --deep: #334155;
-        --radius: 12px;
-        --shell: 1040px;
-        --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-        --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+        --bg: #0f1215;
+        --surface: #171b20;
+        --raised: #1e232a;
+        --border: #252b33;
+        --line: #1c2127;
+        --text: #e7eaee;
+        --muted: #9aa3ae;
+        --faint: #7d8794;
+        --emerald: #3ecf8e;
+        --amber: #f2a93b;
+        --red: #f07167;
+        --sky: #5aa9e6;
+        --link: #9db8d4;
+        --radius: 14px;
+        --shell: 1120px;
+        --sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui, ui-sans-serif, sans-serif;
+        --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
       }
 
       *,
       *::before,
       *::after {
         box-sizing: border-box;
+      }
+
+      html {
+        scroll-padding-top: 80px;
       }
 
       body {
@@ -159,7 +166,11 @@
       }
 
       a {
-        color: var(--sky);
+        color: var(--link);
+      }
+
+      a:hover {
+        color: #c7d8ea;
       }
 
       img {
@@ -167,194 +178,13 @@
         height: auto;
       }
 
-      .shell {
-        width: 100%;
-        max-width: var(--shell);
-        margin: 0 auto;
-        padding: 0 24px;
-      }
-
-      .section {
-        padding: 88px 0;
-        border-top: 1px solid var(--border);
-      }
-
-      .section h2 {
-        font-size: clamp(1.6rem, 3.2vw, 2.1rem);
-        line-height: 1.25;
-        margin: 0 0 12px;
-        letter-spacing: -0.01em;
-      }
-
-      .eyebrow {
+      code {
         font-family: var(--mono);
-        font-size: 0.78rem;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--muted);
-        margin: 0 0 14px;
-      }
-
-      .lede {
-        color: var(--muted);
-        max-width: 62ch;
-        margin: 0 0 40px;
-      }
-
-      .site-header {
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        background: rgba(13, 17, 23, 0.88);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid var(--border);
-      }
-
-      .site-header .shell {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-        min-height: 64px;
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-weight: 650;
-        color: var(--text);
-        text-decoration: none;
-        letter-spacing: -0.01em;
-      }
-
-      .brand img {
-        width: 28px;
-        height: 28px;
-      }
-
-      .site-nav {
-        margin-left: auto;
-        display: flex;
-        align-items: center;
-        gap: 24px;
-      }
-
-      .site-nav a {
-        color: var(--muted);
-        text-decoration: none;
-        font-size: 0.95rem;
-      }
-
-      .site-nav a:hover,
-      .site-nav a:focus-visible {
-        color: var(--text);
-      }
-
-      .button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 13px 24px;
-        border-radius: var(--radius);
-        border: 1px solid transparent;
-        font: inherit;
-        font-weight: 600;
-        text-decoration: none;
-        cursor: pointer;
-        transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease;
-      }
-
-      .button:hover {
-        transform: translateY(-1px);
-      }
-
-      .button:focus-visible {
-        outline: 2px solid var(--sky);
-        outline-offset: 3px;
-      }
-
-      .button-primary {
-        background: var(--emerald);
-        color: #04120c;
-      }
-
-      .button-primary:hover {
-        background: #34d399;
-      }
-
-      .button-ghost {
-        border-color: var(--border);
-        background: var(--surface);
-        color: var(--text);
-      }
-
-      .button-ghost:hover {
-        border-color: var(--muted);
-      }
-
-      .hero {
-        padding: 104px 0 88px;
-      }
-
-      .hero h1 {
-        font-size: clamp(2.1rem, 5.4vw, 3.4rem);
-        line-height: 1.1;
-        letter-spacing: -0.03em;
-        margin: 0 0 20px;
-        max-width: 18ch;
-      }
-
-      .hero p {
-        font-size: 1.15rem;
-        color: var(--muted);
-        max-width: 58ch;
-        margin: 0 0 32px;
-      }
-
-      .hero-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 14px;
-        align-items: center;
-      }
-
-      .download-note {
-        font-family: var(--mono);
-        font-size: 0.85rem;
-        color: var(--muted);
-        margin: 18px 0 0;
-      }
-
-      .tag {
-        display: inline-block;
-        font-family: var(--mono);
-        font-size: 0.72rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--amber);
-        border: 1px solid rgba(245, 158, 11, 0.45);
-        border-radius: 999px;
-        padding: 2px 10px;
-        vertical-align: middle;
-      }
-
-      .beta-note {
-        border-left: 3px solid var(--amber);
-        padding: 4px 0 4px 14px;
-        margin: 24px 0 0;
-        max-width: 62ch;
-        color: var(--muted);
-        font-size: 0.95rem;
-      }
-
-      .hero .beta-note {
-        font-size: 0.95rem;
-        margin: 24px 0 0;
-      }
-
-      .beta-note a {
-        color: var(--text);
+        font-size: 0.88em;
+        background: var(--raised);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.05em 0.4em;
       }
 
       .sprite {
@@ -364,276 +194,290 @@
         overflow: hidden;
       }
 
+      .shell {
+        width: 100%;
+        max-width: var(--shell);
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(15, 18, 21, 0.92);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .site-header .shell {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.05rem;
+      }
+
+      .site-nav {
+        margin-left: auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 20px;
+        font-size: 0.92rem;
+      }
+
+      .site-nav a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      .site-nav a:hover {
+        color: var(--text);
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 46px;
+        padding: 0 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.98rem;
+        text-decoration: none;
+        transition: background 0.2s ease, border-color 0.2s ease;
+      }
+
+      .button-primary {
+        background: var(--amber);
+        color: #1a1205;
+        border: 1px solid var(--amber);
+      }
+
+      .button-primary:hover {
+        background: #f6b85a;
+        color: #1a1205;
+      }
+
+      .button-ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid #2c333c;
+      }
+
+      .button-ghost:hover {
+        background: var(--raised);
+        color: var(--text);
+      }
+
       .os-icon {
         width: 18px;
         height: 18px;
         fill: currentColor;
-        flex: none;
+        flex-shrink: 0;
       }
 
-      .os-buttons .button {
-        min-width: 150px;
+      .hero {
+        padding: 72px 0 40px;
       }
 
-      .platforms {
+      .hero-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 20px;
+        grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+        gap: 48px;
+        align-items: center;
       }
 
-      .platform {
+      .hero h1 {
+        font-size: clamp(2.2rem, 5vw, 3.4rem);
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        margin: 0 0 18px;
+      }
+
+      .hero p {
+        color: var(--muted);
+        max-width: 60ch;
+      }
+
+      .hero-art {
+        position: relative;
         display: flex;
-        flex-direction: column;
-        gap: 18px;
-        padding: 26px;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 1;
+        max-width: 380px;
+        justify-self: center;
+        width: 100%;
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: var(--radius);
+        border-radius: 28px;
       }
 
-      .platform-head {
-        display: flex;
-        align-items: center;
-        gap: 14px;
+      .hero-art .mascot {
+        width: 62%;
       }
 
-      .platform-logo {
-        width: 34px;
-        height: 34px;
-        fill: var(--text);
-        flex: none;
+      .hero-art .state {
+        position: absolute;
+        width: 48px;
+        height: 48px;
+        padding: 6px;
+        background: var(--raised);
+        border: 1px solid var(--border);
+        border-radius: 12px;
       }
 
-      .platform h3 {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin: 0;
-        font-size: 1.2rem;
+      .hero-art .state-a {
+        top: 18px;
+        left: 18px;
       }
 
-      .platform .platform-meta {
-        margin: 2px 0 0;
-        font-size: 0.85rem;
+      .hero-art .state-b {
+        top: 18px;
+        right: 18px;
       }
 
-      .platform p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.95rem;
+      .hero-art .state-c {
+        bottom: 18px;
+        left: 18px;
       }
 
-      .platform-text {
-        flex: 1;
+      .hero-art .state-d {
+        bottom: 18px;
+        right: 18px;
       }
 
-      ol.platform-text {
-        margin: 0;
-        padding-left: 1.2em;
-        color: var(--muted);
-        font-size: 0.95rem;
-        display: grid;
-        gap: 4px;
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin: 0 0 14px;
       }
 
-      .lede a {
-        color: var(--text);
+      .tag {
+        display: inline-block;
+        padding: 1px 9px;
+        border-radius: 999px;
+        background: #2a2316;
+        color: var(--amber);
+        font-family: var(--sans);
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        vertical-align: middle;
       }
 
-      .platform-actions {
+      .hero-actions {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
+        margin: 26px 0 12px;
       }
 
-      .platform-actions .button {
-        flex: 1 1 0;
-        padding: 11px 14px;
-        white-space: nowrap;
+      .download-note {
+        color: var(--faint);
+        font-size: 0.86rem;
+        margin: 0;
       }
 
-      .platform .platform-alt {
-        font-size: 0.85rem;
-      }
-
-      .platform-alt a {
-        color: var(--text);
-        white-space: nowrap;
-      }
-
-      .platforms + .steps {
-        margin-top: 56px;
-      }
-
-      @media (max-width: 900px) {
-        .platforms {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-
-      @media (max-width: 560px) {
-        .os-buttons .button {
-          flex: 1 1 0;
-          min-width: 0;
-          padding: 13px 10px;
-        }
+      .beta-note {
+        margin-top: 18px;
+        font-size: 0.9rem;
+        color: var(--muted);
+        border-left: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 14px;
       }
 
       .badges {
+        list-style: none;
+        padding: 0;
+        margin: 18px 0 0;
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
-        padding: 0;
-        margin: 36px 0 0;
-        list-style: none;
+        gap: 8px;
       }
 
       .badges li {
-        font-family: var(--mono);
         font-size: 0.8rem;
         color: var(--muted);
         border: 1px solid var(--border);
         border-radius: 999px;
-        padding: 5px 13px;
+        padding: 3px 12px;
       }
 
-      @media (max-width: 720px) {
-        body {
-          font-size: 16px;
-        }
-
-        .site-nav a:not(.brand) {
-          font-size: 0.88rem;
-        }
-
-        .site-nav a[href^="#"] {
-          display: none;
-        }
-
-        .section {
-          padding: 64px 0;
-        }
-
-        .hero {
-          padding: 64px 0 56px;
-        }
+      .shot {
+        margin: 0;
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        * {
-          transition: none !important;
-          animation: none !important;
-        }
-      }
-
-      .menu {
-        border: 1px solid var(--border);
+      .shot img {
+        display: block;
+        width: 100%;
         border-radius: var(--radius);
+        border: 1px solid var(--border);
         background: var(--surface);
-        font-family: var(--mono);
-        font-size: 0.88rem;
-        overflow: hidden;
-        max-width: 640px;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
       }
 
-      .menu-header,
-      .menu-row,
-      .menu-footer {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 11px 18px;
-      }
-
-      .menu-header {
-        border-bottom: 1px solid var(--border);
-        color: var(--amber);
-        font-weight: 600;
-      }
-
-      .menu-row + .menu-row {
-        border-top: 1px solid rgba(48, 54, 61, 0.5);
-      }
-
-      .menu-mark {
-        width: 1.2em;
-        flex: none;
-        text-align: center;
-      }
-
-      .menu-name {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .menu-source {
-        flex: none;
-        width: 4.5em;
+      .shot figcaption {
+        margin-top: 10px;
         color: var(--muted);
-        font-size: 0.82em;
+        font-size: 0.9rem;
       }
 
-      .menu-version {
-        color: var(--muted);
-        white-space: nowrap;
+      .shot-hero {
+        margin-top: 56px;
       }
 
-      .is-outdated .menu-mark,
-      .is-outdated .menu-version {
-        color: var(--amber);
+      .shots {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+        margin-top: 32px;
       }
 
-      .is-current .menu-mark {
-        color: var(--emerald);
-      }
-
-      .is-ignored,
-      .is-unknown {
-        color: var(--muted);
-      }
-
-      .menu-footer {
+      .section {
+        padding: 88px 0;
         border-top: 1px solid var(--border);
+      }
+
+      .section h2 {
+        font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+        line-height: 1.2;
+        margin: 0 0 12px;
+        letter-spacing: -0.015em;
+      }
+
+      .lede {
         color: var(--muted);
-        justify-content: space-between;
-      }
-
-      .menu-footer span {
-        white-space: nowrap;
-      }
-
-      @media (max-width: 560px) {
-        .menu {
-          font-size: 0.78rem;
-        }
-
-        .menu-header,
-        .menu-row,
-        .menu-footer {
-          padding: 10px 12px;
-          gap: 8px;
-        }
-
-        .menu-source {
-          display: none;
-        }
+        max-width: 64ch;
+        margin: 0 0 8px;
       }
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        margin-top: 32px;
       }
 
       .card {
+        background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        background: var(--surface);
-        padding: 24px;
+        padding: 22px 22px 18px;
       }
 
       .card h3 {
@@ -648,27 +492,33 @@
       }
 
       .states {
-        display: grid;
-        gap: 16px;
-        margin: 0;
-        padding: 0;
         list-style: none;
+        padding: 0;
+        margin: 32px 0 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
       }
 
       .states li {
         display: flex;
-        align-items: center;
-        gap: 16px;
+        gap: 14px;
+        align-items: flex-start;
+        background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        background: var(--surface);
-        padding: 16px 20px;
+        padding: 18px;
       }
 
       .states img {
-        width: 32px;
-        height: 32px;
-        flex: none;
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+      }
+
+      .states span {
+        color: var(--muted);
+        font-size: 0.93rem;
       }
 
       .states strong {
@@ -676,101 +526,149 @@
         color: var(--text);
       }
 
-      .states span {
+      .platforms {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 32px;
+      }
+
+      .platform {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px;
+      }
+
+      .platform-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .platform-head h3 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .platform-logo {
+        width: 30px;
+        height: 30px;
+        fill: var(--text);
+        flex-shrink: 0;
+      }
+
+      .platform-meta {
+        margin: 2px 0 0;
+        color: var(--faint);
+        font-size: 0.84rem;
+      }
+
+      .platform-text {
+        flex: 1;
+        margin: 0;
         color: var(--muted);
-        font-size: 0.95rem;
+        font-size: 0.93rem;
+      }
+
+      ol.platform-text {
+        padding-left: 1.2em;
+        display: grid;
+        gap: 4px;
+      }
+
+      .platform-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .platform-actions .button {
+        min-height: 40px;
+        padding: 0 14px;
+        font-size: 0.9rem;
+      }
+
+      .platform-alt {
+        margin: 0;
+        color: var(--faint);
+        font-size: 0.84rem;
       }
 
       .steps {
-        counter-reset: step;
         list-style: none;
+        counter-reset: step;
         padding: 0;
-        margin: 0;
+        margin: 32px 0 0;
         display: grid;
-        gap: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
       }
 
       .steps li {
         counter-increment: step;
-        position: relative;
-        padding-left: 52px;
         color: var(--muted);
+        font-size: 0.95rem;
+        padding: 18px 18px 18px 58px;
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
       }
 
       .steps li::before {
         content: counter(step);
         position: absolute;
-        left: 0;
-        top: -2px;
-        width: 32px;
-        height: 32px;
-        display: grid;
-        place-items: center;
+        left: 18px;
+        top: 18px;
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
-        border: 1px solid var(--border);
-        background: var(--surface);
-        color: var(--emerald);
-        font-family: var(--mono);
-        font-size: 0.9rem;
+        background: #2a2316;
+        color: var(--amber);
+        font-weight: 700;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .steps strong {
-        color: var(--text);
         display: block;
-      }
-
-      .steps + .hero-actions {
-        margin-top: 36px;
+        color: var(--text);
       }
 
       .faq details {
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        background: var(--surface);
-        padding: 18px 22px;
-      }
-
-      .faq details + details {
-        margin-top: 12px;
+        border-bottom: 1px solid var(--border);
+        padding: 14px 0;
+        max-width: 820px;
       }
 
       .faq summary {
         cursor: pointer;
         font-weight: 600;
-        list-style: none;
+        list-style-position: outside;
       }
 
-      .faq summary::-webkit-details-marker {
-        display: none;
-      }
-
-      .faq summary::after {
-        content: "+";
-        float: right;
+      .faq details p {
         color: var(--muted);
-        font-family: var(--mono);
-      }
-
-      .faq details[open] summary::after {
-        content: "−";
-      }
-
-      .faq p {
-        margin: 12px 0 0;
-        color: var(--muted);
+        margin: 10px 0 0;
       }
 
       .site-footer {
         border-top: 1px solid var(--border);
-        padding: 44px 0;
-        color: var(--muted);
-        font-size: 0.9rem;
+        padding: 32px 0 48px;
+        color: var(--faint);
+        font-size: 0.88rem;
       }
 
       .site-footer .shell {
         display: flex;
         flex-wrap: wrap;
-        gap: 16px 28px;
+        gap: 12px 24px;
         align-items: center;
       }
 
@@ -778,16 +676,63 @@
         margin-left: auto;
         display: flex;
         flex-wrap: wrap;
-        gap: 20px;
+        gap: 6px 18px;
       }
 
-      code {
-        font-family: var(--mono);
-        font-size: 0.92em;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 1px 6px;
+      .site-footer a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      .site-footer a:hover {
+        color: var(--text);
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--link);
+        outline-offset: 3px;
+      }
+
+      @media (max-width: 900px) {
+        .hero-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-art {
+          max-width: 300px;
+          order: -1;
+        }
+
+        .platforms,
+        .shots {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .site-nav {
+          display: none;
+        }
+
+        .hero {
+          padding-top: 40px;
+        }
+
+        .hero-actions .button {
+          flex: 1 1 0;
+          justify-content: center;
+          padding: 0 10px;
+        }
+
+        .section {
+          padding: 64px 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .button {
+          transition: none;
+        }
       }
     </style>
   </head>
@@ -806,6 +751,7 @@
           Globlin
         </a>
         <nav class="site-nav">
+          <a href="#window">The app</a>
           <a href="#features">Features</a>
           <a href="#states">Icon states</a>
           <a href="#install">Install</a>
@@ -818,111 +764,82 @@
     <main>
       <section class="hero">
         <div class="shell">
-          <p class="eyebrow">Tray app for Windows, macOS and Linux · <span class="tag">Beta</span></p>
-          <h1>Keep every global package up to date</h1>
-          <p>
-            Global CLIs rot silently. Nothing tells you <code>@salesforce/cli</code> is six versions
-            behind until a command breaks in a way that turns out to be &ldquo;oh, I&rsquo;m ancient.&rdquo;
-            Globlin sits in the Windows tray, the macOS menu bar or the Linux system tray, checks on a schedule across every
-            package manager you have installed, and shows you exactly what has fallen behind.
-          </p>
-          <div class="hero-actions os-buttons">
-            <a class="button button-primary" data-os="windows" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-setup-x64.exe" data-file="globlin-setup-x64.exe" rel="nofollow">
-              <svg class="os-icon" aria-hidden="true"><use href="#os-windows"></use></svg>
-              Windows
-            </a>
-            <a class="button button-ghost" data-os="macos" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-macos-apple-silicon.zip" data-file="globlin-macos-apple-silicon.zip" rel="nofollow">
-              <svg class="os-icon" aria-hidden="true"><use href="#os-apple"></use></svg>
-              macOS
-            </a>
-            <a class="button button-ghost" data-os="linux" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-amd64.deb" data-file="globlin-amd64.deb" rel="nofollow">
-              <svg class="os-icon" aria-hidden="true"><use href="#os-linux"></use></svg>
-              Linux
-            </a>
+          <div class="hero-grid">
+            <div>
+              <p class="eyebrow">Tray app for Windows, macOS and Linux · <span class="tag">Beta</span></p>
+              <h1>Keep every global package up to date</h1>
+              <p>
+                Global CLIs rot silently. Nothing tells you <code>@salesforce/cli</code> is six versions
+                behind until a command breaks in a way that turns out to be &ldquo;oh, I&rsquo;m ancient.&rdquo;
+                Globlin sits in the Windows tray, the macOS menu bar or the Linux system tray, checks on a
+                schedule across every package manager you have installed, and puts what has fallen behind
+                first.
+              </p>
+              <div class="hero-actions os-buttons">
+                <a class="button button-primary" data-os="windows" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-setup-x64.exe" data-file="globlin-setup-x64.exe" rel="nofollow">
+                  <svg class="os-icon" aria-hidden="true"><use href="#os-windows"></use></svg>
+                  Windows
+                </a>
+                <a class="button button-ghost" data-os="macos" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-macos-apple-silicon.zip" data-file="globlin-macos-apple-silicon.zip" rel="nofollow">
+                  <svg class="os-icon" aria-hidden="true"><use href="#os-apple"></use></svg>
+                  macOS
+                </a>
+                <a class="button button-ghost" data-os="linux" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-amd64.deb" data-file="globlin-amd64.deb" rel="nofollow">
+                  <svg class="os-icon" aria-hidden="true"><use href="#os-linux"></use></svg>
+                  Linux
+                </a>
+              </div>
+              <p class="download-note">
+                <span id="download-file">globlin-setup-x64.exe</span> · <span data-version>latest</span> ·
+                <a href="https://github.com/TOR968/Globlin/releases/latest">checksums and signatures</a> ·
+                <a href="#install">every download</a>
+              </p>
+              <p class="beta-note">
+                Globlin is in beta. The Windows builds are in daily use; the installer, the ARM64 builds and
+                the macOS and Linux builds are new.
+                <a href="https://github.com/TOR968/Globlin/issues">Report anything that breaks</a>.
+              </p>
+            </div>
+            <div class="hero-art">
+              <img class="mascot" src="/img/logo.png" width="256" height="256" alt="Globlin, a chibi goblin with big glossy eyes">
+              <img class="state state-a" src="/img/icon-idle.png" width="64" height="64" alt="">
+              <img class="state state-b" src="/img/icon-updates.png" width="64" height="64" alt="">
+              <img class="state state-c" src="/img/icon-busy.png" width="64" height="64" alt="">
+              <img class="state state-d" src="/img/icon-error.png" width="64" height="64" alt="">
+            </div>
           </div>
-          <p class="download-note">
-            <span id="download-file">globlin-setup-x64.exe</span> · <span data-version>latest</span> ·
-            <a href="https://github.com/TOR968/Globlin/releases/latest">checksums</a> ·
-            <a href="#install">every download</a>
-          </p>
-          <p class="beta-note">
-            Globlin is in beta. The Windows builds are in daily use; the installer, the ARM64 builds and
-            the macOS and Linux builds are new.
-            <a href="https://github.com/TOR968/Globlin/issues">Report anything that breaks</a>.
-          </p>
           <ul class="badges">
             <li>Installer or portable</li>
             <li>Windows x64 and ARM64</li>
             <li>macOS on Apple Silicon</li>
             <li>Linux deb and rpm</li>
+            <li>Signed updates</li>
             <li>Open source, GPL-3.0</li>
           </ul>
+          <figure class="shot shot-hero">
+            <img src="/img/window-updates.png" width="1920" height="1280" alt="The Globlin window: three updates ready at the top with an Update all button, grouped by package manager, and every other package manager summarised as up to date below">
+          </figure>
         </div>
       </section>
 
-      <section class="section" id="menu">
+      <section class="section" id="window">
         <div class="shell">
           <p class="eyebrow">What you actually see</p>
-          <h2>Every package manager, one list</h2>
+          <h2>Updates first, everything else one click away</h2>
           <p class="lede">
-            Everything you installed globally, wherever it came from, with its version and whether it has
-            fallen behind. Filter by status or by source, tick what you want, update it in one batch.
+            What has fallen behind sits at the top, grouped by package manager, with one button for all of
+            it. Everything that is current folds into a tile per package manager. Even a hundred updates
+            stay readable: groups collapse, a long group shows its first rows and a &ldquo;show more&rdquo;.
           </p>
-          <div class="menu" role="img" aria-label="The Globlin window listing outdated packages from npm, pnpm and winget alongside current, ignored and unchecked ones, with Update all, Check now and Run at startup at the bottom">
-            <div class="menu-header" aria-hidden="true">Globlin — 4 updates available</div>
-            <div class="menu-row is-outdated" aria-hidden="true">
-              <span class="menu-mark">↑</span>
-              <span class="menu-name">@google/gemini-cli</span>
-              <span class="menu-source">npm</span>
-              <span class="menu-version">0.53.1 → 0.54.4</span>
-            </div>
-            <div class="menu-row is-outdated" aria-hidden="true">
-              <span class="menu-mark">↑</span>
-              <span class="menu-name">@salesforce/cli</span>
-              <span class="menu-source">npm</span>
-              <span class="menu-version">2.145.6 → 2.146.3</span>
-            </div>
-            <div class="menu-row is-outdated" aria-hidden="true">
-              <span class="menu-mark">↑</span>
-              <span class="menu-name">vite</span>
-              <span class="menu-source">pnpm</span>
-              <span class="menu-version">6.0.1 → 6.3.2</span>
-            </div>
-            <div class="menu-row is-outdated" aria-hidden="true">
-              <span class="menu-mark">↑</span>
-              <span class="menu-name">Git.Git</span>
-              <span class="menu-source">winget</span>
-              <span class="menu-version">2.44.0 → 2.47.1</span>
-            </div>
-            <div class="menu-row is-current" aria-hidden="true">
-              <span class="menu-mark">✓</span>
-              <span class="menu-name">prettier</span>
-              <span class="menu-source">npm</span>
-              <span class="menu-version">3.9.6</span>
-            </div>
-            <div class="menu-row is-current" aria-hidden="true">
-              <span class="menu-mark">✓</span>
-              <span class="menu-name">yaml-language-server</span>
-              <span class="menu-source">bun</span>
-              <span class="menu-version">1.24.0</span>
-            </div>
-            <div class="menu-row is-ignored" aria-hidden="true">
-              <span class="menu-mark">·</span>
-              <span class="menu-name">npm</span>
-              <span class="menu-source">npm</span>
-              <span class="menu-version">12.0.2 (ignored)</span>
-            </div>
-            <div class="menu-row is-unknown" aria-hidden="true">
-              <span class="menu-mark">?</span>
-              <span class="menu-name">some-package</span>
-              <span class="menu-source">bun</span>
-              <span class="menu-version">1.0.0 (not checked)</span>
-            </div>
-            <div class="menu-footer" aria-hidden="true">
-              <span>Update selected (3)</span>
-              <span>Check now</span>
-              <span>Run at startup</span>
-            </div>
+          <div class="shots">
+            <figure class="shot">
+              <img src="/img/window-batch.png" width="1920" height="1280" loading="lazy" alt="A batch update running: a progress bar with done, failed and active counts, and the queue below it">
+              <figcaption>A batch runs as one queue with a progress bar, and Homebrew always goes last.</figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="/img/window-settings.png" width="1920" height="1280" loading="lazy" alt="The settings page: run at startup, automatic npm script approval, Globlin updates, and a switch per package manager">
+              <figcaption>Settings: startup, Globlin&rsquo;s own updates, and a switch per package manager.</figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -942,19 +859,19 @@
               </p>
             </article>
             <article class="card">
-              <h3>Filter it down, then act in bulk</h3>
+              <h3>Updates first, the rest folded away</h3>
               <p>
-                Updates come first, grouped by source, each group with its own button. Chips filter by status and search narrows by name.
-                Tick the rows you want and update them as a single queue.
+                Outdated packages lead, grouped by package manager, each group with its own Update button.
+                Everything current folds into a tile per package manager. Chips filter by status and
+                search narrows every list by name.
               </p>
             </article>
             <article class="card">
-              <h3>Update one, or update all</h3>
+              <h3>Update one, a group, or all</h3>
               <p>
-                A row updates a single package. Update all runs the outdated ones as a queue with a
-                counter, a progress bar on the active row, and a result on each finished row. winget and
-                choco are reported rather than updated — both need elevation, and Globlin runs without
-                it.
+                Update all runs the outdated packages as one queue with a progress bar and a result on each
+                row; Homebrew and scoop go last, after the tools that run on them. winget and choco are
+                reported rather than updated — both need elevation, and Globlin runs without it.
               </p>
             </article>
             <article class="card">
@@ -967,8 +884,8 @@
             <article class="card">
               <h3>Uninstall without a dialog</h3>
               <p>
-                Every row offers Uninstall, which arms into a Confirm button. The two clicks are the
-                confirmation — the first does nothing on its own.
+                Every row offers Uninstall — go tools included, whose binary Globlin deletes itself — which
+                arms into a Confirm button. The two clicks are the confirmation.
               </p>
             </article>
             <article class="card">
@@ -979,10 +896,11 @@
               </p>
             </article>
             <article class="card">
-              <h3>It updates itself, verified</h3>
+              <h3>It updates itself, signed</h3>
               <p>
-                Globlin checks its own releases on the same schedule. Every download is checked against a
-                published SHA-256 sum, and a mismatch is discarded without touching the running app.
+                Globlin checks its own releases on the same schedule. A new build must carry a valid
+                signature from the Globlin release key built into the app and match its SHA-256 sum, or it
+                is discarded without touching the running app.
               </p>
             </article>
           </div>
@@ -992,27 +910,27 @@
       <section class="section" id="states">
         <div class="shell">
           <p class="eyebrow">Icon states</p>
-          <h2>The colour is the status</h2>
+          <h2>The goblin&rsquo;s colour is the status</h2>
           <p class="lede">
-            The tray icon is drawn from code, not loaded from an image file, so what it shows always
+            The tray goblin is drawn from code, not loaded from an image file, so what it shows always
             matches what it found.
           </p>
           <ul class="states">
             <li>
-              <img src="/img/icon-idle.png" width="32" height="32" alt="">
+              <img src="/img/icon-idle.png" width="48" height="48" alt="">
               <span><strong>Idle — emerald</strong> Everything installed is current.</span>
             </li>
             <li>
-              <img src="/img/icon-updates.png" width="32" height="32" alt="">
+              <img src="/img/icon-updates.png" width="48" height="48" alt="">
               <span><strong>Updates — amber</strong> One or more packages are behind.</span>
             </li>
             <li>
-              <img src="/img/icon-error.png" width="32" height="32" alt="">
-              <span><strong>Error — red</strong> The last registry check failed. A failure never renders as &ldquo;everything is fine&rdquo;.</span>
+              <img src="/img/icon-error.png" width="48" height="48" alt="">
+              <span><strong>Error — red</strong> A check, a source or a registry failed, and the goblin sweats. A failure never renders as &ldquo;everything is fine&rdquo;.</span>
             </li>
             <li>
-              <img src="/img/icon-busy.png" width="32" height="32" alt="">
-              <span><strong>Busy — sky blue</strong> A check or an update is running, filling like a glass.</span>
+              <img src="/img/icon-busy.png" width="48" height="48" alt="">
+              <span><strong>Busy — sky blue</strong> A check or an update is running: the goblin fills like a glass and twitches its ears.</span>
             </li>
           </ul>
         </div>
@@ -1023,8 +941,8 @@
           <p class="eyebrow">Install</p>
           <h2>Pick the build for your machine</h2>
           <p class="lede">
-            The same app for every platform, all of it beta. Checksums and the signature that covers them are
-            on the <a href="https://github.com/TOR968/Globlin/releases/latest">release page</a>.
+            The same app for every platform, all of it beta. Checksums and minisign signatures for every
+            file are on the <a href="https://github.com/TOR968/Globlin/releases/latest">release page</a>.
           </p>
           <div class="platforms">
             <article class="platform">
