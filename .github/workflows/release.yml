@@ -173,7 +173,7 @@ jobs:
         run: |
           foreach ($name in 'globlin-setup-x64.exe', 'globlin-setup-arm64.exe') {
             $hash = (Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLower()
-            $section = & ./.github/virustotal-scan.ps1 -Path "dist/$name" -Sha256 $hash
+            $section = & ./.github/virustotal-scan.ps1 -Path "dist/$name" -Sha256 $hash -Installer
             if ($section) { $section | Set-Content "dist/$name.virustotal.md" -Encoding utf8 }
           }
 

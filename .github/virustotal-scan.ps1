@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory)][string] $Path,
     [Parameter(Mandatory)][string] $Sha256,
+    [switch] $Installer,
     [int] $TimeoutSeconds = 360,
     [int] $PollSeconds = 20
 )
@@ -17,17 +18,26 @@ if (-not $key) {
 $reportUrl = "https://www.virustotal.com/gui/file/$($Sha256.ToLower())"
 $headers = @{ 'x-apikey' = $key }
 
-function Format-Section([string] $verdict) {
-    @"
-## Virus scan — $(Split-Path $Path -Leaf)
-
-[VirusTotal report]($reportUrl) — $verdict
-
+$binaryReason = @"
 An unsigned tray app that writes an autostart key, launches ``npm`` and replaces its own executable
 trips machine-learning heuristics. The
 [README](https://github.com/TOR968/Globlin#install) explains each detection and how to verify this
 build yourself.
 "@
+
+$installerReason = @"
+An unsigned Inno Setup installer unpacks a program and starts it, which is also what a dropper does,
+and a few machine-learning engines flag that wrapper on every release. The portable ``.exe`` in this
+release is the same program without it. The
+[README](https://github.com/TOR968/Globlin#install) explains how to verify either download yourself.
+"@
+
+function Format-Section([string] $verdict, [string] $reason) {
+    $lines = @("## Virus scan — $(Split-Path $Path -Leaf)", '', "[VirusTotal report]($reportUrl) — $verdict")
+    if ($reason) {
+        $lines += @('', $reason)
+    }
+    $lines -join "`n"
 }
 
 try {
@@ -72,11 +82,13 @@ foreach ($name in 'malicious', 'suspicious', 'undetected', 'harmless') {
     $total += [int] $stats.$name
 }
 
-$verdict = if ($flagged -eq 0) {
-    "no engine out of $total flagged this build."
+if ($flagged -eq 0) {
+    $verdict = "no engine out of $total flagged this build."
+    $reason = ''
 } else {
-    "$flagged of $total engines flagged this build."
+    $verdict = "$flagged of $total engines flagged this build."
+    $reason = if ($Installer) { $installerReason } else { $binaryReason }
 }
 
 Write-Host "verdict: $verdict"
-Format-Section $verdict
+Format-Section $verdict $reason
