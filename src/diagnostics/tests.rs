@@ -101,10 +101,18 @@ fn the_same_note_is_written_to_the_log_only_once() {
     append_once(&path, "bun: no global package.json found\n");
     append_once(&path, "yarn: yarn 2+ removed global installs\n");
 
+    let log = std::fs::read_to_string(&path).unwrap();
+
     assert_eq!(
-        std::fs::read_to_string(&path).unwrap(),
-        "bun: no global package.json found\nyarn: yarn 2+ removed global installs\n"
+        log.matches("bun: no global package.json found\n").count(),
+        1
     );
+    assert_eq!(
+        log.matches("yarn: yarn 2+ removed global installs\n")
+            .count(),
+        1
+    );
+    assert_eq!(log.matches("== Globlin ").count(), 2);
 }
 
 #[test]
@@ -143,4 +151,26 @@ fn credentials_a_package_manager_echoes_never_reach_the_log() {
     );
     assert!(cleaned.contains("using <redacted> for auth\n"), "{cleaned}");
     assert!(cleaned.ends_with("prettier 3.9.6 is fine\n"), "{cleaned}");
+}
+
+#[test]
+fn a_log_entry_is_stamped_with_the_version_and_the_utc_time() {
+    let moment = UNIX_EPOCH + std::time::Duration::from_secs(1_791_676_683);
+
+    assert_eq!(
+        heading(moment),
+        format!(
+            "== Globlin {} · 2026-10-10 23:58:03 UTC ==\n",
+            env!("CARGO_PKG_VERSION")
+        )
+    );
+}
+
+#[test]
+fn calendar_dates_survive_leap_days_and_century_rules() {
+    assert_eq!(civil_date(0), (1970, 1, 1));
+    assert_eq!(civil_date(11_016), (2000, 2, 29));
+    assert_eq!(civil_date(19_782), (2024, 2, 29));
+    assert_eq!(civil_date(47_540), (2100, 2, 28));
+    assert_eq!(civil_date(47_541), (2100, 3, 1));
 }

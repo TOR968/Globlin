@@ -2,6 +2,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Output;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::model::{Package, Status};
 use crate::platform;
@@ -19,7 +20,52 @@ pub fn self_update_log_path() -> PathBuf {
 }
 
 pub fn record_failures(report: &str) {
-    truncate(&log_path(), &redacted(report));
+    truncate(
+        &log_path(),
+        &format!("{}\n{}", heading(SystemTime::now()), redacted(report)),
+    );
+}
+
+const SECONDS_PER_DAY: u64 = 86_400;
+
+fn heading(now: SystemTime) -> String {
+    format!(
+        "== Globlin {} · {} ==\n",
+        env!("CARGO_PKG_VERSION"),
+        stamp(now)
+    )
+}
+
+fn stamp(now: SystemTime) -> String {
+    let seconds = now
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let (year, month, day) = civil_date(seconds / SECONDS_PER_DAY);
+    let time = seconds % SECONDS_PER_DAY;
+    format!(
+        "{year:04}-{month:02}-{day:02} {:02}:{:02}:{:02} UTC",
+        time / 3600,
+        time % 3600 / 60,
+        time % 60
+    )
+}
+
+fn civil_date(days: u64) -> (u64, u64, u64) {
+    let shifted = days + 719_468;
+    let era = shifted / 146_097;
+    let day_of_era = shifted % 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + u64::from(month <= 2);
+    (year, month, day)
 }
 
 const SECRET_KEYS: [&str; 4] = ["_authToken=", "_auth=", "_password=", "Authorization:"];
@@ -87,7 +133,7 @@ fn append_once(path: &Path, note: &str) {
     if fs::read_to_string(path).is_ok_and(|log| log.contains(note)) {
         return;
     }
-    append(path, note);
+    append(path, &format!("{}{note}", heading(SystemTime::now())));
 }
 
 fn truncate(path: &Path, text: &str) {
@@ -101,7 +147,11 @@ fn append(path: &Path, text: &str) {
 }
 
 pub fn record_self_update_failure(report: &str) {
-    fs::write(self_update_log_path(), report).ok();
+    fs::write(
+        self_update_log_path(),
+        format!("{}\n{report}", heading(SystemTime::now())),
+    )
+    .ok();
 }
 
 pub fn record_snapshot(packages: &[Package]) {

@@ -112,11 +112,19 @@ fn a_package_that_is_not_checked_is_never_reported_as_current() {
     assert_eq!(snapshot.packages[0].latest, None);
 }
 
+fn snapshot(view: &View, config: &Config) -> Snapshot {
+    snapshot_on(view, config, "windows")
+}
+
 #[test]
-fn every_source_gets_a_sidebar_row_even_when_it_is_switched_off() {
+fn every_source_the_platform_can_have_gets_a_sidebar_row_even_when_it_is_switched_off() {
     let snapshot = snapshot(&view(&[], None), &config());
     let mut labels: Vec<&str> = snapshot.sources.iter().map(|row| row.label).collect();
-    let mut expected: Vec<&str> = KINDS.iter().map(|kind| kind.label()).collect();
+    let mut expected: Vec<&str> = KINDS
+        .iter()
+        .filter(|kind| kind.available_on("windows"))
+        .map(|kind| kind.label())
+        .collect();
     labels.sort_unstable();
     expected.sort_unstable();
 
@@ -436,4 +444,22 @@ fn only_the_page_globlin_loaded_itself_counts_as_its_own() {
     ] {
         assert!(!is_own_page(foreign), "{foreign}");
     }
+}
+
+#[test]
+fn a_mac_sidebar_never_offers_scoop_winget_or_choco() {
+    let snapshot = snapshot_on(&view(&[], None), &config(), "macos");
+    let labels: Vec<&str> = snapshot.sources.iter().map(|row| row.label).collect();
+
+    for windows_only in ["scoop", "winget", "choco"] {
+        assert!(!labels.contains(&windows_only), "{labels:?}");
+    }
+    assert!(labels.contains(&"brew"), "{labels:?}");
+}
+
+#[test]
+fn a_windows_sidebar_never_offers_homebrew() {
+    let snapshot = snapshot(&view(&[], None), &config());
+
+    assert!(!snapshot.sources.iter().any(|row| row.label == "brew"));
 }

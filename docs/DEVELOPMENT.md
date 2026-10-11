@@ -453,7 +453,12 @@ Things about the environment the code has to work around, all verified rather th
 - **`dotnet tool list` grew JSON in SDK 9.** `--format json` wraps rows in `{"version":1,"data":[…]}`;
   the serde structs accept camel and Pascal case because the SDK's serializer context decides which. An
   older SDK rejects the flag, prints nothing on stdout, and the source falls back to the table, reading
-  rows after the dashed separator so the localised header is never a row.
+  rows after the dashed separator so the localised header is never a row. A machine with the `dotnet`
+  host but no SDK (a runtime-only install) answers `tool list` with exit `0x80008091` and *No .NET SDKs
+  were found*; that reads as no tools, not as a failed source.
+- **Log entries carry a heading.** `last-run.log` and `self-update.log` start each entry with
+  `== Globlin <version> · <UTC time> ==`, because notes are appended to an older failure report and a
+  stale `docx@latest` failure from a previous build once looked fresh next to a new dotnet note.
 - **psgallery quotes module names.** Every name reaches PowerShell inside `-Command`, so `quoted` wraps it
   in single quotes and doubles any quote inside. `Get-InstalledModule` lists only Gallery-installed
   modules, which is the set `Update-Module` can act on; the update is pinned to `-Scope CurrentUser` so
@@ -684,7 +689,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-508 tests on Windows: 479 run by default (no network, no side effects), 29 `#[ignore]`d because they
+516 tests on Windows: 487 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
@@ -863,8 +868,10 @@ suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
   which can list `.JS` or `.PS1` files `Command::new` cannot spawn. On Unix it requires the execute bit.
   Only npm's `default_location` (`%APPDATA%\npm\npm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
   still `cfg`-split.
-- `SourceKind::windows_only` — scoop, winget and choco; `source::enabled` skips them elsewhere. The
-  window's sidebar still lists them on macOS and Linux, switched off.
+- `SourceKind::available_on(os)` — scoop, winget and choco exist only on Windows, Homebrew everywhere
+  but Windows. `source::enabled` skips the rest, and the window's sidebar (`window::snapshot_on`) does
+  not list them at all, so a Mac never shows a scoop row and Windows never shows brew. The config keeps
+  every field on every platform, so one `globlin.json` still parses anywhere.
 - `install::managed_by` — `Manager::Winget` for a winget package directory, `Manager::SystemPackage` for
   a Linux binary under `/usr` (the deb and rpm install to `/usr/bin`). Either one skips the release
   lookup and tells the user which tool updates Globlin instead.

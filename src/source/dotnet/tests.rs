@@ -103,3 +103,25 @@ fn the_real_dotnet_listing_still_parses() {
         .iter()
         .all(|item| !item.name.is_empty() && !item.version.is_empty()));
 }
+
+#[test]
+fn a_dotnet_runtime_without_an_sdk_counts_as_having_no_tools() {
+    let output = std::process::Output {
+        status: std::process::ExitStatus::default(),
+        stdout: Vec::new(),
+        stderr: b"The command could not be loaded, possibly because:\n  * You intended to execute a .NET SDK command:\n      No .NET SDKs were found.\n".to_vec(),
+    };
+
+    assert!(without_sdk(&output));
+}
+
+#[test]
+fn a_dotnet_failure_for_another_reason_is_not_mistaken_for_a_missing_sdk() {
+    let output = std::process::Output {
+        status: std::process::ExitStatus::default(),
+        stdout: Vec::new(),
+        stderr: b"error NU1301: Unable to load the service index\n".to_vec(),
+    };
+
+    assert!(!without_sdk(&output));
+}

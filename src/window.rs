@@ -84,6 +84,10 @@ pub struct ScriptRow {
 }
 
 pub fn snapshot(view: &View, config: &Config) -> Snapshot {
+    snapshot_on(view, config, std::env::consts::OS)
+}
+
+fn snapshot_on(view: &View, config: &Config, os: &str) -> Snapshot {
     let (self_update, auto_update, managed_by) = match view.self_update {
         SelfUpdate::Managed(manager) => (None, false, Some(manager.label())),
         SelfUpdate::Own {
@@ -96,7 +100,7 @@ pub fn snapshot(view: &View, config: &Config) -> Snapshot {
             None,
         ),
     };
-    let sources = source_rows(view.packages, config);
+    let sources = source_rows(view.packages, config, os);
     Snapshot {
         headline: tray::headline(view),
         busy: view.activity.is_some(),
@@ -142,9 +146,10 @@ fn row(package: &Package) -> Row {
     }
 }
 
-fn source_rows(packages: &[Package], config: &Config) -> Vec<SourceRow> {
+fn source_rows(packages: &[Package], config: &Config, os: &str) -> Vec<SourceRow> {
     let mut rows: Vec<SourceRow> = KINDS
         .into_iter()
+        .filter(|kind| kind.available_on(os))
         .map(|kind| source_row(kind, packages, config))
         .collect();
     rows.sort_by_key(|row| {
