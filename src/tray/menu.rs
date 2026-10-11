@@ -1,3 +1,4 @@
+use std::ops::Range;
 use std::time::Duration;
 
 use semver::Version;
@@ -13,6 +14,8 @@ use crate::progress;
 use crate::selfupdate::Release;
 use crate::Result;
 
+const BATCH_ROWS_SHOWN: usize = 7;
+const BATCH_ROWS_BEFORE_ACTIVE: usize = 2;
 const ID_UPDATE_ALL: &str = "update-all";
 const ID_CHECK_NOW: &str = "check-now";
 const ID_OPEN_WINDOW: &str = "open-window";
@@ -61,7 +64,7 @@ pub enum Action {
 pub struct Built {
     pub menu: Menu,
     pub header: MenuItem,
-    pub rows: Vec<MenuItem>,
+    pub rows: Vec<(usize, MenuItem)>,
 }
 
 #[derive(Clone, Copy)]
@@ -218,11 +221,15 @@ pub fn build(view: &View) -> Result<Built> {
 
     let mut rows = Vec::new();
     if let Some(batch) = active_batch(view.activity) {
-        for position in 0..batch.total() {
+        let shown = shown_batch_rows(batch.index, batch.total());
+        for position in shown.clone() {
             let text = batch_row_text(view, position).unwrap_or_default();
             let item = MenuItem::new(text, false, None);
             built.item(&item)?;
-            rows.push(item);
+            rows.push((position, item));
+        }
+        if let Some(summary) = hidden_batch_summary(&shown, batch.total()) {
+            built.item(&MenuItem::new(summary, false, None))?;
         }
     }
     built.split()?;
@@ -261,6 +268,19 @@ pub fn build(view: &View) -> Result<Built> {
         header,
         rows,
     })
+}
+
+pub fn shown_batch_rows(index: usize, total: usize) -> Range<usize> {
+    let width = BATCH_ROWS_SHOWN.min(total);
+    let start = index
+        .saturating_sub(BATCH_ROWS_BEFORE_ACTIVE)
+        .min(total - width);
+    start..start + width
+}
+
+fn hidden_batch_summary(shown: &Range<usize>, total: usize) -> Option<String> {
+    let hidden = total - shown.len();
+    (hidden > 0).then(|| format!("… {hidden} more — the full queue is in Open Globlin"))
 }
 
 pub fn batch_row_text(view: &View, position: usize) -> Option<String> {

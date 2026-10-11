@@ -164,7 +164,7 @@ fn run(show_window: bool) -> ! {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                app.close_window(window_id);
+                app.close_window(window_id, target);
                 ControlFlow::WaitUntil(app.next_wake())
             }
             _ => ControlFlow::WaitUntil(app.next_wake()),

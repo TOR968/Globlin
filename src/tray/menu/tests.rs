@@ -685,3 +685,25 @@ fn the_auto_approve_id_parses_back_to_its_action() {
         Some(Action::ToggleAutoApprove)
     );
 }
+
+#[test]
+fn a_long_batch_shows_only_a_few_rows_around_the_active_one() {
+    assert_eq!(shown_batch_rows(0, 102), 0..7);
+    assert_eq!(shown_batch_rows(50, 102), 48..55);
+    assert_eq!(shown_batch_rows(101, 102), 95..102);
+}
+
+#[test]
+fn a_short_batch_shows_every_row() {
+    assert_eq!(shown_batch_rows(1, 3), 0..3);
+    assert_eq!(shown_batch_rows(0, 7), 0..7);
+}
+
+#[test]
+fn the_rows_left_out_of_the_menu_are_counted_in_one_line() {
+    assert_eq!(
+        hidden_batch_summary(&(48..55), 102).as_deref(),
+        Some("… 95 more — the full queue is in Open Globlin")
+    );
+    assert_eq!(hidden_batch_summary(&(0..3), 3), None);
+}

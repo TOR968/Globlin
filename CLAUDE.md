@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 504 tests (475 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 508 tests (479 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -84,8 +84,9 @@ arrives already in display order. `window/shell.rs` is the only file that touche
 
 **The tray menu no longer lists packages.** It is the short entry point — status, Open Globlin, Update
 all, Check now, Run at startup, Open last log, the self-update block, Quit — plus the live batch rows
-while an update runs. The package list lives in the window only, so there is one place a row can be
-wrong.
+while an update runs, at most seven around the active one (`menu::shown_batch_rows`) and one
+"… N more" line, because a 100-package batch otherwise grows the menu past the screen. The package list
+lives in the window only, so there is one place a row can be wrong.
 
 **Seven catalogs, one read path.** `SourceKind::catalog` says where the version to compare against comes
 from and what its absence means. Five are remote and resolved in `registry.rs` for the union of names:

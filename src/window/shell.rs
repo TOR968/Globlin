@@ -68,6 +68,20 @@ impl Window {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub fn show_in_dock(target: &EventLoopWindowTarget<Message>, visible: bool) {
+    use tao::platform::macos::{ActivationPolicy, EventLoopWindowTargetExtMacOS};
+
+    target.set_activation_policy_at_runtime(if visible {
+        ActivationPolicy::Regular
+    } else {
+        ActivationPolicy::Accessory
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+pub const fn show_in_dock(_target: &EventLoopWindowTarget<Message>, _visible: bool) {}
+
 #[cfg(not(target_os = "linux"))]
 fn attach<'a>(builder: WebViewBuilder<'a>, host: &'a HostWindow) -> Result<WebView> {
     Ok(builder.build(host)?)

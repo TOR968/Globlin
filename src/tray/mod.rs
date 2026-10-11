@@ -14,7 +14,7 @@ pub use menu::{
 pub struct Tray {
     icon: TrayIcon,
     header: MenuItem,
-    rows: Vec<MenuItem>,
+    rows: Vec<(usize, MenuItem)>,
 }
 
 impl Tray {
@@ -60,8 +60,8 @@ impl Tray {
 
     pub fn animate(&mut self, view: &View, level: f32) -> Result<()> {
         self.header.set_text(menu::headline(view));
-        for (position, row) in self.rows.iter().enumerate() {
-            if let Some(text) = menu::batch_row_text(view, position) {
+        for (position, row) in &self.rows {
+            if let Some(text) = menu::batch_row_text(view, *position) {
                 row.set_text(text);
             }
         }

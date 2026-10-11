@@ -86,6 +86,7 @@ pub fn run(
             }
             Err(failure) => {
                 report.push_str(&failure.details);
+                diagnostics::record_failures(&report);
                 match failure.blocked {
                     Some(scripts) => outcome.blocked.push(Blocked {
                         target: target.clone(),
@@ -98,9 +99,6 @@ pub fn run(
         }
     }
 
-    if !report.is_empty() {
-        diagnostics::record_failures(&report);
-    }
     outcome
 }
 

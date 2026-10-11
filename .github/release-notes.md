@@ -13,9 +13,10 @@ entries; or download the portable `globlin.exe` (or `globlin-arm64.exe`) and run
 keeps its config in a `globlin.json` next to itself, so it can live on a USB stick or in any folder you
 like. Enable *Run at startup* from the tray menu if you want it to come back after a reboot.
 
-**macOS (experimental, Apple Silicon):** unzip `Globlin-macos-arm64.zip`, move Globlin.app to
-Applications, and allow it once under *System Settings → Privacy & Security → Open Anyway* — it is signed
-ad hoc, not notarised. Do not open `globlin-macos-arm64` itself — it is the bare binary the installed
+**macOS (experimental, Apple Silicon):** unzip `Globlin-macos-arm64.zip` and move Globlin.app to
+Applications. Open it, choose **Done** when macOS says it could not verify Globlin, then allow it once under
+*System Settings → Privacy & Security → Open Anyway* — it is signed ad hoc, not notarised. If the button is
+missing, run `xattr -dr com.apple.quarantine /Applications/Globlin.app`. Do not open `globlin-macos-arm64` itself — it is the bare binary the installed
 app updates itself from, and macOS refuses to run it on its own.
 
 **Linux (experimental):** `sudo apt install ./globlin-amd64.deb` (or `globlin-arm64.deb`) on Debian and

@@ -337,6 +337,12 @@ binary and watch the next scan.
 
 Things about the environment the code has to work around, all verified rather than assumed:
 
+- **A batch updates brew and scoop last.** Both install the runtimes other sources run on. On the first
+  real Mac, *Update all* upgraded Homebrew's `ruby` mid-batch, `brew link` failed on a conflicting `erb`,
+  `/opt/homebrew/bin/gem` vanished, and every gem update queued after it failed with
+  `could not run gem: No such file or directory`. `model::in_update_order` (applied in
+  `App::start_update`) stable-sorts `SourceKind::installs_runtimes` targets to the end, so the gems, npm
+  packages and pipx tools are updated while their runtime is still in place.
 - **`npm ls -g --json` exits non-zero when the global tree has problems** (an orphaned directory in
   `node_modules` is enough). The exit code is therefore ignored and stdout is parsed anyway; entries with
   no usable `version` are skipped instead of failing the whole listing.
@@ -678,7 +684,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-504 tests on Windows: 475 run by default (no network, no side effects), 29 `#[ignore]`d because they
+508 tests on Windows: 479 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
@@ -891,6 +897,11 @@ walks users through *Open Anyway*).
   still code); `codesign --force --sign -`; `ditto` into `Globlin-macos-arm64.zip`. `main.rs` also sets
   `ActivationPolicy::Accessory`, because self-update relaunches the bare binary rather than going
   through Launch Services. CI attaches the zip to every run, for testing a branch on a real Mac.
+- **Dock while the window is open.** A menu-bar app whose window has no Dock icon is invisible to ⌘-Tab
+  and gets lost behind other windows, so `window::show_in_dock` switches the policy to `Regular` (Dock
+  icon, ⌘-Tab, app menu) right before the window is shown and back to `Accessory` when it is closed —
+  `set_activation_policy_at_runtime` overrides `LSUIElement`. A Dock click while the window is open
+  arrives as `Event::Reopen` and shows it again. A no-op off macOS.
 - **PATH.** A GUI app on macOS inherits launchd's minimal `PATH`, without `/opt/homebrew/bin`,
   `~/.cargo/bin` or nvm. `platform::prepare_environment` runs first in `main`: it asks `$SHELL -i -l -c`
   to print `PATH` between markers (5 s timeout; the markers survive a noisy rc file) and puts those
