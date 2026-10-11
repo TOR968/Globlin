@@ -28,8 +28,9 @@ and shows you exactly what's behind, across every package manager you have insta
 see the lot in one list, filter it by status or by source, tick the ones you want and update them in a
 batch. It never touches anything on its own unless you turn that on.
 
-Single portable `.exe`, ~3.3 MB, no installer, no runtime dependencies, Windows only. The window is
-drawn by WebView2, which ships with Windows 11 and with any up-to-date Windows 10.
+On Windows it is one ~3.3 MB `.exe` with no runtime dependencies — run it portable, or let the
+per-user installer put it in place. The window is drawn by WebView2, which ships with Windows 11 and with
+any up-to-date Windows 10. Experimental builds exist for macOS (Apple Silicon) and Linux (deb, rpm, AUR).
 
 ## Install
 
@@ -260,7 +261,7 @@ The tray icon is drawn from code, not an image file, so its colour always matche
 |---|---|---|
 | <img src="docs/img/icon-idle.png" width="24" height="24" alt="idle icon"> | **Idle** — emerald | everything installed is current |
 | <img src="docs/img/icon-updates.png" width="24" height="24" alt="updates icon"> | **Updates** — amber | one or more packages are behind |
-| <img src="docs/img/icon-error.png" width="24" height="24" alt="error icon"> | **Error** — red | the last registry check failed |
+| <img src="docs/img/icon-error.png" width="24" height="24" alt="error icon"> | **Error** — red | the last check failed, or a source could not be listed (the notification and *Open last log* name it) |
 | <img src="docs/img/icon-busy.png" width="24" height="24" alt="busy icon"> | **Busy** — sky blue | a check or an update is running, filling like a glass |
 
 ## Keeping itself updated
@@ -287,8 +288,10 @@ restart work.
 
 <br>
 
-Read from next to the exe first, otherwise from `%LOCALAPPDATA%\globlin\`. Written back to whichever of
-those accepts a write. Missing keys take their defaults, so a partial file is fine. If the file isn't
+The portable Windows build reads it from next to the exe first, otherwise from
+`%LOCALAPPDATA%\globlin\`, and writes it back to whichever of those accepts a write. An installed build
+(the installer or winget) and every macOS and Linux build keep it in the data directory only —
+`%LOCALAPPDATA%\globlin\`, `~/Library/Application Support/globlin/` or `~/.local/share/globlin/`. Missing keys take their defaults, so a partial file is fine. If the file isn't
 valid JSON, it's moved to `globlin.json.invalid`, defaults are used, and a notification says so — your
 edits are never silently overwritten.
 
@@ -308,6 +311,7 @@ edits are never silently overwritten.
     "dotnet": true,
     "psgallery": false,
     "gem": true,
+    "brew": true,
     "winget": false,
     "choco": false
   },
@@ -315,6 +319,7 @@ edits are never silently overwritten.
   "last_notified": [],
   "npm_cmd": null,
   "auto_update": false,
+  "auto_approve_scripts": false,
   "last_self_notice": null
 }
 ```
@@ -329,6 +334,8 @@ edits are never silently overwritten.
 - **`npm_cmd`** — an override, only needed if `npm.cmd` is somewhere unusual. Left `null`, `PATH` is
   searched, then `%APPDATA%\npm\npm.cmd`.
 - **`auto_update`** — see [Keeping itself updated](#keeping-itself-updated).
+- **`auto_approve_scripts`** — the window's **Auto-approve npm scripts** switch; see
+  [Using it](#using-it).
 - **`last_self_notice`** — the version string of the last self-update failure a toast was already raised
   for, so retrying the same failing version doesn't notify twice.
 
@@ -341,7 +348,8 @@ edits are never silently overwritten.
 
 In `%LOCALAPPDATA%\globlin\`: **`last-check.txt`** (every package from the most recent check with its
 state — look here first when the window shows something surprising), **`last-run.log`** (stdout/stderr of
-the most recent *failed* package update, reachable from *Open last log*), **`self-update.log`** (the
+the most recent *failed* package update, and the reason a source could not be listed, reachable from
+*Open last log*), **`self-update.log`** (the
 error from the most recent *failed* self-update lookup, kept separate so an offline run doesn't overwrite
 the log *Open last log* reads), and **`app.ico`** (the notification artwork).
 
@@ -356,7 +364,8 @@ to the `.exe` — safe to delete too. Two optional `HKEY_CURRENT_USER` cleanups:
 - `Software\Classes\AppUserModelId\Globlin.Tray`, created so notifications are attributed to "Globlin"
   rather than to PowerShell.
 
-Nothing else is written — no installer, no service, no scheduled task.
+Nothing else is written — no service, no scheduled task. The installer adds only its own uninstall
+entry and shortcuts, and removes them again.
 
 **Upgrading from `npm-globals-tray`:** this app was renamed from `npm-globals-tray` to Globlin. The new
 build starts fresh with default settings, leaving three harmless leftovers you can delete once you've
@@ -370,14 +379,17 @@ switched to `globlin.exe`: the old config file (`npm-globals-tray.json`), the ol
 
 <br>
 
-Requires a Rust toolchain (MSVC on Windows) plus Microsoft C++ Build Tools and the Windows SDK.
+On Windows, a Rust toolchain (MSVC) plus Microsoft C++ Build Tools and the Windows SDK. On macOS, a Rust
+toolchain and the Xcode command-line tools. On Debian or Ubuntu, a Rust toolchain plus
+`libgtk-3-dev libxdo-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev`.
 
 ```
 cargo build --release
 ```
 
-`target/release/globlin.exe` is portable — copy it anywhere and run it; it keeps its config next to
-itself.
+On Windows `target/release/globlin.exe` is portable — copy it anywhere and run it; it keeps its config
+next to itself. The macOS `.app` bundle and the Linux packages are assembled by the scripts in `.github/`
+— see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#other-platforms).
 
 </details>
 

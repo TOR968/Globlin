@@ -525,14 +525,15 @@ still holding while it shuts down, then raises a `Globlin — updated / now runn
 
 ### When winget owns the binary
 
-`install::winget_managed()` answers one question — is this `.exe` running from a directory a package
-manager controls — and two unrelated behaviours hang off it. The predicate is deliberately dumb: the exe
+`install::managed_by()` answers one question — is this `.exe` running from a directory a package
+manager controls, and which one (`Manager::Winget`, or `Manager::SystemPackage` for a Linux binary under
+`/usr`) — and two unrelated behaviours hang off it. The predicate is deliberately dumb: the exe
 path contains the adjacent components `WinGet` and `Packages`, matched case-insensitively. That covers the
 user-scope `%LOCALAPPDATA%\Microsoft\WinGet\Packages\` and the machine-scope
 `%PROGRAMFILES%\WinGet\Packages\` without reading either environment variable, and it deliberately does
 not match the shim in `WinGet\Links\`, which is not where the real binary lives. `is_winget_path` takes
-the path as an argument so all of that is unit-testable; `winget_managed` is the one-line wrapper that
-calls `current_exe`.
+the path as an argument so all of that is unit-testable; `managed_by` is the thin wrapper that calls
+`current_exe`.
 
 **The config would otherwise be destroyed on every upgrade.** Globlin is portable: `config::candidate_paths`
 tries `globlin.json` next to the exe first, for both reading and writing, and falls back to
@@ -549,7 +550,8 @@ the menu says `Installed with winget — run winget upgrade` in place of the upd
 
 That menu change is why `View` carries a `SelfUpdate` enum rather than another `bool`. Adding a fifth flag
 to a struct that already had four tripped `clippy::struct_excessive_bools`, and the lint was right: the two
-cases are alternatives, not independent switches. `SelfUpdate::Winget` has no fields, and
+cases are alternatives, not independent switches. `SelfUpdate::Managed(Manager)` carries only which
+manager to name, and
 `SelfUpdate::Own { release, auto_update, log }` groups the three fields that only mean anything when
 Globlin manages itself — so the auto-update checkbox cannot be rendered in a state where ticking it would
 do nothing.
@@ -589,8 +591,8 @@ build started from the Start menu saw every package. Explorer hands it the same 
 does. Globlin also repairs its own environment on Windows, whoever starts it — see
 `platform::prepare_environment` under [Other platforms](#other-platforms).
 
-The autostart task writes the same `HKCU\…\Run\globlin` = `"<exe>"` the tray toggle writes, so the two
-read one value. A second `[Registry]` entry with `ValueType: none; Flags: uninsdeletevalue` deletes it on
+The autostart task writes the same `HKCU\…\Run\globlin` = `"<exe>" --background` the tray toggle
+writes, so the two read one value. A second `[Registry]` entry with `ValueType: none; Flags: uninsdeletevalue` deletes it on
 uninstall whoever created it. Setup and uninstall both `taskkill /F /IM globlin.exe` first, because the
 exe is locked while it runs; the single-instance mutex means there is at most one to stop.
 
@@ -606,14 +608,15 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-415 tests: 389 run by default (no network, no side effects), 26 `#[ignore]`d because they touch the real
-system — the HKCU Run key, a real toast, a real `npm install -g`, one that runs the real `npm config
-get/set` against a temporary userconfig, two icon/PNG dump tests, two that hit
+468 tests on Windows: 439 run by default (no network, no side effects), 29 `#[ignore]`d because they
+touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
+runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
+the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
 this machine), four that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index and the
-Gallery redirect), and eleven that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
-`cargo`, `go`, `dotnet`, PowerShell and `gem`. Those last eleven exist because
+Gallery redirect), and twelve that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
+`cargo`, `go`, `dotnet`, PowerShell, `gem` and `brew`. Those last twelve exist because
 the parsers below are pinned against captured output, and captured output cannot notice the day a tool
 changes its format — run them after a winget or Chocolatey upgrade. Each carries its own exact invocation
 in its
@@ -662,9 +665,10 @@ determining versions.
   a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
   `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
   on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), checksums and scans
-  them too, and creates one GitHub Release with all twelve files — the eight Windows ones plus the
-  `build-macos` job's `Globlin-macos-arm64.zip` and bare `globlin-macos-arm64`, each with its `.sha256`
-  (no VirusTotal scan for those).
+  them too, and creates one GitHub Release with twenty-one files — the eight Windows ones; the
+  `build-macos` job's `Globlin-macos-arm64.zip` and bare `globlin-macos-arm64`; the `build-linux` jobs'
+  two `.deb` and two `.rpm` files, each of those with its `.sha256` (no VirusTotal scan for the macOS and
+  Linux files); and `globlin-bin.PKGBUILD`, rendered from the release's own checksums.
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`

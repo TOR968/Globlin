@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 460 tests (431 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 468 tests (439 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -51,7 +51,7 @@ serves all three — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#other-platf
 state and lives inside the closure. Work that can block — a check, an update run — is spawned on a plain
 `std::thread` with a *clone* of `Config`, and reports back by sending a `Message` through
 `EventLoopProxy`. There are no locks and no shared state; anything a worker learns must travel as a
-`Message` variant (`main.rs:27`). Menu clicks arrive the same way: `tray_icon`'s global handler is
+`Message` variant (`main.rs:36`). Menu clicks arrive the same way: `tray_icon`'s global handler is
 forwarded into the same queue.
 
 **`Activity` is the concurrency guard.** `App.activity: Option<Activity>` doubles as (a) the "a job is in
