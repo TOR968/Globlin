@@ -138,10 +138,13 @@ winget and choco need elevation, so `update_command` and `uninstall_command` ret
 them — the icon should go amber when a winget package is behind — while `model::updatable` is what
 `Update all` and the menu count.
 
-`SourceKind::removable` is the second, separate question. go is updatable but has no uninstall command of
-its own, so `Go::uninstall_command` is `None` while `read_only` is `false`. The window's row carries
-`removable` next to `read_only`, and `ui.html` draws **Uninstall** from `removable` alone — before that
-flag existed, a go row offered an Uninstall button that could only fail.
+`SourceKind::removable` is the second, separate question. Only winget and choco are not removable. go is
+updatable but has no uninstall command, so `Go::uninstall_command` is `None` while `read_only` is `false`;
+instead `Go` implements `PackageSource::remove_directly`, which `remove::apply` tries before the command
+path. It finds the binary with `go version -m <bin dir>` (the untagged header line of each block carries the
+file path), matches it by package path and deletes that file, refusing any file whose parent is not the Go
+bin directory. The window's row carries `removable` next to `read_only`, and `ui.html` draws **Uninstall**
+from `removable` alone.
 
 ### The window
 
@@ -689,7 +692,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-516 tests on Windows: 487 run by default (no network, no side effects), 29 `#[ignore]`d because they
+526 tests on Windows: 497 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit

@@ -88,7 +88,7 @@ impl SourceKind {
     }
 
     pub const fn removable(self) -> bool {
-        !matches!(self, Self::Go | Self::Winget | Self::Choco)
+        !matches!(self, Self::Winget | Self::Choco)
     }
 
     pub const fn installs_runtimes(self) -> bool {

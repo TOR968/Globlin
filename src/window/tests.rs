@@ -350,7 +350,7 @@ fn the_window_shell_starts_against_a_real_webview() {
 }
 
 #[test]
-fn a_source_with_no_uninstall_of_its_own_offers_no_remove_button() {
+fn a_go_row_offers_a_remove_button_because_globlin_deletes_the_binary_itself() {
     let packages = vec![Package {
         name: "golang.org/x/tools/gopls".to_string(),
         current: "0.15.3".to_string(),
@@ -359,8 +359,21 @@ fn a_source_with_no_uninstall_of_its_own_offers_no_remove_button() {
     }];
     let snapshot = snapshot(&view(&packages, None), &config());
 
-    assert!(!snapshot.packages[0].removable);
+    assert!(snapshot.packages[0].removable);
     assert!(!snapshot.packages[0].read_only);
+}
+
+#[test]
+fn a_read_only_source_offers_no_remove_button() {
+    let packages = vec![Package {
+        name: "Git.Git".to_string(),
+        current: "2.45.0".to_string(),
+        source: SourceKind::Winget,
+        status: Status::Current,
+    }];
+    let snapshot = snapshot(&view(&packages, None), &config());
+
+    assert!(!snapshot.packages[0].removable);
 }
 
 #[test]

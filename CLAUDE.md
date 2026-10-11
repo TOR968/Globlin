@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 516 tests (487 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 526 tests (497 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -108,9 +108,10 @@ and must still be displayable. The full endpoint rationale is in `docs/DEVELOPME
 `uninstall_command` return `Option<Command>`; winget and choco return `None` for both because both need
 elevation. `SourceKind::read_only` names those two directly and is deliberately not derived from the
 catalog, and `Package::update_target` returns `None` for them, so they can never enter a batch. They
-still show as `Outdated` — being told is the point. `SourceKind::removable` is a separate question: go
-updates fine but has no uninstall, so the window draws **Uninstall** from `removable`, not from
-`!read_only`.
+still show as `Outdated` — being told is the point. `SourceKind::removable` is a separate question: winget
+and choco are the only non-removable sources, and the window draws **Uninstall** from `removable`, not from
+`!read_only`. go has no uninstall command, so it removes itself through `PackageSource::remove_directly`,
+which deletes the binary from the Go bin directory.
 
 **Read path vs write path.** `check.rs` = sources → installed list → registry `dist-tags` →
 `Status` per package. `update.rs` = run the update command per target, announcing `Progress` between
