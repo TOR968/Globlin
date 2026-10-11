@@ -61,7 +61,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libxdo-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev
 
       - name: Install the Rust toolchain
         if: runner.os == 'Windows' && runner.arch == 'ARM64'
@@ -99,6 +99,7 @@ jobs:
           rpm -qp --requires linux-out/*.rpm
           sudo apt-get install -y ./linux-out/globlin-$(dpkg --print-architecture).deb
           test -x /usr/bin/globlin
+          if ldd /usr/bin/globlin | grep "not found"; then exit 1; fi
           test -f /usr/share/applications/globlin.desktop
           test -f /usr/share/icons/hicolor/256x256/apps/globlin.png
           sudo apt-get remove -y globlin

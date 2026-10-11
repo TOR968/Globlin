@@ -20,6 +20,7 @@ docker run --rm -v "$work:/pkg" archlinux:base-devel bash -euo pipefail -c '
     cat .SRCINFO
     sudo -u builder makepkg --syncdeps --install --noconfirm
     test -x /usr/bin/globlin
+    if ldd /usr/bin/globlin | grep "not found"; then exit 1; fi
     test -f /usr/share/applications/globlin.desktop
     test -f /usr/share/icons/hicolor/256x256/apps/globlin.png
     namcap PKGBUILD || true
