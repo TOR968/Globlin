@@ -1285,7 +1285,7 @@
         const all = el("update-all");
         all.textContent = updatable ? "Update all (" + updatable + ")" : "Update all";
         all.disabled = busy || !updatable;
-        all.hidden = snapshot.batch.length > 0;
+        all.hidden = snapshot.batch.length > 0 || !updatable;
         const chosen = chosenRows();
         const some = el("update-selected");
         some.hidden = updatable < 2 || snapshot.batch.length > 0;
