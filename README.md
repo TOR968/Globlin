@@ -212,7 +212,7 @@ Check now
 ☑ Run at startup
 Open last log
 ─────────────────────────────────────
-Globlin v0.2.3                        ▸  Update Globlin 0.2.3 → 0.3.0
+Globlin v0.4.0                        ▸  Update Globlin 0.4.0 → 0.4.1
                                          ☐ Auto-update Globlin
                                          Open Globlin-update log
 ─────────────────────────────────────
@@ -220,7 +220,8 @@ Quit
 ```
 
 `Update all (2)` counts what Globlin can actually update — the third, a winget package, is reported but
-not actionable.
+not actionable. While a batch runs, the menu also shows up to seven rows around the package being
+updated and one `… N more` line; the full queue is in the window.
 
 ## Sources
 
