@@ -7,6 +7,7 @@
 | macOS 11+ on Apple Silicon (experimental) | — | [`globlin-macos-apple-silicon.zip`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-macos-apple-silicon.zip) |
 | Debian, Ubuntu (experimental) | [`globlin-amd64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-amd64.deb) | [`globlin-arm64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-arm64.deb) |
 | Fedora, openSUSE (experimental) | [`globlin-x86_64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-x86_64.rpm) | [`globlin-aarch64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-aarch64.rpm) |
+| Any Linux, updates itself (experimental) | [`globlin-x86_64.AppImage`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-x86_64.AppImage) | [`globlin-aarch64.AppImage`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-aarch64.AppImage) |
 | Arch Linux (experimental) | [`globlin-bin.PKGBUILD`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-bin.PKGBUILD) | same file |
 
 The other two files, `SHA256SUMS` and `SHA256SUMS.minisig`, are for checking a download — and they are
@@ -54,7 +55,9 @@ ad hoc, not notarised. If the button is missing, run `xattr -dr com.apple.quaran
 
 **Linux:** `sudo apt install ./globlin-amd64.deb` or `sudo dnf install ./globlin-x86_64.rpm`. GNOME needs the
 AppIndicator extension to show the tray icon. On Arch, save `globlin-bin.PKGBUILD` as `PKGBUILD` and run
-`makepkg -si`. Packages do not update themselves — install the next one.
+`makepkg -si`. Packages do not update themselves — install the next one. The AppImage does: `chmod +x` it,
+keep it in a folder you can write to, such as `~/Applications`, and run it. It needs WebKitGTK 4.1 and the
+Ayatana AppIndicator library installed, like the packages.
 
 ## Notes
 

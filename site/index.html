@@ -77,7 +77,7 @@
             "name": "Does it work on macOS or Linux?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Both, in beta. macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings, Privacy and Security, Open Anyway. Linux gets a deb for Debian and Ubuntu and an rpm for Fedora and openSUSE, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon."
+              "text": "Both, in beta. macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings, Privacy and Security, Open Anyway. Linux gets a deb for Debian and Ubuntu, an rpm for Fedora and openSUSE and an AppImage that updates itself, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon."
             }
           },
           {
@@ -812,7 +812,7 @@
             <li>Installer or portable</li>
             <li>Windows x64 and ARM64</li>
             <li>macOS on Apple Silicon</li>
-            <li>Linux deb and rpm</li>
+            <li>Linux deb, rpm and AppImage</li>
             <li>Signed updates</li>
             <li>Open source, GPL-3.0</li>
           </ul>
@@ -999,8 +999,8 @@
                 </div>
               </div>
               <p class="platform-text">
-                Install the package with apt or dnf. GNOME needs the AppIndicator extension to show the
-                tray icon; packages do not update themselves.
+                Install the package with apt or dnf, or run the AppImage, which updates itself. GNOME
+                needs the AppIndicator extension to show the tray icon; packages do not update themselves.
               </p>
               <div class="platform-actions">
                 <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-amd64.deb" rel="nofollow">
@@ -1011,10 +1011,15 @@
                   <svg class="os-icon" aria-hidden="true"><use href="#os-fedora"></use></svg>
                   .rpm
                 </a>
+                <a class="button button-ghost" href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-x86_64.AppImage" rel="nofollow">
+                  <svg class="os-icon" aria-hidden="true"><use href="#os-linux"></use></svg>
+                  AppImage
+                </a>
               </div>
               <p class="platform-alt">
                 ARM64: <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-arm64.deb" rel="nofollow">.deb</a> ·
-                <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-aarch64.rpm" rel="nofollow">.rpm</a>
+                <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-aarch64.rpm" rel="nofollow">.rpm</a> ·
+                <a href="https://github.com/TOR968/Globlin/releases/latest/download/globlin-aarch64.AppImage" rel="nofollow">AppImage</a>
               </p>
             </article>
           </div>
@@ -1050,7 +1055,7 @@
           </details>
           <details>
             <summary>Does it work on macOS or Linux?</summary>
-            <p>Both, in beta. macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux gets a deb for Debian and Ubuntu and an rpm for Fedora and openSUSE, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon.</p>
+            <p>Both, in beta. macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux gets a deb for Debian and Ubuntu, an rpm for Fedora and openSUSE and an AppImage that updates itself, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon.</p>
           </details>
           <details>
             <summary>Do I need Node.js installed?</summary>

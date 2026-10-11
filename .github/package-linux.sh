@@ -11,6 +11,7 @@ GLOBLIN_ICON_DIR="$PWD/target/linux-icons" cargo test -- --ignored --exact icon:
 
 cargo deb --no-build --output "$out_dir/globlin-$deb_arch.deb"
 cargo generate-rpm --output "$out_dir/globlin-$rpm_arch.rpm"
+bash .github/package-appimage.sh "$out_dir"
 
 dpkg-deb --info "$out_dir/globlin-$deb_arch.deb"
 dpkg-deb --contents "$out_dir/globlin-$deb_arch.deb"

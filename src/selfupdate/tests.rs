@@ -332,19 +332,41 @@ fn a_swap_replaces_a_leftover_previous_build() {
 
 #[test]
 fn an_x64_build_updates_from_the_asset_every_released_version_already_reads() {
-    assert_eq!(asset_for("windows", "x86_64"), Some("globlin.exe"));
+    assert_eq!(asset_for("windows", "x86_64", false), Some("globlin.exe"));
 }
 
 #[test]
 fn an_arm64_build_updates_from_its_own_asset() {
-    assert_eq!(asset_for("windows", "aarch64"), Some("globlin-arm64.exe"));
+    assert_eq!(
+        asset_for("windows", "aarch64", false),
+        Some("globlin-arm64.exe")
+    );
 }
 
 #[test]
 fn an_architecture_without_a_published_build_gets_no_asset() {
-    assert_eq!(asset_for("windows", "x86"), None);
-    assert_eq!(asset_for("linux", "x86_64"), None);
-    assert_eq!(asset_for("macos", "x86_64"), None);
+    assert_eq!(asset_for("windows", "x86", false), None);
+    assert_eq!(asset_for("macos", "x86_64", false), None);
+    assert_eq!(asset_for("linux", "riscv64", true), None);
+}
+
+#[test]
+fn an_appimage_updates_from_the_appimage_for_its_architecture() {
+    assert_eq!(
+        asset_for("linux", "x86_64", true),
+        Some("globlin-x86_64.AppImage")
+    );
+    assert_eq!(
+        asset_for("linux", "aarch64", true),
+        Some("globlin-aarch64.AppImage")
+    );
+    assert!(!is_bundle_archive(APPIMAGE_X64_ASSET));
+}
+
+#[test]
+fn a_linux_binary_outside_an_appimage_is_never_replaced_by_one() {
+    assert_eq!(asset_for("linux", "x86_64", false), None);
+    assert_eq!(asset_for("linux", "aarch64", false), None);
 }
 
 #[test]
@@ -399,7 +421,7 @@ fn the_checksum_line_for_the_other_architecture_is_ignored() {
 #[test]
 fn an_apple_silicon_build_updates_from_the_app_bundle_archive() {
     assert_eq!(
-        asset_for("macos", "aarch64"),
+        asset_for("macos", "aarch64", false),
         Some("globlin-macos-apple-silicon.zip")
     );
     assert!(is_bundle_archive(MACOS_ASSET));
