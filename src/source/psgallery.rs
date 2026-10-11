@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
+use super::{
+    find_on_path, hidden_command, listed, not_installed, run_listing, stdout_text, PackageSource,
+};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -19,7 +21,7 @@ impl PsGallery {
         let command = SHELLS
             .into_iter()
             .find_map(find_on_path)
-            .ok_or("no PowerShell was found on PATH")?;
+            .ok_or_else(|| not_installed("no PowerShell was found on PATH".to_string()))?;
         Ok(Self { command })
     }
 

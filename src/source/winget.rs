@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{find_on_path, hidden_command, listed, run_listing, stdout_text, PackageSource};
+use super::{
+    find_on_path, hidden_command, listed, not_on_path, run_listing, stdout_text, PackageSource,
+};
 use crate::model::{Installed, SourceKind};
 use crate::Result;
 
@@ -20,7 +22,7 @@ pub struct Winget {
 
 impl Winget {
     pub fn new() -> Result<Self> {
-        let command = find_on_path(EXECUTABLE).ok_or("winget was not found on PATH")?;
+        let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("winget"))?;
         Ok(Self { command })
     }
 }

@@ -264,3 +264,69 @@ fn a_manifest_spec_that_names_a_path_a_link_a_git_url_or_an_alias_is_another_ori
         assert!(!names_another_origin(spec), "{spec}");
     }
 }
+
+struct Present(SourceKind);
+
+impl PackageSource for Present {
+    fn kind(&self) -> SourceKind {
+        self.0
+    }
+
+    fn installed(&self) -> Result<Vec<Installed>> {
+        Ok(Vec::new())
+    }
+
+    fn update_command(&self, _name: &str) -> Option<Command> {
+        None
+    }
+
+    fn uninstall_command(&self, _name: &str) -> Option<Command> {
+        None
+    }
+}
+
+fn present(kind: SourceKind) -> Box<dyn PackageSource> {
+    Box::new(Present(kind))
+}
+
+fn broken(message: &str) -> Result<Box<dyn PackageSource>> {
+    Err(message.into())
+}
+
+#[test]
+fn a_machine_without_any_enabled_package_manager_is_an_empty_check_not_a_failure() {
+    let sources = assemble([Err(not_on_path("npm")), Err(not_on_path("cargo"))]).unwrap();
+
+    assert!(sources.is_empty());
+}
+
+#[test]
+fn an_installed_package_manager_that_fails_to_start_is_still_a_failure() {
+    let error = assemble([Err(not_on_path("npm")), broken("\"npm_cmd\" was refused")])
+        .err()
+        .expect("a broken source with nothing else working should fail")
+        .to_string();
+
+    assert!(error.contains("npm_cmd"), "{error}");
+    assert!(!error.contains("not found on PATH"), "{error}");
+}
+
+#[test]
+fn a_working_source_outweighs_both_missing_and_broken_ones() {
+    let sources = assemble([
+        Err(not_on_path("bun")),
+        broken("pnpm could not be started"),
+        Ok(present(SourceKind::Npm)),
+    ])
+    .unwrap();
+
+    assert_eq!(sources.len(), 1);
+    assert_eq!(sources[0].kind(), SourceKind::Npm);
+}
+
+#[test]
+fn a_missing_program_is_told_apart_from_a_broken_one() {
+    assert!(not_on_path("go").is::<NotInstalled>());
+    assert_eq!(not_on_path("go").to_string(), "go was not found on PATH");
+    assert!(!crate::Error::from("go crashed").is::<NotInstalled>());
+}
