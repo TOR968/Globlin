@@ -215,6 +215,22 @@ level driven by the batch-share arithmetic in `progress.rs`, while the ears twit
 base by up to 0.2 rad), the mouth hops and, at sticker size, the sparkles orbit the face. The other states
 are still.
 
+**The monochrome look is a second drawing of the same shapes, not a recolour.** `render::mono` paints
+the silhouette in a single ink and *erases* the eyes and mouth (`Paint::Erase`, a destination-out
+composite), so the face is a hole the tray shows through; the glints go back in as ink, so the goblin still
+looks up the way the colour one does. With no colour left to say which state it is in, the state moves into
+shape: Updates adds a badge disc at the lower right, set apart from the head by an erased 1.5-unit gap;
+Error cuts an exclamation mark into that badge; Busy draws the silhouette at 35 % alpha and fills the head
+with the same wave clip at full alpha. Every opaque pixel is exactly the ink colour, so on macOS the image
+works as a template (`with_icon_as_template`/`set_icon_as_template`) and AppKit tints it to the menu bar.
+Elsewhere the ink is chosen by `icon::look`: near-black when `platform::tray_is_light()` says the tray is
+light — on Windows the `SystemUsesLightTheme` value under `HKCU\…\Themes\Personalize`, which is the
+taskbar's half of the theme setting — white otherwise, and always white on Linux, whose panels are dark by
+default. `Tray::render` re-reads it, `Tray::animate` reuses what render read, so a theme switch shows on
+the next full render (a state change or a check), not mid-animation. The switch is `monochrome_icon` in
+the config and the `monochrome-icon` id; it touches only the tray — the `.exe`, the toast and the window
+keep the colour goblin.
+
 Every icon is supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px
 frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the
 container by hand) for `winresource` to embed as the executable icon; every notification rewrites that
@@ -773,7 +789,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-540 tests on Windows: 510 run by default (no network, no side effects), 30 `#[ignore]`d because they
+551 tests on Windows: 521 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

@@ -24,6 +24,7 @@ const ID_AUTOSTART: &str = "autostart";
 const ID_UPDATE_SELF: &str = "update-self";
 const ID_AUTO_UPDATE: &str = "auto-update";
 const ID_AUTO_APPROVE: &str = "auto-approve";
+const ID_MONOCHROME_ICON: &str = "monochrome-icon";
 const ID_OPEN_LOG: &str = "open-log";
 const ID_OPEN_SELF_LOG: &str = "open-self-log";
 const ID_QUIT: &str = "quit";
@@ -56,6 +57,7 @@ pub enum Action {
     UpdateSelf,
     ToggleAutoUpdate,
     ToggleAutoApprove,
+    ToggleMonochromeIcon,
     OpenLog,
     OpenSelfLog,
     Quit,
@@ -103,6 +105,7 @@ impl Action {
             ID_UPDATE_SELF => Some(Self::UpdateSelf),
             ID_AUTO_UPDATE => Some(Self::ToggleAutoUpdate),
             ID_AUTO_APPROVE => Some(Self::ToggleAutoApprove),
+            ID_MONOCHROME_ICON => Some(Self::ToggleMonochromeIcon),
             ID_OPEN_LOG => Some(Self::OpenLog),
             ID_OPEN_SELF_LOG => Some(Self::OpenSelfLog),
             ID_QUIT => Some(Self::Quit),

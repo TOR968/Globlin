@@ -679,6 +679,14 @@ fn an_approval_id_without_a_package_name_is_ignored() {
 }
 
 #[test]
+fn the_monochrome_icon_id_parses_back_to_its_action() {
+    assert_eq!(
+        Action::from_key(ID_MONOCHROME_ICON),
+        Some(Action::ToggleMonochromeIcon)
+    );
+}
+
+#[test]
 fn the_auto_approve_id_parses_back_to_its_action() {
     assert_eq!(
         Action::from_key(ID_AUTO_APPROVE),

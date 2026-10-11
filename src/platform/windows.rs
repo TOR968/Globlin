@@ -12,6 +12,8 @@ const APP_USER_MODEL_ID: &str = "Globlin.Tray";
 const DISPLAY_NAME: &str = "Globlin";
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "globlin";
+const PERSONALIZE_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+const LIGHT_TASKBAR_VALUE: &str = "SystemUsesLightTheme";
 const USER_ENVIRONMENT: &str = "Environment";
 const SYSTEM_ENVIRONMENT: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
 const VOLATILE_ENVIRONMENT: &str = "Volatile Environment";
@@ -199,6 +201,13 @@ pub fn set_autostart(enabled: bool) -> Result<()> {
         key.delete_value(RUN_VALUE)?;
     }
     Ok(())
+}
+
+pub fn tray_is_light() -> bool {
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(PERSONALIZE_KEY)
+        .and_then(|key| key.get_value::<u32, _>(LIGHT_TASKBAR_VALUE))
+        .is_ok_and(|light| light != 0)
 }
 
 fn run_value(executable: &Path) -> String {

@@ -69,6 +69,10 @@ pub fn set_autostart(enabled: bool) -> Result<()> {
     Ok(())
 }
 
+pub fn tray_is_light() -> bool {
+    false
+}
+
 pub fn setup_install_location() -> Option<PathBuf> {
     None
 }

@@ -1,7 +1,8 @@
 use tray_icon::menu::MenuItem;
 use tray_icon::{TrayIcon, TrayIconBuilder};
 
-use crate::icon::{self, IconState};
+use crate::icon::{self, IconState, Look};
+use crate::platform;
 use crate::Result;
 
 mod menu;
@@ -15,10 +16,11 @@ pub struct Tray {
     icon: TrayIcon,
     header: MenuItem,
     rows: Vec<(usize, MenuItem)>,
+    look: Look,
 }
 
 impl Tray {
-    pub fn new() -> Result<Self> {
+    pub fn new(monochrome: bool) -> Result<Self> {
         let view = View {
             packages: &[],
             activity: None,
@@ -34,9 +36,11 @@ impl Tray {
             elapsed: std::time::Duration::ZERO,
         };
         let built = menu::build(&view)?;
+        let look = look_for(monochrome);
         let icon = TrayIconBuilder::new()
             .with_tooltip(menu::headline(&view))
-            .with_icon(icon::tray(IconState::Busy, 0, 0.0)?)
+            .with_icon(icon::tray(IconState::Busy, 0, 0.0, look)?)
+            .with_icon_as_template(monochrome)
             .with_menu(Box::new(built.menu))
             .with_menu_on_left_click(false)
             .build()?;
@@ -44,17 +48,26 @@ impl Tray {
             icon,
             header: built.header,
             rows: built.rows,
+            look,
         })
     }
 
-    pub fn render(&mut self, view: &View, state: IconState, level: f32) -> Result<()> {
+    pub fn render(
+        &mut self,
+        view: &View,
+        state: IconState,
+        level: f32,
+        monochrome: bool,
+    ) -> Result<()> {
         let built = menu::build(view)?;
         self.icon.set_menu(Some(Box::new(built.menu)));
         self.header = built.header;
         self.rows = built.rows;
         self.icon.set_tooltip(Some(menu::headline(view)))?;
+        self.look = look_for(monochrome);
+        self.icon.set_icon_as_template(monochrome);
         self.icon
-            .set_icon(Some(icon::tray(state, view.frame, level)?))?;
+            .set_icon(Some(icon::tray(state, view.frame, level, self.look)?))?;
         Ok(())
     }
 
@@ -65,8 +78,16 @@ impl Tray {
                 row.set_text(text);
             }
         }
-        self.icon
-            .set_icon(Some(icon::tray(IconState::Busy, view.frame, level)?))?;
+        self.icon.set_icon(Some(icon::tray(
+            IconState::Busy,
+            view.frame,
+            level,
+            self.look,
+        )?))?;
         Ok(())
     }
+}
+
+fn look_for(monochrome: bool) -> Look {
+    icon::look(monochrome, monochrome && platform::tray_is_light())
 }

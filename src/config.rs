@@ -21,6 +21,7 @@ pub struct Config {
     pub npm_cmd: Option<PathBuf>,
     pub auto_update: bool,
     pub auto_approve_scripts: bool,
+    pub monochrome_icon: bool,
     pub last_self_notice: Option<String>,
 }
 
@@ -55,6 +56,7 @@ impl Default for Config {
             npm_cmd: None,
             auto_update: false,
             auto_approve_scripts: false,
+            monochrome_icon: false,
             last_self_notice: None,
         }
     }
