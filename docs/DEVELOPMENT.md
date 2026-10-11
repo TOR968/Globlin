@@ -177,16 +177,18 @@ these a link or an `.html` file dragged onto the window became a page with `wind
 
 ### The icon
 
-The icon is an uppercase `G` — a ring with a gap on the right and a crossbar at shelf height closing that
-gap — drawn from primitives in `src/icon/render.rs`. There are no image files as sources; `build.rs`
-renders the same glyph into the `.exe` icon, so the two cannot drift apart. A lowercase `g` was tried
-first and rejected: at 16 px it read as the numeral `9` no matter how the descender hook was shaped,
-because `g` and `9` are topologically the same closed-loop-plus-descender shape and only a curvature that
-tightens through the turn — something the constant-radius `Arc` primitive cannot express — tells them
-apart.
+The icon is a goblin's head — a play on the name — whose mouth is an up chevron: a head polygon flattened
+from four quadratic curves, two pointed ears and, at sizes above 20 px, two eyes, all drawn from
+primitives (`Disc`, `Segment`, `Polygon`) in `src/icon/render.rs`, in the state colour with white
+features. At tray size (16–20 px) the eyes are dropped and the chevron thickens, because 1-px eyes only
+blur. There are no image files as sources; `build.rs` renders the same drawing into the `.exe` icon, so
+the two cannot drift apart. It replaced an uppercase `G` in 2026-10, chosen from four directions and six
+goblin variations drawn on a design canvas; the coordinates are the canvas's 64-unit SVG halved into the
+32-unit design space.
 
-While a job runs the letter becomes a vessel: a dim outline fills with water whose surface ripples every
-120 ms, at a level driven by the batch-share arithmetic in `progress.rs`.
+While a job runs the goblin becomes a vessel: a dim silhouette fills with water whose surface ripples
+every 120 ms, at a level driven by the batch-share arithmetic in `progress.rs`, while the ears twitch
+(rotated about their base by up to 0.2 rad) and the mouth hops up to 1.2 units over the 8-frame cycle.
 
 Every icon is supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px
 frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the
@@ -692,7 +694,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-526 tests on Windows: 497 run by default (no network, no side effects), 29 `#[ignore]`d because they
+528 tests on Windows: 499 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit

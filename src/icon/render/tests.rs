@@ -68,7 +68,7 @@ fn sky_pixels(level: f32) -> usize {
         .as_chunks::<4>()
         .0
         .iter()
-        .filter(|pixel| pixel[3] > 128 && pixel[2] > pixel[0] + 40)
+        .filter(|pixel| pixel[3] > 128 && u16::from(pixel[2]) > u16::from(pixel[0]) + 40)
         .count()
 }
 
@@ -132,37 +132,48 @@ fn a_segment_is_thick_along_its_length_only() {
 }
 
 #[test]
-fn an_arc_contains_its_span_and_not_the_gap() {
-    let arc = Shape::Arc {
-        cx: 16.0,
-        cy: 16.0,
-        r: 6.0,
-        width: 4.0,
-        start: std::f32::consts::PI,
-        end: std::f32::consts::TAU,
-    };
+fn a_polygon_contains_its_inside_and_not_its_outside() {
+    let triangle = Shape::Polygon(vec![(4.0, 4.0), (28.0, 4.0), (16.0, 28.0)]);
 
-    assert!(arc.contains(16.0, 10.0), "the top of the arc is missing");
-    assert!(!arc.contains(16.0, 22.0), "the bottom should be a gap");
-    assert!(!arc.contains(16.0, 16.0), "the centre should be hollow");
-    assert!(!arc.contains(30.0, 10.0), "outside the radius");
-    assert!(arc.contains(22.0, 16.0), "the span should close at its end");
+    assert!(triangle.contains(16.0, 10.0));
+    assert!(!triangle.contains(5.0, 26.0));
+    assert!(!triangle.contains(30.0, 30.0));
+}
+
+#[test]
+fn the_goblin_has_a_head_two_ears_and_a_gap_between_the_ears() {
+    let shapes = silhouette(0.0);
+    let hits = |x: f32, y: f32| shapes.iter().any(|shape| shape.contains(x, y));
+
+    assert!(hits(16.0, 16.0), "the head is missing");
+    assert!(hits(7.0, 9.0), "the left ear is missing");
+    assert!(hits(25.0, 9.0), "the right ear is missing");
+    assert!(!hits(16.0, 5.0), "nothing should sit between the ears");
     assert!(
-        arc.contains(10.0, 16.0),
-        "the span should close at its start"
+        !hits(16.0, 30.0),
+        "the chin should end above the bottom edge"
     );
 }
 
 #[test]
-fn the_glyph_covers_the_ring_and_the_crossbar() {
-    let shapes = glyph();
-    let hits = |x: f32, y: f32| shapes.iter().any(|shape| shape.contains(x, y));
+fn the_face_drops_its_eyes_at_tray_sizes_but_keeps_the_mouth() {
+    let detailed = face(true, 0.0);
+    let small = face(false, 0.0);
+    let eye = |shapes: &[Shape]| shapes.iter().any(|shape| shape.contains(12.0, 15.0));
 
-    assert!(hits(16.0, 7.0), "the top of the ring is missing");
-    assert!(hits(20.0, 17.0), "the crossbar is missing");
-    assert!(!hits(16.0, 16.0), "the ring's counter should be hollow");
-    assert!(
-        !hits(25.0, 16.0),
-        "the gap on the right of the ring should be open"
+    assert!(eye(&detailed));
+    assert!(!eye(&small));
+    assert!(small.iter().any(|shape| shape.contains(16.0, 17.5)));
+}
+
+#[test]
+fn the_ears_swing_and_the_mouth_hops_while_busy() {
+    let resting = rgba(IconState::Busy, 0, 0.5, 64);
+    let swung = rgba(IconState::Busy, BUSY_FRAMES / 4, 0.5, 64);
+
+    assert_ne!(resting, swung);
+    assert_ne!(
+        rotated(&LEFT_EAR, LEFT_EAR_PIVOT, -EAR_SWING),
+        LEFT_EAR.to_vec()
     );
 }
