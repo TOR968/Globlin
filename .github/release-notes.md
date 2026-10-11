@@ -15,7 +15,8 @@ like. Enable *Run at startup* from the tray menu if you want it to come back aft
 
 **macOS (experimental, Apple Silicon):** unzip `Globlin-macos-arm64.zip`, move Globlin.app to
 Applications, and allow it once under *System Settings → Privacy & Security → Open Anyway* — it is signed
-ad hoc, not notarised. `globlin-macos-arm64` is the bare binary the Mac app updates itself from.
+ad hoc, not notarised. Do not open `globlin-macos-arm64` itself — it is the bare binary the installed
+app updates itself from, and macOS refuses to run it on its own.
 
 **Linux (experimental):** `sudo apt install ./globlin-amd64.deb` (or `globlin-arm64.deb`) on Debian and
 Ubuntu, `sudo dnf install ./globlin-x86_64.rpm` (or `globlin-aarch64.rpm`) on Fedora. GNOME needs the
@@ -28,7 +29,13 @@ AppIndicator extension to show the tray icon. On Arch, download `globlin-bin.PKG
 (Get-FileHash globlin.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-Compare the result with the `.sha256` published beside the file you downloaded.
+Compare the result with the `.sha256` published beside the file you downloaded. Every file also has a
+[minisign](https://jedisct1.github.io/minisign/) signature beside it, made with the Globlin release key —
+the same key the app checks before it installs an update of itself:
+
+```sh
+minisign -Vm globlin.exe -P RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+
+```
 
 ## Notes
 

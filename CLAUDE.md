@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 498 tests (469 run, 29 ignored) on Windows, no network, no side effects
+cargo test                     # 504 tests (475 run, 29 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```

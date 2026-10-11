@@ -115,9 +115,11 @@ model's line. If yours objects:
    Update-MpSignature
    ```
 
-2. **Check the hash.** Every release publishes `globlin.exe.sha256` beside the `.exe`. Run
-   `Get-FileHash globlin.exe` and compare — a match means the file is the one CI built from this
-   repository and nothing altered the download.
+2. **Check the hash and the signature.** Every release publishes `globlin.exe.sha256` beside the
+   `.exe`. Run `Get-FileHash globlin.exe` and compare — a match means nothing altered the download.
+   `globlin.exe.minisig` is a [minisign](https://jedisct1.github.io/minisign/) signature by the Globlin
+   release key, which proves the file came from this project's release pipeline:
+   `minisign -Vm globlin.exe -P RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`.
 3. **Read the VirusTotal report** linked from that release's notes. CI uploads every build as it is
    published, so you get the full engine spread rather than one engine's guess.
 4. **Build it yourself** — see *Building from source* below. The source is all here and
@@ -275,8 +277,9 @@ can always tell which one is live. When a newer one is published the submenu gro
 `Update Globlin <current> → <new>` row; ticking **Auto-update Globlin** installs it unattended the next
 time one is found, no click needed.
 
-Before installing anything, the download is verified against a published SHA-256 checksum — a mismatch
-is discarded and the running app is never touched. The one real failure mode: if Globlin can't write next
+Before installing anything, the download must carry a valid signature by the Globlin release key, whose
+public half is built into the app, and match its published SHA-256 checksum — a release without a
+signature is not offered, a mismatch is discarded, and the running app is never touched. The one real failure mode: if Globlin can't write next
 to itself (installed under `Program Files` without elevation, or a directory an antivirus is holding
 open), the install fails. You get one toast about it, not a repeat nag; auto-update stops retrying that
 build rather than re-downloading it every few hours, and the reason lands in a log you can open from the

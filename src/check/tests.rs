@@ -131,6 +131,7 @@ fn a_successful_release_lookup_is_carried_in_the_report() {
         version: Version::parse("0.2.0").unwrap(),
         exe_url: "https://example.test/exe".to_string(),
         sha_url: "https://example.test/sha".to_string(),
+        sig_url: "https://example.test/sig".to_string(),
     };
     assert_eq!(look_up_release(Ok(Some(release.clone()))), Some(release));
 }
@@ -141,6 +142,7 @@ fn a_failed_package_check_still_carries_the_release() {
         version: Version::parse("0.2.0").unwrap(),
         exe_url: "https://example.test/exe".to_string(),
         sha_url: "https://example.test/sha".to_string(),
+        sig_url: "https://example.test/sig".to_string(),
     };
     let report = Report {
         packages: Err("npm is not installed".into()),

@@ -576,6 +576,23 @@ A successful swap restarts the app itself: it spawns the new `.exe` with `--repl
 process waits up to 10 seconds (50 attempts, 200 ms apart) for the single-instance mutex the old process is
 still holding while it shuts down, then raises a `Globlin — updated / now running <version>` toast.
 
+### The release signature
+
+A checksum published in the same release as the binary proves the download is intact, not that the
+project published it: whoever can edit a release can edit both. So every release file also gets a
+minisign signature, `<file>.minisig`, and self-update refuses a binary whose signature does not verify
+against `RELEASE_PUBLIC_KEY` in `selfupdate.rs` (`RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`). `offer` does not even offer a
+release that lacks the `.minisig` for the running asset, and the download agent is `https_only`.
+
+`.github/minisign-sign.py` writes the prehashed (`ED`, BLAKE2b-512) format `minisign -V` and the
+`minisign-verify` crate read, from the `MINISIGN_SECRET_KEY` repository secret — base64 of an 8-byte key
+id followed by the 32-byte Ed25519 seed, not minisign's own encrypted key file, so CI needs no password.
+The publish job fails rather than publish unsigned files when the secret is missing. The private key
+exists only in that secret and in the maintainer's offline backup; **losing it means shipping a build with
+a new public key, which every installed copy will refuse until the user downloads it by hand**, so the
+backup matters more than the secret. The unit tests sign with a fixed throwaway key
+(`TEST_KEY`), never the real one.
+
 ### When winget owns the binary
 
 `install::managed_by()` answers one question — is this `.exe` running from a directory a package
@@ -661,7 +678,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-498 tests on Windows: 469 run by default (no network, no side effects), 29 `#[ignore]`d because they
+504 tests on Windows: 475 run by default (no network, no side effects), 29 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
@@ -721,10 +738,11 @@ determining versions.
   a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
   `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
   on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), checksums and scans
-  them too, and creates one GitHub Release with twenty-one files — the eight Windows ones; the
+  them too, and creates one GitHub Release with thirty-two files — the eight Windows ones; the
   `build-macos` job's `Globlin-macos-arm64.zip` and bare `globlin-macos-arm64`; the `build-linux` jobs'
   two `.deb` and two `.rpm` files, each of those with its `.sha256` (no VirusTotal scan for the macOS and
-  Linux files); and `globlin-bin.PKGBUILD`, rendered from the release's own checksums.
+  Linux files); and `globlin-bin.PKGBUILD`, rendered from the release's own checksums — plus a
+  `.minisig` signature for each of the eleven (see [The release signature](#the-release-signature)).
 - **`release-plz.yml`** — every push to `master`. [release-plz](https://release-plz.dev) keeps a
   **release pull request** open containing the version bump and the new `CHANGELOG.md` entries; nothing
   is published while it sits there. Merging it is the decision to release: release-plz creates the `v*`
