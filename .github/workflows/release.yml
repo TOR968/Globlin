@@ -166,7 +166,7 @@ jobs:
           }
           "releasing $manifest"
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
@@ -272,7 +272,7 @@ jobs:
           gh release download "v$version" --pattern 'globlin-amd64.deb.sha256' --pattern 'globlin-arm64.deb.sha256' --dir sums
           bash .github/render-pkgbuild.sh "$version" "$(cut -d' ' -f1 sums/globlin-amd64.deb.sha256)" "$(cut -d' ' -f1 sums/globlin-arm64.deb.sha256)" aur
 
-      - uses: KSXGitHub/github-actions-deploy-aur@2ac5a4c1d7035885d46b10e3193393be8460b6f1 # v4.1.1
+      - uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
         if: env.AUR_SSH_KEY != ''
         with:
           pkgname: globlin-bin
