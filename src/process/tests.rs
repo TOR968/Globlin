@@ -2,7 +2,7 @@ use super::*;
 
 #[cfg(windows)]
 fn printing(text: &str) -> Command {
-    let mut command = Command::new("cmd");
+    let mut command = crate::source::hidden_command(std::path::Path::new("cmd"));
     command.args(["/C", "echo", text]);
     command
 }
@@ -16,7 +16,7 @@ fn printing(text: &str) -> Command {
 
 #[cfg(windows)]
 fn lingering() -> Command {
-    let mut command = Command::new("ping");
+    let mut command = crate::source::hidden_command(std::path::Path::new("ping"));
     command.args(["-n", "30", "127.0.0.1"]);
     command
 }
