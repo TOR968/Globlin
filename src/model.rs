@@ -99,8 +99,16 @@ impl SourceKind {
         matches!(self, Self::Scoop | Self::Winget | Self::Choco)
     }
 
-    pub const fn available(self) -> bool {
-        cfg!(windows) || !self.windows_only()
+    pub fn available_on(self, os: &str) -> bool {
+        match self {
+            Self::Brew => os != "windows",
+            kind if kind.windows_only() => os == "windows",
+            _ => true,
+        }
+    }
+
+    pub fn available(self) -> bool {
+        self.available_on(std::env::consts::OS)
     }
 
     pub const fn suffix(self) -> &'static str {

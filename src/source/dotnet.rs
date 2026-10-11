@@ -8,6 +8,7 @@ use crate::model::{Installed, SourceKind};
 use crate::Result;
 
 const EXECUTABLE: &str = "dotnet";
+const NO_SDK: &str = "No .NET SDKs were found";
 
 pub struct Dotnet {
     command: PathBuf,
@@ -36,6 +37,9 @@ impl PackageSource for Dotnet {
             return Ok(reported);
         }
         let table = self.run(&["tool", "list", "--global"])?;
+        if without_sdk(&table) {
+            return Ok(Vec::new());
+        }
         listed(
             parse_table(&stdout_text(&table)),
             "dotnet tool list --global",
@@ -54,6 +58,12 @@ impl PackageSource for Dotnet {
         command.args(["tool", "uninstall", "--global", name]);
         Some(command)
     }
+}
+
+fn without_sdk(output: &std::process::Output) -> bool {
+    [&output.stdout, &output.stderr]
+        .into_iter()
+        .any(|stream| String::from_utf8_lossy(stream).contains(NO_SDK))
 }
 
 fn parse_json(stdout: &str) -> Vec<Installed> {

@@ -270,14 +270,36 @@ fn only_winget_choco_and_scoop_are_windows_only() {
     assert_eq!(windows_only, ["scoop", "winget", "choco"]);
 }
 
+fn available_on(os: &str) -> Vec<&'static str> {
+    KINDS
+        .iter()
+        .filter(|kind| kind.available_on(os))
+        .map(|kind| kind.label())
+        .collect()
+}
+
 #[test]
-fn every_source_is_available_on_windows_and_only_the_portable_ones_elsewhere() {
+fn windows_has_every_source_except_homebrew() {
+    assert!(!available_on("windows").contains(&"brew"));
+    assert_eq!(available_on("windows").len(), KINDS.len() - 1);
+}
+
+#[test]
+fn macos_and_linux_have_no_scoop_winget_or_choco() {
+    for os in ["macos", "linux"] {
+        let found = available_on(os);
+        for windows_only in ["scoop", "winget", "choco"] {
+            assert!(!found.contains(&windows_only), "{os}: {windows_only}");
+        }
+        assert!(found.contains(&"brew"), "{os}");
+        assert_eq!(found.len(), KINDS.len() - 3, "{os}");
+    }
+}
+
+#[test]
+fn the_running_build_uses_its_own_platform() {
     for kind in KINDS {
-        assert_eq!(
-            kind.available(),
-            cfg!(windows) || !kind.windows_only(),
-            "{kind:?}"
-        );
+        assert_eq!(kind.available(), kind.available_on(std::env::consts::OS));
     }
 }
 
