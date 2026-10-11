@@ -1050,7 +1050,7 @@ Experimental, x64 and ARM64, shipped as a deb and an rpm.
 - **No libxdo.** `tray-icon` is built with `default-features = false, features = ["gtk"]`. Its default
   `libxdo` feature only makes muda's predefined Copy/Cut/Paste/Select All items work, and the tray uses
   none of them — only separators. Linked in, it tied the binary to the build machine's soname: the
-  Ubuntu 22.04 release linked `libxdo.so.3`, Arch's `xdotool` ships a different one, and `globlin-bin`
+  Ubuntu 22.04 release linked `libxdo.so.3`, Arch's `xdotool` ships `libxdo.so.4`, and `globlin-bin`
   0.4.3 failed at load with `libxdo.so.3: cannot open shared object file` before `main` ran. The deb and
   the AUR smoke tests now run `ldd /usr/bin/globlin` and fail on any `not found`.
 - **Tray.** `tray-icon` uses Ayatana/libappindicator, which reports no clicks — any click opens the menu,
