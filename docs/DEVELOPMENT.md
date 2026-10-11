@@ -635,7 +635,7 @@ installing — its own update. That endpoint always resolves to the newest *publ
 excludes pre-releases and drafts from it, so neither can reach a user by accident. A release is offered
 only when its tag parses as semver strictly newer than the running build, and both the binary for the
 running platform (`globlin.exe` on x64, `globlin-arm64.exe` on ARM64, `globlin-macos-apple-silicon.zip`
-on a Mac — `selfupdate::asset_for`), `SHA256SUMS` and `SHA256SUMS.minisig` are all attached — a release
+on a Mac, `globlin-<arch>.AppImage` in an AppImage — `selfupdate::asset_for`), `SHA256SUMS` and `SHA256SUMS.minisig` are all attached — a release
 missing any of them is skipped rather than half-offered.
 
 Applying an update downloads all three, verifies the signature on `SHA256SUMS` (see
@@ -683,7 +683,7 @@ still holding while it shuts down, then raises a `Globlin — updated / now runn
 
 A checksum published in the same release as the binary proves the download is intact, not that the
 project published it: whoever can edit a release can edit both. So `SHA256SUMS` lists the
-SHA-256 of all ten release files, `SHA256SUMS.minisig` is a minisign signature over that list, and
+SHA-256 of all twelve release files, `SHA256SUMS.minisig` is a minisign signature over that list, and
 self-update refuses a download unless the signature verifies against `RELEASE_PUBLIC_KEY` in
 `selfupdate.rs` (`RWTTLQhyI4Bn/MclkJqsthxavfiFPGVos6b7/d9keFthKYcrAmvZ31V+`) and the download's hash
 matches its line. `offer` does not even offer a release that lacks either file, and the download agent is
@@ -789,7 +789,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-551 tests on Windows: 521 run by default (no network, no side effects), 30 `#[ignore]`d because they
+556 tests on Windows: 526 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
@@ -850,11 +850,11 @@ determining versions.
   a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
   `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
   on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), scans them too,
-  and creates one GitHub Release with twelve files. Ten are the release proper: the two installers
+  and creates one GitHub Release with fourteen files. Twelve are the release proper: the two installers
   and the two portable `.exe`s; the `build-macos` job's `globlin-macos-apple-silicon.zip`; the
-  `build-linux` jobs' two `.deb` and two `.rpm` files (no VirusTotal scan for the macOS and Linux files);
-  and `globlin-bin.PKGBUILD`, rendered from the two debs' hashes. The last two are `SHA256SUMS`, one
-  `<hex>  <file>` line (two spaces, the `sha256sum` format) for each of the ten, and its
+  `build-linux` jobs' two `.deb`, two `.rpm` and two `.AppImage` files (no VirusTotal scan for the macOS
+  and Linux files); and `globlin-bin.PKGBUILD`, rendered from the two debs' hashes. The last two are
+  `SHA256SUMS`, one `<hex>  <file>` line (two spaces, the `sha256sum` format) for each of the twelve, and its
   `SHA256SUMS.minisig` (see [The release signature](#the-release-signature)), which is also what
   self-update checks. Up to v0.3.15 every file carried its own `.sha256` and `.minisig`, thirty-two files
   in all, and the asset list GitHub shows — alphabetical, with
@@ -985,9 +985,11 @@ suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
 - `install::managed_by` — `Manager::Winget` for a winget package directory, `Manager::SystemPackage` for
   a Linux binary under `/usr` (the deb and rpm install to `/usr/bin`). Either one skips the release
   lookup and tells the user which tool updates Globlin instead.
-- `selfupdate::asset_for(os, arch)` — `windows/x86_64` → `globlin.exe`, `windows/aarch64` →
-  `globlin-arm64.exe`, `macos/aarch64` → `globlin-macos-apple-silicon.zip`; anything else — Linux included, whose
-  packages never self-update — has no build, and the lookup logs why instead of offering one. `globlin.exe` stays the x64 name forever: every released version
+- `selfupdate::asset_for(os, arch, appimage)` — `windows/x86_64` → `globlin.exe`, `windows/aarch64` →
+  `globlin-arm64.exe`, `macos/aarch64` → `globlin-macos-apple-silicon.zip`, and on Linux, only when
+  running from an AppImage, `globlin-x86_64.AppImage` or `globlin-aarch64.AppImage`; anything else — a
+  Linux package or a binary built from source included — has no build, and the lookup logs why instead of
+  offering one. `globlin.exe` stays the x64 name forever: every released version
   looks for it by that exact name, and an x64 build running under emulation on ARM keeps updating to x64.
 - `build.rs` — embeds the Windows resource only when the target is Windows.
 - `platform::prepare_environment` runs first in `main` on every OS. On macOS and Linux it adopts the login
@@ -1097,6 +1099,27 @@ the same PKGBUILD from the release's own deb checksums and attaches it as `globl
 users can `makepkg -si` it while the AUR package does not exist yet. Like the deb and rpm it installs to `/usr/bin`, so
 `install::managed_by` reports a system package and self-update stays off.
 
+**AppImage.** `.github/package-appimage.sh`, run at the end of `package-linux.sh`, lays out an AppDir
+from the same binary, desktop file and hicolor icons — `AppRun` is a symlink to `usr/bin/globlin` — and
+packs it with `appimagetool` 1.9.1 and the static type2 runtime 20251108, both downloaded from their
+GitHub releases and checked against pinned SHA-256s before they run (`APPIMAGE_EXTRACT_AND_RUN=1`, so the
+runner needs no FUSE). It is deliberately thin: no GTK, no WebKitGTK, no AppIndicator inside, about the
+size of the binary, depending on the same system libraries as the packages. A bundled WebKitGTK (the
+linuxdeploy-plugin-gtk route Tauri takes) would add 80–100 MB and break wherever WebKit's helper
+processes, found by absolute path, or the bundled EGL/Mesa stack disagree with the host. `ci.yml`
+unpacks it with `--appimage-extract` and runs the same `ldd` check as the deb.
+
+The AppImage is the one Linux build that updates itself. The runtime sets `$APPIMAGE` to the `.AppImage`
+file, while `current_exe` is the binary inside the read-only mount, so `platform::program_path()` — the
+`$APPIMAGE` path on Linux when it is set, `current_exe` everywhere else — is what self-update swaps,
+`relaunch` starts and `clean_stale` tidies next to, and what the autostart entry's `Exec` names, so moving
+the AppImage and starting it once repairs autostart. `selfupdate::asset_for` offers
+`globlin-<arch>.AppImage` only when `$APPIMAGE` is set, so a binary built from source can never be
+replaced by an AppImage. The swap needs the AppImage's folder to be writable; in a read-only one it fails
+and lands in the self-update log. Notifications ask for the `globlin` icon by name, which an AppImage
+does not install into the icon theme, so they show the generic icon unless an integration tool such as
+AppImageLauncher or Gear Lever has registered it.
+
 Decided and deliberately not done: Flatpak (its sandbox would have to be opened to the host for every
 command Globlin runs) and self-update for the packages (the package manager owns `/usr/bin`; a newer
-release is a new package). An AppImage, which could self-update, is the open option.
+release is a new package — the AppImage is the self-updating option).

@@ -91,7 +91,7 @@ jobs:
         with:
           tool: cargo-deb,cargo-generate-rpm
 
-      - name: Package the deb and the rpm, then install and remove the deb
+      - name: Package the deb, the rpm and the AppImage, then install the deb and unpack the AppImage
         if: runner.os == 'Linux'
         run: |
           bash .github/package-linux.sh linux-out
@@ -104,6 +104,14 @@ jobs:
           test -f /usr/share/icons/hicolor/256x256/apps/globlin.png
           sudo apt-get remove -y globlin
           test ! -e /usr/bin/globlin
+          appimage="$PWD/linux-out/globlin-$(uname -m).AppImage"
+          test -x "$appimage"
+          cd "$(mktemp -d)"
+          "$appimage" --appimage-extract >/dev/null
+          test -x squashfs-root/usr/bin/globlin
+          test -f squashfs-root/globlin.desktop
+          test -f squashfs-root/usr/share/icons/hicolor/256x256/apps/globlin.png
+          if ldd squashfs-root/usr/bin/globlin | grep "not found"; then exit 1; fi
 
       - name: Build the AUR package from the deb and install it on Arch
         if: runner.os == 'Linux' && runner.arch == 'X64'

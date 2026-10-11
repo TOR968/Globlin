@@ -90,7 +90,7 @@ pub fn set_autostart(enabled: bool) -> Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(&path, autostart_desktop_entry(&std::env::current_exe()?))?;
+        fs::write(&path, autostart_desktop_entry(&super::program_path()?))?;
     } else if path.is_file() {
         fs::remove_file(&path)?;
     }

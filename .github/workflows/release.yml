@@ -97,7 +97,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    name: Build the Linux packages (${{ matrix.runner }})
+    name: Build the Linux packages and AppImage (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -120,7 +120,7 @@ jobs:
       - name: Test
         run: cargo test
 
-      - name: Package the deb and the rpm
+      - name: Package the deb, the rpm and the AppImage
         run: bash .github/package-linux.sh dist
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -187,7 +187,7 @@ jobs:
       - name: Write SHA256SUMS
         shell: pwsh
         run: |
-          $files = 'globlin-setup-x64.exe', 'globlin-setup-arm64.exe', 'globlin.exe', 'globlin-arm64.exe', 'globlin-macos-apple-silicon.zip', 'globlin-amd64.deb', 'globlin-arm64.deb', 'globlin-x86_64.rpm', 'globlin-aarch64.rpm', 'globlin-bin.PKGBUILD'
+          $files = 'globlin-setup-x64.exe', 'globlin-setup-arm64.exe', 'globlin.exe', 'globlin-arm64.exe', 'globlin-macos-apple-silicon.zip', 'globlin-amd64.deb', 'globlin-arm64.deb', 'globlin-x86_64.rpm', 'globlin-aarch64.rpm', 'globlin-x86_64.AppImage', 'globlin-aarch64.AppImage', 'globlin-bin.PKGBUILD'
           $lines = foreach ($name in $files) {
             "$((Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLower())  $name"
           }
@@ -241,6 +241,8 @@ jobs:
           dist/globlin-arm64.deb
           dist/globlin-x86_64.rpm
           dist/globlin-aarch64.rpm
+          dist/globlin-x86_64.AppImage
+          dist/globlin-aarch64.AppImage
           dist/globlin-bin.PKGBUILD
           dist/SHA256SUMS
           dist/SHA256SUMS.minisig

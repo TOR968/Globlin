@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 551 tests (521 run, 30 ignored) on Windows, no network, no side effects
+cargo test                     # 556 tests (526 run, 30 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -45,8 +45,8 @@ Never add a PNG or ICO to `docs/` or `src/` by hand; render it through `src/icon
 window, the screenshot dump) instead.
 
 The crate compiles, lints and tests on Windows x64/ARM64, macOS ARM64 and Linux x64/ARM64 (the `ci.yml`
-matrix). Windows is the main platform; macOS (Apple Silicon, ad-hoc signed `Globlin.app`) and Linux (deb
-and rpm, x64 and ARM64) are experimental. Each has a real arm in `src/platform/`; `src/window/shell.rs`
+matrix). Windows is the main platform; macOS (Apple Silicon, ad-hoc signed `Globlin.app`) and Linux (deb,
+rpm and a self-updating AppImage, x64 and ARM64) are experimental. Each has a real arm in `src/platform/`; `src/window/shell.rs`
 serves all three — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#other-platforms).
 
 ## Architecture

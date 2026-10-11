@@ -30,7 +30,7 @@ batch. It never touches anything on its own unless you turn that on.
 
 On Windows it is one ~3.3 MB `.exe` with no runtime dependencies — run it portable, or let the
 per-user installer put it in place. The window is drawn by WebView2, which ships with Windows 11 and with
-any up-to-date Windows 10. Experimental builds exist for macOS (Apple Silicon) and Linux (deb, rpm, AUR).
+any up-to-date Windows 10. Experimental builds exist for macOS (Apple Silicon) and Linux (deb, rpm, AUR, AppImage).
 
 ## Install
 
@@ -85,6 +85,19 @@ sudo dnf install ./globlin-x86_64.rpm     # Fedora
 yay -S globlin-bin                        # Arch, from the AUR
 ```
 
+Or take the AppImage (`globlin-x86_64.AppImage`, `globlin-aarch64.AppImage`) — one file for any
+distribution, and the only Linux build that updates itself:
+
+```sh
+mkdir -p ~/Applications && cd ~/Applications
+curl -LO https://github.com/TOR968/Globlin/releases/latest/download/globlin-x86_64.AppImage
+chmod +x globlin-x86_64.AppImage && ./globlin-x86_64.AppImage
+```
+
+It is a thin AppImage: it carries Globlin, its desktop file and its icons, and uses the WebKitGTK 4.1, GTK 3
+and Ayatana AppIndicator libraries already on the system (`webkit2gtk-4.1` and `libayatana-appindicator`
+on Arch). Keep it in a folder you can write to — an update replaces the file in place.
+
 Until `globlin-bin` is published in the AUR, every release also carries the same PKGBUILD with its version
 and checksums filled in:
 
@@ -97,6 +110,7 @@ The package pulls in WebKitGTK 4.1 and the Ayatana AppIndicator library. GNOME s
 the *AppIndicator and KStatusNotifierItem Support* extension; KDE, Xfce, Cinnamon and most other desktops
 show them out of the box. On Linux the tray icon opens its menu on any click — pick **Open Globlin** for
 the window. A packaged Globlin does not update itself: install the new package from the release page.
+The AppImage does, like the Windows and macOS builds.
 Settings and logs live in `~/.local/share/globlin/`; *Run at startup* writes
 `~/.config/autostart/globlin.desktop`.
 

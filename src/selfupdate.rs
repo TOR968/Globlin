@@ -14,6 +14,8 @@ use crate::{diagnostics, install, platform, Result};
 const X64_ASSET: &str = "globlin.exe";
 const ARM64_ASSET: &str = "globlin-arm64.exe";
 const MACOS_ASSET: &str = "globlin-macos-apple-silicon.zip";
+const APPIMAGE_X64_ASSET: &str = "globlin-x86_64.AppImage";
+const APPIMAGE_ARM64_ASSET: &str = "globlin-aarch64.AppImage";
 const SUMS_ASSET: &str = "SHA256SUMS";
 const SUMS_SIGNATURE_ASSET: &str = "SHA256SUMS.minisig";
 const BUNDLE_STAGING: &str = "update";
@@ -68,11 +70,13 @@ fn asset_url(assets: &[ApiAsset], name: &str) -> Option<String> {
         .map(|asset| asset.browser_download_url.clone())
 }
 
-fn asset_for(os: &str, arch: &str) -> Option<&'static str> {
-    match (os, arch) {
-        ("windows", "x86_64") => Some(X64_ASSET),
-        ("windows", "aarch64") => Some(ARM64_ASSET),
-        ("macos", "aarch64") => Some(MACOS_ASSET),
+fn asset_for(os: &str, arch: &str, appimage: bool) -> Option<&'static str> {
+    match (os, arch, appimage) {
+        ("windows", "x86_64", _) => Some(X64_ASSET),
+        ("windows", "aarch64", _) => Some(ARM64_ASSET),
+        ("macos", "aarch64", _) => Some(MACOS_ASSET),
+        ("linux", "x86_64", true) => Some(APPIMAGE_X64_ASSET),
+        ("linux", "aarch64", true) => Some(APPIMAGE_ARM64_ASSET),
         _ => None,
     }
 }
@@ -88,7 +92,8 @@ fn verify_signature(bytes: &[u8], signature: &str, public_key: &str) -> Result<(
 
 fn running_asset() -> Result<&'static str> {
     let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
-    asset_for(os, arch).ok_or_else(|| format!("no build is published for {os} {arch}").into())
+    asset_for(os, arch, platform::appimage().is_some())
+        .ok_or_else(|| format!("no self-updating build is published for {os} {arch}").into())
 }
 
 fn published_hash(body: &str, asset: &str) -> Option<String> {
@@ -158,12 +163,12 @@ fn swap(current: &Path, staged: &Path) -> Result<()> {
 }
 
 pub fn clean_stale() {
-    if let Ok(current) = std::env::current_exe() {
-        remove_leftovers(&current);
-        if let Some(bundle) = bundle_of(&current) {
-            fs::remove_dir_all(previous_path(&bundle)).ok();
-            fs::remove_dir_all(sibling(&bundle, BUNDLE_STAGING)).ok();
-        }
+    if let Ok(program) = platform::program_path() {
+        remove_leftovers(&program);
+    }
+    if let Some(bundle) = std::env::current_exe().ok().and_then(|exe| bundle_of(&exe)) {
+        fs::remove_dir_all(previous_path(&bundle)).ok();
+        fs::remove_dir_all(sibling(&bundle, BUNDLE_STAGING)).ok();
     }
 }
 
@@ -209,7 +214,7 @@ fn is_bundle_archive(asset: &str) -> bool {
 }
 
 fn install_binary(binary: &[u8]) -> Result<()> {
-    let current = std::env::current_exe()?;
+    let current = platform::program_path()?;
     let staged = staged_path(&current);
     fs::write(&staged, binary)?;
     #[cfg(unix)]
@@ -290,7 +295,7 @@ fn should_discard_staged(current: &Path) -> bool {
 }
 
 pub fn relaunch() -> Result<()> {
-    Command::new(std::env::current_exe()?)
+    Command::new(platform::program_path()?)
         .arg(RESTART_FLAG)
         .spawn()?;
     Ok(())
