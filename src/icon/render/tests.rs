@@ -146,8 +146,8 @@ fn the_goblin_has_a_head_two_ears_and_a_gap_between_the_ears() {
     let hits = |x: f32, y: f32| shapes.iter().any(|shape| shape.contains(x, y));
 
     assert!(hits(16.0, 16.0), "the head is missing");
-    assert!(hits(7.0, 9.0), "the left ear is missing");
-    assert!(hits(25.0, 9.0), "the right ear is missing");
+    assert!(hits(6.7, 8.5), "the left ear is missing");
+    assert!(hits(25.3, 8.5), "the right ear is missing");
     assert!(!hits(16.0, 5.0), "nothing should sit between the ears");
     assert!(
         !hits(16.0, 30.0),
@@ -156,14 +156,67 @@ fn the_goblin_has_a_head_two_ears_and_a_gap_between_the_ears() {
 }
 
 #[test]
-fn the_face_drops_its_eyes_at_tray_sizes_but_keeps_the_mouth() {
-    let detailed = face(true, 0.0);
-    let small = face(false, 0.0);
-    let eye = |shapes: &[Shape]| shapes.iter().any(|shape| shape.contains(12.0, 15.0));
+fn an_ellipse_is_wider_than_it_is_tall_when_told_so() {
+    let ellipse = Shape::Ellipse {
+        cx: 16.0,
+        cy: 16.0,
+        rx: 6.0,
+        ry: 3.0,
+    };
 
-    assert!(eye(&detailed));
-    assert!(!eye(&small));
-    assert!(small.iter().any(|shape| shape.contains(16.0, 17.5)));
+    assert!(ellipse.contains(21.0, 16.0));
+    assert!(!ellipse.contains(16.0, 20.0));
+}
+
+#[test]
+fn a_grown_polygon_reaches_past_its_edge_by_the_given_distance() {
+    let square = vec![(10.0, 10.0), (20.0, 10.0), (20.0, 20.0), (10.0, 20.0)];
+    let grown = Shape::Grown(square.clone(), 2.0);
+
+    assert!(grown.contains(15.0, 15.0));
+    assert!(grown.contains(21.5, 15.0));
+    assert!(!grown.contains(23.0, 15.0));
+    assert!(!Shape::Polygon(square).contains(21.5, 15.0));
+}
+
+fn has_shape_colour(pixels: &[u8], colour: [u8; 3]) -> bool {
+    pixels
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .any(|pixel| pixel[3] == 255 && pixel[..3] == colour)
+}
+
+#[test]
+fn only_sticker_sizes_get_the_white_outline_and_the_sparkles() {
+    let sticker = rgba(IconState::Idle, 0, 0.0, 128);
+    let tray = rgba(IconState::Idle, 0, 0.0, 32);
+
+    assert!(has_shape_colour(&sticker, GOLD), "the sparkles are missing");
+    assert!(
+        !has_shape_colour(&tray, GOLD),
+        "the tray should have no sparkles"
+    );
+    let ring = ((128 * 25 + 64) * 4) as usize;
+    assert_eq!(&sticker[ring..ring + 4], &[255, 255, 255, 255]);
+    assert_eq!(tray[((32 * 6 + 16) * 4 + 3) as usize], 0);
+}
+
+#[test]
+fn the_smallest_face_keeps_its_eyes_and_drops_the_mouth() {
+    assert!(Face::for_detail(Detail::Tiny).mouth.is_none());
+    assert!(Face::for_detail(Detail::Tray).mouth.is_some());
+    assert_eq!(Detail::for_size(16), Detail::Tiny);
+    assert_eq!(Detail::for_size(32), Detail::Tray);
+    assert_eq!(Detail::for_size(48), Detail::Sticker);
+}
+
+#[test]
+fn an_error_sweats() {
+    let error = rgba(IconState::Error, 0, 0.0, 64);
+
+    assert!(has_shape_colour(&error, DROP));
+    assert!(!has_shape_colour(&rgba(IconState::Idle, 0, 0.0, 64), DROP));
 }
 
 #[test]

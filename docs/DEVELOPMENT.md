@@ -158,13 +158,22 @@ builds is `update-many:npm:a|pnpm:b`, the bulk form.
 
 Animation is the one place that does not re-render: at 8 fps a full rebuild of a 200-row list is
 noticeable, so `App::advance_animation` sends `window.globlin.tick(...)` with just the headline and the
-batch rows, mirroring the `Tray::render` / `Tray::animate` split exactly.
+batch rows, mirroring the `Tray::render` / `Tray::animate` split exactly. The page goes one step further:
+a tick only rebuilds the hero card's queue when a batch row's state changed since the last draw, and
+otherwise rewrites the title, the progress bar and the busy flags. The spinner on the running row is CSS,
+so it turns without any tick at all. Batch rows reach the page as `name`, `source`, `from`, `to` and
+`state` rather than the tray's preformatted line, because the page groups the queue by source.
 
 `src/window/ui.html` is one file with no build step, no bundler and no CDN — it is `include_str!`d into
 the binary. Everything it needs arrives in the snapshot, already in display order: `window.rs` puts enabled sources
 that found packages first (most outdated, then most packages), empty ones next and switched-off ones
 last, and orders the package list by that same source order with outdated packages first inside each
-source. The page owns filtering, search and the two-click uninstall confirmation, and nothing else.
+source. The page owns filtering, search, which groups and tiles are open, the switch between the
+package view and Settings, and the two-click uninstall confirmation, and nothing else. Its layout puts
+updates first: a hero card with the headline and **Update all**, the outdated packages grouped by source
+(five rows per group until *Show N more*), then one tile per source for everything that is not outdated.
+Settings shows only what the snapshot carries; there is no interval picker because `Snapshot` has no
+interval.
 
 **The page is the only document the view will ever show.** `window::is_own_page` accepts `about:blank`
 and `data:text/html…` — what WebView2 reports for `with_html` (navigation is the `data:` URL, IPC
@@ -177,18 +186,28 @@ these a link or an `.html` file dragged onto the window became a page with `wind
 
 ### The icon
 
-The icon is a goblin's head — a play on the name — whose mouth is an up chevron: a head polygon flattened
-from four quadratic curves, two pointed ears and, at sizes above 20 px, two eyes, all drawn from
-primitives (`Disc`, `Segment`, `Polygon`) in `src/icon/render.rs`, in the state colour with white
-features. At tray size (16–20 px) the eyes are dropped and the chevron thickens, because 1-px eyes only
-blur. There are no image files as sources; `build.rs` renders the same drawing into the `.exe` icon, so
-the two cannot drift apart. It replaced an uppercase `G` in 2026-10, chosen from four directions and six
-goblin variations drawn on a design canvas; the coordinates are the canvas's 64-unit SVG halved into the
-32-unit design space.
+The icon is a chibi goblin — a play on the name — drawn from primitives (`Disc`, `Ellipse`, `Segment`,
+`Polygon`, `Grown`) in `src/icon/render.rs`: a round head flattened from four quadratic curves, two
+pointed ears, big dark eyes with white glints and an up-chevron mouth, the head in the state colour. It
+has three levels of detail, picked by `Detail::for_size`:
 
-While a job runs the goblin becomes a vessel: a dim silhouette fills with water whose surface ripples
-every 120 ms, at a level driven by the batch-share arithmetic in `progress.rs`, while the ears twitch
-(rotated about their base by up to 0.2 rad) and the mouth hops up to 1.2 units over the 8-frame cycle.
+- **Sticker** (48 px and up — the `.exe`/app icon, the macOS iconset, the Linux hicolor icons, the README
+  and the site): a white outline (`Shape::Grown`, the silhouette dilated by 1.25 units) and two gold
+  sparkles, like a laptop sticker.
+- **Tray** (21–47 px, which is what the 32 px tray frames are): no outline or sparkles, smaller eyes, the
+  mouth kept.
+- **Tiny** (20 px and below): only the head, ears and big eyes — a 1-px mouth only blurs.
+
+Error adds a sweat drop and greys the sparkles. There are no image files as sources; `build.rs` renders
+the same drawing into the `.exe` icon, so the two cannot drift apart. It replaced an uppercase `G` in
+2026-10, chosen on a design canvas from four directions, six goblin variations and six anime styles; the
+coordinates are the canvas's 64-unit SVG halved into the 32-unit design space.
+
+While a job runs the goblin becomes a vessel: a dim silhouette whose head fills with water — the ears
+stay out of the fill so they cannot leave a ghost behind when they move — rippling every 120 ms at a
+level driven by the batch-share arithmetic in `progress.rs`, while the ears twitch (rotated about their
+base by up to 0.2 rad), the mouth hops and, at sticker size, the sparkles orbit the face. The other states
+are still.
 
 Every icon is supersampled 4× for antialiasing, at whatever size is asked for. The tray asks for 32 px
 frames at runtime; `build.rs` renders 16/32/48/64/128 px into a real `.ico` (`src/icon/ico.rs` writes the
@@ -258,6 +277,45 @@ Verified against `site/img/og.png` on Python 3.14.4, which printed
 `site/img/og.png: 1200x630, inflated 3024630 bytes, IDAT 50126 bytes` — `3024630` is exactly
 `(1200 * 4 + 1) * 630`, the filtered-row stride times the height, which is what a correctly-shaped stream
 inflates to regardless of what the encoder's own reader would have accepted.
+
+### The window screenshots
+
+The README's and the landing page's pictures of the window (`docs/img/window-{updates,batch,settings}.png`,
+copied unchanged into `site/img/`) are generated too, in two steps. An ignored test builds three realistic
+`Snapshot`s through the real `window::snapshot` — 23 packages across npm, bun, go and scoop with three
+outdated; a 12-target batch with five done, one failed, one running and five queued; and the same
+packages with a Globlin release waiting — and writes each as a self-contained copy of `ui.html` that
+stubs `window.ipc` before the page's script runs and calls `window.globlin.render(...)` after it.
+`settings.html` also sets the `#settings` fragment first: on its first render the page opens Settings
+when `location.hash` is `#settings`. The app itself never sets a fragment, which the navigation guard
+would refuse anyway (`about:blank#x` is not the page's own URL).
+
+```
+$env:GLOBLIN_SCREENSHOT_DIR = "$env:TEMP\globlin-screenshots"
+cargo test -- --ignored --exact window::tests::dump_window_screenshots
+```
+
+Then headless Edge renders each page at the window's own 960×640, at 2× for sharp text.
+`--force-dark-mode` pins the colour scheme: without it headless Edge follows the Windows setting, so a
+machine in light mode would produce light screenshots, and these are meant to show the default dark
+theme. (`--blink-settings=preferredColorScheme=1` renders the light theme instead, for checking it.) A
+fresh `--user-data-dir` keeps it from attaching to a running Edge, and the `| Out-Null` is load-bearing:
+`msedge.exe` is a GUI binary, so without a pipe PowerShell returns at once, the next run attaches to the
+first one's profile, and only one of the three PNGs gets written:
+
+```
+$edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+foreach ($name in "updates", "batch", "settings") {
+    $page = "$env:GLOBLIN_SCREENSHOT_DIR\$name.html" -replace '\\', '/'
+    & $edge --headless=new --disable-gpu --hide-scrollbars --force-dark-mode `
+        --user-data-dir="$env:TEMP\globlin-edge-profile" --force-device-scale-factor=2 `
+        --window-size=960,640 --screenshot="$PWD\docs\img\window-$name.png" "file:///$page" | Out-Null
+    Copy-Item "docs\img\window-$name.png" "site\img\window-$name.png"
+}
+```
+
+Regenerate them after any visible change to `src/window/ui.html` or to the fixtures in
+`src/window/tests.rs`, open each PNG to check it before committing, and commit them with the change.
 
 ### The version resource
 
@@ -704,10 +762,11 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-532 tests on Windows: 503 run by default (no network, no side effects), 29 `#[ignore]`d because they
+540 tests on Windows: 510 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
-the README images, the site images, the macOS iconset and the Linux hicolor icons), two that hit
+the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
+window screenshot pages (`dump_window_screenshots`), two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
 this machine), four that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index and the
@@ -893,7 +952,7 @@ suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
   Only npm's `default_location` (`%APPDATA%\npm\npm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
   still `cfg`-split.
 - `SourceKind::available_on(os)` — scoop, winget and choco exist only on Windows, Homebrew everywhere
-  but Windows. `source::enabled` skips the rest, and the window's sidebar (`window::snapshot_on`) does
+  but Windows. `source::enabled` skips the rest, and the window's Settings (`window::snapshot_on`) does
   not list them at all, so a Mac never shows a scoop row and Windows never shows brew. The config keeps
   every field on every platform, so one `globlin.json` still parses anywhere.
 - `install::managed_by` — `Manager::Winget` for a winget package directory, `Manager::SystemPackage` for
