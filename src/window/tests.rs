@@ -260,7 +260,30 @@ fn a_running_batch_reaches_the_window_with_one_row_per_target_and_its_state() {
     assert_eq!(snapshot.batch.len(), 2);
     assert_eq!(snapshot.batch[0].state, "failed");
     assert_eq!(snapshot.batch[1].state, "active");
-    assert!(snapshot.batch[0].text.contains("alpha"));
+    assert_eq!(snapshot.batch[0].name, "alpha");
+}
+
+#[test]
+fn a_batch_row_carries_its_target_apart_so_the_window_can_group_it_by_source() {
+    let batch = Batch::new(vec![UpdateTarget {
+        name: "docx".to_string(),
+        source: SourceKind::Bun,
+        from: "9.9.0".to_string(),
+        to: "9.10.0".to_string(),
+    }]);
+    let activity = Activity::Updating { batch };
+    let snapshot = snapshot(&view(&[], Some(&activity)), &config());
+
+    assert_eq!(
+        snapshot.batch,
+        vec![BatchRow {
+            name: "docx".to_string(),
+            source: "bun",
+            from: "9.9.0".to_string(),
+            to: "9.10.0".to_string(),
+            state: "active",
+        }]
+    );
 }
 
 #[test]
@@ -475,4 +498,232 @@ fn a_windows_sidebar_never_offers_homebrew() {
     let snapshot = snapshot(&view(&[], None), &config());
 
     assert!(!snapshot.sources.iter().any(|row| row.label == "brew"));
+}
+
+const SCREENSHOT_PACKAGES: [(&str, SourceKind, &str, &str, bool, bool); 22] = [
+    (
+        "@salesforce/cli",
+        SourceKind::Npm,
+        "2.153.5",
+        "2.154.0",
+        true,
+        true,
+    ),
+    ("prettier", SourceKind::Npm, "3.9.10", "3.10.1", true, true),
+    ("typescript", SourceKind::Npm, "5.9.2", "5.9.3", false, true),
+    ("eslint", SourceKind::Npm, "9.36.0", "9.37.0", false, true),
+    ("vercel", SourceKind::Npm, "48.1.0", "48.2.4", false, true),
+    (
+        "npm-check-updates",
+        SourceKind::Npm,
+        "19.0.0",
+        "19.0.0",
+        false,
+        false,
+    ),
+    ("serve", SourceKind::Npm, "14.2.5", "14.2.5", false, false),
+    ("nodemon", SourceKind::Npm, "3.1.10", "3.1.10", false, false),
+    ("tsx", SourceKind::Npm, "4.20.6", "4.20.6", false, false),
+    ("pm2", SourceKind::Npm, "6.0.13", "6.0.13", false, false),
+    (
+        "http-server",
+        SourceKind::Npm,
+        "14.1.1",
+        "14.1.1",
+        false,
+        false,
+    ),
+    ("yo", SourceKind::Npm, "5.1.0", "5.1.0", false, false),
+    ("docx", SourceKind::Bun, "9.9.0", "9.10.0", true, true),
+    (
+        "@biomejs/biome",
+        SourceKind::Bun,
+        "2.2.4",
+        "2.2.5",
+        false,
+        true,
+    ),
+    (
+        "wrangler",
+        SourceKind::Bun,
+        "4.42.0",
+        "4.42.0",
+        false,
+        false,
+    ),
+    (
+        "esbuild",
+        SourceKind::Bun,
+        "0.25.10",
+        "0.25.10",
+        false,
+        false,
+    ),
+    (
+        "golang.org/x/tools/gopls",
+        SourceKind::Go,
+        "0.19.1",
+        "0.20.0",
+        false,
+        true,
+    ),
+    (
+        "honnef.co/go/tools/cmd/staticcheck",
+        SourceKind::Go,
+        "0.6.0",
+        "0.6.1",
+        false,
+        true,
+    ),
+    (
+        "github.com/golangci/golangci-lint/v2/cmd/golangci-lint",
+        SourceKind::Go,
+        "2.4.0",
+        "2.5.0",
+        false,
+        true,
+    ),
+    (
+        "github.com/go-delve/delve/cmd/dlv",
+        SourceKind::Go,
+        "1.25.2",
+        "1.25.2",
+        false,
+        false,
+    ),
+    ("7zip", SourceKind::Scoop, "24.09", "25.01", false, true),
+    ("git", SourceKind::Scoop, "2.50.1", "2.51.0", false, true),
+];
+
+fn screenshot_packages(running: bool) -> Vec<Package> {
+    let mut packages: Vec<Package> = SCREENSHOT_PACKAGES
+        .iter()
+        .map(|&(name, source, older, newer, idle, batch)| {
+            let outdated = if running { batch } else { idle };
+            Package {
+                name: name.to_string(),
+                current: if outdated { older } else { newer }.to_string(),
+                source,
+                status: if outdated {
+                    Status::Outdated {
+                        latest: newer.to_string(),
+                    }
+                } else {
+                    Status::Current
+                },
+            }
+        })
+        .collect();
+    packages.insert(
+        12,
+        Package {
+            name: "npm".to_string(),
+            current: "11.6.2".to_string(),
+            source: SourceKind::Npm,
+            status: Status::Ignored,
+        },
+    );
+    packages
+}
+
+fn screenshot_config() -> Config {
+    let mut config = config();
+    config.sources.bun = true;
+    config.sources.go = true;
+    config.sources.scoop = true;
+    config.sources.pnpm = true;
+    config.sources.winget = false;
+    config
+}
+
+fn screenshot_activity(packages: &[Package]) -> Activity {
+    let mut batch = Batch::new(packages.iter().filter_map(Package::update_target).collect());
+    for position in 0..5 {
+        batch.finish(position, true);
+    }
+    batch.finish(5, false);
+    batch.start(6);
+    Activity::Updating { batch }
+}
+
+fn screenshot_page(snapshot: &Snapshot, hash: Option<&str>) -> String {
+    let stub = "<script>window.ipc = { postMessage() {} };</script></head>";
+    let navigate = hash.map_or_else(String::new, |hash| {
+        format!("history.replaceState(null, \"\", \"{hash}\");")
+    });
+    let call = format!("<script>{navigate}{}</script></body>", script(snapshot));
+    UI.replacen("</head>", stub, 1)
+        .replacen("</body>", &call, 1)
+}
+
+#[test]
+fn a_screenshot_page_stubs_the_bridge_before_the_page_script_runs() {
+    let page = screenshot_page(&snapshot(&view(&[], None), &config()), Some("#settings"));
+    let stub = page.find("window.ipc = {").unwrap();
+    let bridge = page.find("window.globlin = {").unwrap();
+    let render = page.rfind("window.globlin.render(").unwrap();
+
+    assert!(stub < bridge && bridge < render);
+    assert!(page.contains("history.replaceState(null, \"\", \"#settings\");"));
+}
+
+#[test]
+fn the_screenshot_batch_has_every_state_the_window_draws() {
+    let running = screenshot_packages(true);
+    let activity = screenshot_activity(&running);
+    let busy = snapshot(&view(&running, Some(&activity)), &screenshot_config());
+    let states: Vec<&str> = busy.batch.iter().map(|row| row.state).collect();
+
+    assert_eq!(busy.packages.len(), 23);
+    assert_eq!(states.len(), 12);
+    for expected in ["done", "failed", "active", "queued"] {
+        assert!(states.contains(&expected), "{states:?}");
+    }
+}
+
+#[test]
+#[ignore = "writes the window screenshot pages into $env:GLOBLIN_SCREENSHOT_DIR: cargo test -- --ignored --exact window::tests::dump_window_screenshots"]
+fn dump_window_screenshots() {
+    let directory = std::env::var_os("GLOBLIN_SCREENSHOT_DIR").map_or_else(
+        || std::env::temp_dir().join("globlin-screenshots"),
+        std::path::PathBuf::from,
+    );
+    std::fs::create_dir_all(&directory).unwrap();
+    let config = screenshot_config();
+
+    let idle = screenshot_packages(false);
+    let updates = snapshot(&view(&idle, None), &config);
+    std::fs::write(
+        directory.join("updates.html"),
+        screenshot_page(&updates, None),
+    )
+    .unwrap();
+
+    let running = screenshot_packages(true);
+    let activity = screenshot_activity(&running);
+    let busy = snapshot(&view(&running, Some(&activity)), &config);
+    std::fs::write(directory.join("batch.html"), screenshot_page(&busy, None)).unwrap();
+
+    let release = crate::selfupdate::Release {
+        version: semver::Version::new(0, 4, 0),
+        exe_url: String::new(),
+        sha_url: String::new(),
+        sig_url: String::new(),
+    };
+    let settings_view = View {
+        self_update: SelfUpdate::Own {
+            release: Some(&release),
+            auto_update: true,
+            log: false,
+        },
+        ..view(&idle, None)
+    };
+    let settings = snapshot(&settings_view, &config);
+    std::fs::write(
+        directory.join("settings.html"),
+        screenshot_page(&settings, Some("#settings")),
+    )
+    .unwrap();
+
+    println!("window screenshot pages written to {}", directory.display());
 }

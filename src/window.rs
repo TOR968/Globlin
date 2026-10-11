@@ -62,7 +62,10 @@ pub struct SourceRow {
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct BatchRow {
-    pub text: String,
+    pub name: String,
+    pub source: &'static str,
+    pub from: String,
+    pub to: String,
     pub state: &'static str,
 }
 
@@ -185,12 +188,16 @@ fn batch_rows(view: &View) -> Vec<BatchRow> {
     let Some(Activity::Updating { batch }) = view.activity else {
         return Vec::new();
     };
-    (0..batch.total())
-        .filter_map(|position| {
-            Some(BatchRow {
-                text: tray::batch_row_text(view, position)?,
-                state: state_label(batch, position),
-            })
+    batch
+        .targets
+        .iter()
+        .enumerate()
+        .map(|(position, target)| BatchRow {
+            name: target.name.clone(),
+            source: target.source.label(),
+            from: target.from.clone(),
+            to: target.to.clone(),
+            state: state_label(batch, position),
         })
         .collect()
 }
