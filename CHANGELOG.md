@@ -7,6 +7,16 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.8](https://github.com/TOR968/Globlin/compare/v0.4.7...v0.4.8) - 2026-10-11
+
+### Fixed
+
+- explain VirusTotal detections only where they happen, and name the installer's real cause ([#103](https://github.com/TOR968/Globlin/pull/103))
+
+### Other
+
+- add a code signing policy and a privacy section ([#104](https://github.com/TOR968/Globlin/pull/104))
+
 ## [0.4.7](https://github.com/TOR968/Globlin/compare/v0.4.6...v0.4.7) - 2026-10-11
 
 ### Added
