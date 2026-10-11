@@ -156,6 +156,12 @@ rather than destroys, because re-creating a WebView2 is visibly slow. State flow
 same `Action::from_key`. There is one action vocabulary for both surfaces; the only id the tray never
 builds is `update-many:npm:a|pnpm:b`, the bulk form.
 
+The window sets both of its icons from `icon::image`: the small one (`with_window_icon`, the title bar)
+and, on Windows, the big one (`with_taskbar_icon`, the taskbar button and Alt-Tab). tao's window icon only
+fills the small slot; without the big one Windows draws the taskbar button from the `.exe`'s icon through
+its shell icon cache, which an in-place upgrade does not refresh — after 0.4.0 the title bar showed the
+goblin while the taskbar kept the old `G`.
+
 Animation is the one place that does not re-render: at 8 fps a full rebuild of a 200-row list is
 noticeable, so `App::advance_animation` sends `window.globlin.tick(...)` with just the headline and the
 batch rows, mirroring the `Tray::render` / `Tray::animate` split exactly. The page goes one step further:
