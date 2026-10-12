@@ -1,5 +1,5 @@
 use tray_icon::menu::MenuItem;
-use tray_icon::{TrayIcon, TrayIconBuilder};
+use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 use crate::icon::{self, IconState, Look};
 use crate::platform;
@@ -65,10 +65,7 @@ impl Tray {
         self.rows = built.rows;
         self.icon.set_tooltip(Some(menu::headline(view)))?;
         self.look = look_for(monochrome);
-        self.icon.set_icon_as_template(monochrome);
-        self.icon
-            .set_icon(Some(icon::tray(state, view.frame, level, self.look)?))?;
-        Ok(())
+        self.show(icon::tray(state, view.frame, level, self.look)?)
     }
 
     pub fn animate(&mut self, view: &View, level: f32) -> Result<()> {
@@ -78,12 +75,15 @@ impl Tray {
                 row.set_text(text);
             }
         }
-        self.icon.set_icon(Some(icon::tray(
-            IconState::Busy,
-            view.frame,
-            level,
-            self.look,
-        )?))?;
+        self.show(icon::tray(IconState::Busy, view.frame, level, self.look)?)
+    }
+
+    fn show(&self, icon: Icon) -> Result<()> {
+        #[cfg(target_os = "macos")]
+        self.icon
+            .set_icon_with_as_template(Some(icon), matches!(self.look, Look::Mono(_)))?;
+        #[cfg(not(target_os = "macos"))]
+        self.icon.set_icon(Some(icon))?;
         Ok(())
     }
 }
