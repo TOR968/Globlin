@@ -458,18 +458,18 @@ see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 ## Code signing policy
 
-The Windows builds are not code-signed yet. Free signing through
-[SignPath Foundation](https://signpath.org) has been applied for; once it is granted, this applies:
-free code signing provided by [SignPath.io](https://signpath.io), certificate by
-[SignPath Foundation](https://signpath.org).
+The Windows builds are not code-signed, so SmartScreen warns the first time one runs. Free signing through
+[SignPath Foundation](https://signpath.org) was applied for in October 2026 and declined for now: the
+Foundation signs projects that already have wider public adoption, and Globlin will apply again once it
+does. Until then, what is signed is the release itself — every file is listed in `SHA256SUMS`, and that
+list is signed with the Globlin [minisign](https://jedisct1.github.io/minisign/) release key, the same key
+the app checks before it updates itself (see *If Windows Defender flags the download* above).
 
-- **What is signed:** only the files `.github/workflows/release.yml` builds from a tagged commit of this
-  repository on GitHub-hosted runners — `globlin.exe`, `globlin-arm64.exe`, `globlin-setup-x64.exe` and
-  `globlin-setup-arm64.exe`. Nothing built anywhere else, and no third-party binaries. The macOS and Linux
-  builds are outside this policy; every release file is also listed in the minisign-signed `SHA256SUMS`.
-- **Team roles:** committers and reviewers — [TOR968](https://github.com/TOR968); approvers —
-  [TOR968](https://github.com/TOR968). Every signing request is approved by hand.
-- **Multi-factor authentication** is required for every role, on GitHub and on SignPath.
+- **What is released:** only the files `.github/workflows/release.yml` builds from a tagged commit of this
+  repository on GitHub-hosted runners. Nothing built anywhere else, and no third-party binaries.
+- **Team roles:** committers, reviewers and release approvers — [TOR968](https://github.com/TOR968).
+  Every release is reviewed and merged by hand.
+- **Multi-factor authentication** is required on GitHub for every role.
 - **Uninstalling:** the installer registers an uninstaller under *Settings → Apps*; the portable build
   and everything Globlin writes are covered in *Diagnostics & removing it* above.
 
