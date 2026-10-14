@@ -217,8 +217,9 @@ The window puts updates first:
 scripts automatically*, *Update Globlin automatically* (greyed out with the manager's name when winget
 or the installer keeps Globlin up to date) and, when a release is waiting, **Update now**. Under
 *Sources* every package manager this platform can have gets a switch and a one-line status — *13
-packages · 2 updates*, *No global packages*, *Off*. Switching one goes into `globlin.json` and triggers a
-fresh check. *Diagnostics* opens the last log; *About* shows the version and links to
+packages · 2 updates*, *No global packages*, *Off*. Switching one goes into `globlin.json` at once; a
+fresh check follows two seconds after the last switch, so flipping several costs one check.
+*Diagnostics* opens the last log; *About* shows the version and links to
 [Patreon](https://www.patreon.com/c/TOR968), as does *Support on Patreon* beside *Open last log* at the
 foot of the window.
 
