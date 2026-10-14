@@ -159,7 +159,7 @@ pub(crate) fn run_change(
     kind: SourceKind,
 ) -> std::result::Result<Output, String> {
     let mut command =
-        command.ok_or_else(|| format!("{name}: the {} source is read-only\n", kind.label()))?;
+        command.ok_or_else(|| format!("{name}: {} has no command for this\n", kind.label()))?;
     process::output_within(&mut command, process::CHANGE_LIMIT)
         .map_err(|error| format!("{name}: could not run {}: {error}\n", kind.label()))
 }
@@ -246,6 +246,18 @@ pub(crate) fn node_modules_listing(root: &Path, source: SourceKind) -> Vec<Insta
 
 pub(crate) fn names_another_origin(spec: &str) -> bool {
     spec.contains(':') || spec.contains('/')
+}
+
+pub(crate) fn plain_name(name: &str) -> Option<&str> {
+    let plain = !name.is_empty()
+        && name
+            .chars()
+            .all(|glyph| glyph.is_ascii_alphanumeric() || matches!(glyph, '.' | '_' | '-'));
+    plain.then_some(name)
+}
+
+pub(crate) fn quoted(text: &str) -> String {
+    format!("'{}'", text.replace('\'', "''"))
 }
 
 pub(crate) fn pinned_to(name: &str, version: &str) -> String {

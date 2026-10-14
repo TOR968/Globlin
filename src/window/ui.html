@@ -20,8 +20,8 @@
         --control: #1e232a;
         --control-line: #2c333c;
         --control-hover: #3a4350;
-        --pill: #1f252c;
         --track: #232930;
+        --pill: #1f252c;
         --link: #9db8d4;
         --amber: #f2a93b;
         --amber-text: #f2a93b;
@@ -55,8 +55,8 @@
           --control: #f3f5f7;
           --control-line: #d3d8de;
           --control-hover: #aeb6c0;
-          --pill: #eef1f4;
           --track: #e4e8ec;
+          --pill: #eef1f4;
           --link: #2f6aa3;
           --amber: #f2a93b;
           --amber-text: #9a5b00;
@@ -197,15 +197,6 @@
       .link.danger:hover:not(:disabled),
       .link.danger.armed {
         color: var(--red-text);
-      }
-
-      .tag {
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: var(--pill);
-        color: var(--muted);
-        font-size: 11px;
-        white-space: nowrap;
       }
 
       .top {
@@ -522,6 +513,24 @@
         font-weight: 500;
       }
 
+      .name-cell {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .tag {
+        flex: none;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--pill);
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+        cursor: help;
+      }
+
       .version {
         color: var(--muted);
         text-align: right;
@@ -545,10 +554,6 @@
 
       .update-row .act:hover:not(:disabled) {
         border-color: var(--control-hover);
-      }
-
-      .update-row .tag {
-        justify-self: center;
       }
 
       .batch-row {
@@ -1255,7 +1260,7 @@
         return state.status === "all" || row.status === state.status;
       };
 
-      const selectable = (row) => row.status === "outdated" && !row.read_only;
+      const selectable = (row) => row.status === "outdated";
 
       const groupBy = (rows, keyOf) => {
         const groups = new Map();
@@ -1393,6 +1398,19 @@
         return cell;
       };
 
+      const elevationTag = (elevation) => {
+        const tag = make("span", "tag", elevation.label);
+        tag.title = elevation.detail;
+        return tag;
+      };
+
+      const nameCell = (row) => {
+        const cell = make("span", "name-cell");
+        cell.append(make("span", "name", row.name));
+        if (row.elevation) cell.append(elevationTag(row.elevation));
+        return cell;
+      };
+
       const ignoreButton = (row) => {
         const ignore = button("link", row.status === "ignored" ? "Unignore" : "Ignore", () => send(row.ignore_id));
         ignore.disabled = state.snapshot.busy;
@@ -1400,7 +1418,6 @@
       };
 
       const removeButton = (row) => {
-        if (!row.removable) return make("span");
         const armed = state.confirming === row.key;
         const remove = button(armed ? "link danger armed" : "link danger", armed ? "Confirm" : "Uninstall", () => {
           if (armed) {
@@ -1428,15 +1445,9 @@
           else state.selected.delete(row.key);
           applyBusy();
         };
-        let action;
-        if (row.read_only) {
-          action = make("span", "tag", "read-only");
-          action.title = "Upgrading needs an administrator, so Globlin only reports it";
-        } else {
-          action = button("act", "Update", () => send(row.update_id));
-          action.disabled = busy;
-        }
-        line.append(box, make("span", "name", row.name), versionCell(row), action, ignoreButton(row), removeButton(row));
+        const action = button("act", "Update", () => send(row.update_id));
+        action.disabled = busy;
+        line.append(box, nameCell(row), versionCell(row), action, ignoreButton(row), removeButton(row));
         return line;
       };
 
@@ -1452,14 +1463,14 @@
         }
         for (const [source, members] of groupBy(rows, (row) => row.source)) {
           const key = "updates:" + source;
-          const keys = members.filter(selectable).map((row) => row.key);
-          const note = plural(members.length, "update", "updates") + (keys.length ? "" : " · read-only");
+          const keys = members.map((row) => row.key);
+          const elevation = members[0].elevation;
+          const note = plural(members.length, "update", "updates") + (elevation ? " · " + elevation.label : "");
           const { head, open } = groupHead(key, true, source, note);
-          if (keys.length) {
-            const go = button("btn small", "Update " + keys.length, () => send("update-many:" + keys.join("|")));
-            go.disabled = state.snapshot.busy;
-            head.append(go);
-          }
+          if (elevation) head.title = elevation.detail;
+          const go = button("btn small", "Update " + keys.length, () => send("update-many:" + keys.join("|")));
+          go.disabled = state.snapshot.busy;
+          head.append(go);
           host.append(head);
           if (!open) continue;
           const shown = state.more.has(key) ? members : members.slice(0, LIMIT);
@@ -1524,7 +1535,7 @@
         const line = make("div", "package-row " + row.status);
         const sign = make("span", "sign", PACKAGE_SIGNS[row.status] || "");
         sign.setAttribute("aria-hidden", "true");
-        line.append(sign, make("span", "name", row.name), versionCell(row), ignoreButton(row), removeButton(row));
+        line.append(sign, nameCell(row), versionCell(row), ignoreButton(row), removeButton(row));
         return line;
       };
 
@@ -1648,11 +1659,7 @@
           const label = make("span", "setting-label", source.label);
           label.id = "source-" + source.label.replace(/\W+/g, "-");
           line.append(label, make("span", "setting-note", sourceNote(source)));
-          if (source.read_only) {
-            const tag = make("span", "tag", "read-only");
-            tag.title = "Upgrading needs an administrator, so Globlin only reports these";
-            line.append(tag);
-          }
+          if (source.elevation) line.append(elevationTag(source.elevation));
           const toggle = button("switch", "", () => send(source.id));
           toggle.setAttribute("aria-labelledby", label.id);
           setSwitch(toggle, source.enabled);

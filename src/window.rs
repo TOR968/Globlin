@@ -44,11 +44,16 @@ pub struct Row {
     pub current: String,
     pub latest: Option<String>,
     pub status: &'static str,
-    pub read_only: bool,
-    pub removable: bool,
+    pub elevation: Option<Elevation>,
     pub update_id: String,
     pub ignore_id: String,
     pub remove_id: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub struct Elevation {
+    pub label: &'static str,
+    pub detail: &'static str,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -56,7 +61,7 @@ pub struct SourceRow {
     pub label: &'static str,
     pub id: String,
     pub enabled: bool,
-    pub read_only: bool,
+    pub elevation: Option<Elevation>,
     pub total: usize,
     pub outdated: usize,
 }
@@ -143,8 +148,7 @@ fn row(package: &Package) -> Row {
         current: package.current.clone(),
         latest: package.latest().map(ToString::to_string),
         status: package.status.label(),
-        read_only: package.source.read_only(),
-        removable: package.source.removable(),
+        elevation: elevation(package.source),
         update_id: tray::update_id(package),
         ignore_id: tray::ignore_id(package),
         remove_id: tray::remove_id(package),
@@ -177,12 +181,26 @@ fn source_row(kind: SourceKind, packages: &[Package], config: &Config) -> Source
         label: kind.label(),
         id: tray::source_id(kind),
         enabled: config.source_enabled(kind),
-        read_only: kind.read_only(),
+        elevation: elevation(kind),
         total: mine.len(),
         outdated: mine
             .iter()
             .filter(|package| matches!(package.status, Status::Outdated { .. }))
             .count(),
+    }
+}
+
+fn elevation(kind: SourceKind) -> Option<Elevation> {
+    match kind {
+        SourceKind::Winget => Some(Elevation {
+            label: "may ask for admin",
+            detail: "winget runs as you. A package installed for you alone updates without asking; one installed for the whole machine shows its own Windows administrator prompt.",
+        }),
+        SourceKind::Choco => Some(Elevation {
+            label: "asks for admin",
+            detail: "Chocolatey needs an administrator for every change, so Windows asks once for each choco update or uninstall.",
+        }),
+        _ => None,
     }
 }
 

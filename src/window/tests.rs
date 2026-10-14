@@ -77,16 +77,6 @@ fn every_package_reaches_the_window_with_the_ids_that_act_on_it() {
     assert_eq!(row.current, "1.2.3");
     assert_eq!(row.latest.as_deref(), Some("2.0.0"));
     assert_eq!(row.status, "outdated");
-    assert!(!row.read_only);
-}
-
-#[test]
-fn a_read_only_source_is_flagged_so_the_window_can_disable_its_update_button() {
-    let packages = vec![outdated("Git.Git", SourceKind::Winget, "2.47.1")];
-    let snapshot = snapshot(&view(&packages, None), &config());
-
-    assert!(snapshot.packages[0].read_only);
-    assert_eq!(snapshot.packages[0].status, "outdated");
 }
 
 #[test]
@@ -188,7 +178,6 @@ fn a_sidebar_row_carries_the_toggle_that_switches_its_source() {
 
     assert_eq!(winget.id, "source:winget");
     assert!(winget.enabled);
-    assert!(winget.read_only);
 }
 
 #[test]
@@ -373,33 +362,6 @@ fn the_window_shell_starts_against_a_real_webview() {
 }
 
 #[test]
-fn a_go_row_offers_a_remove_button_because_globlin_deletes_the_binary_itself() {
-    let packages = vec![Package {
-        name: "golang.org/x/tools/gopls".to_string(),
-        current: "0.15.3".to_string(),
-        source: SourceKind::Go,
-        status: Status::Current,
-    }];
-    let snapshot = snapshot(&view(&packages, None), &config());
-
-    assert!(snapshot.packages[0].removable);
-    assert!(!snapshot.packages[0].read_only);
-}
-
-#[test]
-fn a_read_only_source_offers_no_remove_button() {
-    let packages = vec![Package {
-        name: "Git.Git".to_string(),
-        current: "2.45.0".to_string(),
-        source: SourceKind::Winget,
-        status: Status::Current,
-    }];
-    let snapshot = snapshot(&view(&packages, None), &config());
-
-    assert!(!snapshot.packages[0].removable);
-}
-
-#[test]
 fn a_blocked_update_reaches_the_window_with_its_scripts_and_ids() {
     let approvals = vec![Blocked {
         target: UpdateTarget {
@@ -442,19 +404,6 @@ fn a_window_with_nothing_blocked_has_no_approvals() {
     let snapshot = snapshot(&view(&[], None), &config());
 
     assert!(snapshot.approvals.is_empty());
-}
-
-#[test]
-fn a_source_globlin_can_uninstall_from_says_so() {
-    let packages = vec![Package {
-        name: "prettier".to_string(),
-        current: "3.9.6".to_string(),
-        source: SourceKind::Npm,
-        status: Status::Current,
-    }];
-    let snapshot = snapshot(&view(&packages, None), &config());
-
-    assert!(snapshot.packages[0].removable);
 }
 
 #[test]
@@ -736,4 +685,61 @@ fn dump_window_screenshots() {
     .unwrap();
 
     println!("window screenshot pages written to {}", directory.display());
+}
+
+#[test]
+fn a_winget_row_warns_that_it_may_ask_for_an_administrator() {
+    let packages = vec![outdated("Git.Git", SourceKind::Winget, "2.47.1")];
+    let snapshot = snapshot(&view(&packages, None), &config());
+
+    let elevation = snapshot.packages[0].elevation.unwrap();
+    assert_eq!(elevation.label, "may ask for admin");
+    assert!(
+        elevation.detail.contains("whole machine"),
+        "{}",
+        elevation.detail
+    );
+}
+
+#[test]
+fn a_choco_row_says_windows_asks_once_per_package_by_default() {
+    let packages = vec![outdated("git", SourceKind::Choco, "2.47.1")];
+    let snapshot = snapshot(&view(&packages, None), &config());
+
+    let elevation = snapshot.packages[0].elevation.unwrap();
+    assert_eq!(elevation.label, "asks for admin");
+    assert!(
+        elevation.detail.contains("once for each choco update"),
+        "{}",
+        elevation.detail
+    );
+}
+
+#[test]
+fn a_source_that_never_needs_an_administrator_carries_no_warning() {
+    let packages = vec![outdated("prettier", SourceKind::Npm, "3.0.0")];
+    let snapshot = snapshot(&view(&packages, None), &config());
+
+    assert_eq!(snapshot.packages[0].elevation, None);
+    let npm = snapshot
+        .sources
+        .iter()
+        .find(|row| row.label == "npm")
+        .unwrap();
+    assert_eq!(npm.elevation, None);
+}
+
+#[test]
+fn the_settings_rows_for_winget_and_choco_carry_the_same_warning_as_their_packages() {
+    let snapshot = snapshot(&view(&[], None), &config());
+    let labels: Vec<(&str, &str)> = snapshot
+        .sources
+        .iter()
+        .filter_map(|row| row.elevation.map(|elevation| (row.label, elevation.label)))
+        .collect();
+
+    assert_eq!(
+        labels,
+        vec![("winget", "may ask for admin"), ("choco", "asks for admin")]
+    );
 }

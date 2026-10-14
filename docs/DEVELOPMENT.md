@@ -129,22 +129,52 @@ or post-release is reported as `Unknown` rather than guessed at.
 That fork is also why package versions are `String` in `model.rs` rather than `semver::Version`. winget
 and choco emit `1.2.3.4` and `2024.01.15`; neither parses as semver, and both must still render.
 
-### Read-only and removable
+### Elevation: winget and choco
 
-`SourceKind::read_only` names winget and choco directly and is deliberately not derived from the
-catalog: scoop and gem resolve their own versions the way winget does, but both update unelevated.
-winget and choco need elevation, so `update_command` and `uninstall_command` return `None` for them,
-`Package::update_target` returns `None`, and they can never enter a batch. `model::outdated` still counts
-them — the icon should go amber when a winget package is behind — while `model::updatable` is what
-`Update all` and the menu count.
+Every source updates and uninstalls; there is no read-only source any more. Earlier versions kept winget
+and choco read-only (`SourceKind::read_only`, `removable`), because both can need an administrator and
+Globlin runs unelevated. They now go through the same `update_command`/`uninstall_command` path as the
+rest, and the elevation is left to Windows' own prompt:
 
-`SourceKind::removable` is the second, separate question. Only winget and choco are not removable. go is
-updatable but has no uninstall command, so `Go::uninstall_command` is `None` while `read_only` is `false`;
-instead `Go` implements `PackageSource::remove_directly`, which `remove::apply` tries before the command
-path. It finds the binary with `go version -m <bin dir>` (the untagged header line of each block carries the
-file path), matches it by package path and deletes that file, refusing any file whose parent is not the Go
-bin directory. The window's row carries `removable` next to `read_only`, and `ui.html` draws **Uninstall**
-from `removable` alone.
+- **winget runs as the user.** `winget upgrade|uninstall --id <id> --exact --silent
+  --disable-interactivity --accept-source-agreements` (plus `--accept-package-agreements` on upgrade). A
+  per-user package changes with no prompt; a machine-scope installer raises its own UAC prompt, which
+  appears on the secure desktop even though winget's window is hidden. `--exact` matters: without it
+  `--id Git.Git` also matches `Git.Git.Beta`-style ids and winget stops to ask which one. The id is passed
+  as a plain argument, never through a shell, so the `ARP\Machine\X64\{GUID}` ids winget invents for
+  registry-only entries need no escaping and uninstall like any other.
+- **choco always needs an administrator**, so `Choco::elevated` wraps it in Windows PowerShell:
+  `Start-Process -FilePath <choco> -ArgumentList '<verb>', '<name>', '-y', '--no-progress' -Verb RunAs
+  -WindowStyle Hidden -Wait -PassThru`, one UAC prompt per package. `$ErrorActionPreference = 'Stop'` is
+  what makes a declined prompt fail: without it `Start-Process` writes a non-terminating error, `$run` is
+  `$null`, and the script exits 0 — a refusal that reads as a success. Exit codes 1641 and 3010 (a reboot
+  is pending) count as success; any other non-zero code exits through with a pointer to choco's own log,
+  because an elevated process's output cannot be captured by an unelevated parent. The package name is
+  pasted into the script, so it must pass `source::plain_name` (`[A-Za-z0-9._-]`, the same rule
+  psgallery uses) or no command is built at all.
+- **One prompt per package**, so the queue's per-row progress keeps working for choco. A
+  batch of five choco packages shows five prompts; saying *No* fails that one package and the queue moves
+  on.
+- **The window says so before the prompt appears.** `window::elevation` gives winget and choco rows and
+  their Settings switches an `Elevation { label, detail }` — *may ask for admin* for winget, *asks for
+  admin* for choco. `ui.html` draws the label
+  as a tag beside the package name (outdated and current rows alike, since **Uninstall** prompts too),
+  appends it to the group's note, and puts it beside the source's switch, with the detail as the
+  tooltip. The tag sits where the old `read-only` tag was, so the text is decided in Rust and tested
+  there, and the page only draws it.
+- **Globlin never auto-approves the prompt.** An unelevated process that can skip UAC is a UAC bypass
+  any other program running as the user could reuse. The only ways to avoid the prompts are the user's:
+  run Globlin itself elevated, or change the system's UAC policy.
+- **Globlin's own winget row is dropped.** `winget list` shows the Inno Setup install as
+  `ARP\User\X64\{380BD341-…}_is1`, named `Globlin`; uninstalling that from inside the running app would
+  pull the binary out from under it, and a winget-owned Globlin is upgraded by winget outside the app.
+  `winget::to_installed` skips any row whose display name is exactly `Globlin`.
+
+go is still the one source without an uninstall command: `Go::uninstall_command` is `None`, and `Go`
+implements `PackageSource::remove_directly`, which `remove::apply` tries before the command path. It finds
+the binary with `go version -m <bin dir>` (the untagged header line of each block carries the file path),
+matches it by package path and deletes that file, refusing any file whose parent is not the Go bin
+directory.
 
 ### The window
 
@@ -563,7 +593,7 @@ Things about the environment the code has to work around, all verified rather th
 - **Log entries carry a heading.** `last-run.log` and `self-update.log` start each entry with
   `== Globlin <version> · <UTC time> ==`, because notes are appended to an older failure report and a
   stale `docx@latest` failure from a previous build once looked fresh next to a new dotnet note.
-- **psgallery quotes module names.** Every name reaches PowerShell inside `-Command`, so `quoted` wraps it
+- **psgallery quotes module names.** Every name reaches PowerShell inside `-Command`, so `source::quoted` wraps it
   in single quotes and doubles any quote inside. `Get-InstalledModule` lists only Gallery-installed
   modules, which is the set `Update-Module` can act on; the update is pinned to `-Scope CurrentUser` so
   it never needs elevation.
@@ -578,9 +608,11 @@ Things about the environment the code has to work around, all verified rather th
   than column *names*, because the headers are localised. The `Available` column only appears when at
   least one package has an upgrade, so a five-column table means `Name Id Version Available Source` and
   a four-column one means `Name Id Version Source` — that rule holds in any language. The **Id** is
-  taken as the key, not the display name. One known limit: winget ellipsises cells that overflow their
-  column, so a very long id can arrive truncated. It is a display defect only, because the source is
-  read-only and no command is ever built from that string.
+  taken as the key, not the display name, because the id is what `winget upgrade --id` takes. winget
+  ellipsises cells that overflow their column in a console, but with stdout redirected winget 1.29 sized
+  every column to its widest cell and printed no `…` across a long real listing. An id that did arrive
+  truncated would carry the literal `…`, which `--exact` matches against nothing, so the update fails and
+  lands in the log rather than touching some other package.
 - **`choco list` changed meaning between v1 and v2.** In Chocolatey 1.x, `choco list -r` lists the
   *remote* community feed — thousands of packages — and the local set needs `--local-only`; in 2.x that
   flag is gone and `choco list -r` is local. Guessing wrong is not a small error, so the source reads
@@ -808,7 +840,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-564 tests on Windows: 534 run by default (no network, no side effects), 30 `#[ignore]`d because they
+571 tests on Windows: 541 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

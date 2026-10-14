@@ -10,6 +10,83 @@ const OUTDATED: &str = "git|2.44.0|2.47.1|false
 nodejs|22.11.0|24.1.0|false
 ";
 
+fn arguments(command: &Command) -> Vec<String> {
+    command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect()
+}
+
+fn choco(shell: Option<&str>) -> Choco {
+    Choco {
+        command: PathBuf::from(r"C:\ProgramData\chocolatey\bin\choco.exe"),
+        shell: shell.map(PathBuf::from),
+    }
+}
+
+fn script(command: &Command) -> String {
+    let arguments = arguments(command);
+    assert_eq!(
+        arguments[..3],
+        ["-NoProfile", "-NonInteractive", "-Command"]
+    );
+    arguments[3].clone()
+}
+
+#[test]
+fn an_upgrade_asks_for_elevation_and_runs_choco_unattended() {
+    let script = script(&choco(Some("powershell")).update_command("git").unwrap());
+
+    assert!(script.contains(
+        r"Start-Process -FilePath 'C:\ProgramData\chocolatey\bin\choco.exe' -ArgumentList 'upgrade', 'git', '-y', '--no-progress'"
+    ), "{script}");
+    assert!(script.contains("-Verb RunAs"), "{script}");
+    assert!(script.contains("-Wait -PassThru"), "{script}");
+}
+
+#[test]
+fn an_uninstall_asks_for_elevation_too() {
+    let script = script(&choco(Some("powershell")).uninstall_command("git").unwrap());
+
+    assert!(
+        script.contains("-ArgumentList 'uninstall', 'git', '-y'"),
+        "{script}"
+    );
+    assert!(script.contains("-Verb RunAs"), "{script}");
+}
+
+#[test]
+fn a_declined_elevation_prompt_stops_the_script_instead_of_reading_as_success() {
+    let script = script(&choco(Some("powershell")).update_command("git").unwrap());
+
+    assert!(
+        script.starts_with("$ErrorActionPreference = 'Stop';"),
+        "{script}"
+    );
+}
+
+#[test]
+fn a_pending_reboot_counts_as_a_finished_change() {
+    let script = script(&choco(Some("powershell")).update_command("git").unwrap());
+
+    assert!(script.contains("-in 1641, 3010) { exit 0 }"), "{script}");
+}
+
+#[test]
+fn a_name_that_could_break_out_of_the_script_builds_no_command() {
+    let choco = choco(Some("powershell"));
+
+    for name in ["git'; Remove-Item C:\\ -Recurse; '", "a b", "", "x$(y)"] {
+        assert!(choco.update_command(name).is_none(), "{name}");
+        assert!(choco.uninstall_command(name).is_none(), "{name}");
+    }
+}
+
+#[test]
+fn without_powershell_there_is_no_way_to_elevate_and_no_command() {
+    assert!(choco(None).update_command("git").is_none());
+}
+
 #[test]
 fn the_local_listing_becomes_the_installed_set() {
     let installed = merge(LISTING, "");
