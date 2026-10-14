@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::diagnostics;
-use crate::model::{Blocked, BlockedScript, Package, Status, UpdateTarget};
+use crate::model::{Blocked, BlockedScript, Installed, Package, SourceKind, Status, UpdateTarget};
 use crate::source::{self, PackageSource};
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -72,34 +72,61 @@ pub fn run(
     };
     let mut report = String::new();
 
-    for (index, target) in targets.iter().enumerate() {
+    for job in jobs(targets, config.choco_one_prompt) {
         announce(Step::Started {
-            target: target.clone(),
-            index,
+            target: targets[job[0]].clone(),
+            index: job[0],
             total: targets.len(),
         });
 
-        match apply(&sources, target) {
-            Ok(()) => {
-                outcome.updated.push(target.clone());
-                announce(Step::Finished { index, ok: true });
-            }
-            Err(failure) => {
-                report.push_str(&failure.details);
-                diagnostics::record_failures(&report);
-                match failure.blocked {
-                    Some(scripts) => outcome.blocked.push(Blocked {
-                        target: target.clone(),
-                        scripts,
-                    }),
-                    None => outcome.failed.push(target.name.clone()),
+        let results = if let [index] = job[..] {
+            vec![apply(&sources, &targets[index])]
+        } else {
+            let group: Vec<UpdateTarget> =
+                job.iter().map(|index| targets[*index].clone()).collect();
+            apply_together(&sources, &group)
+        };
+
+        for (index, result) in job.into_iter().zip(results) {
+            let target = &targets[index];
+            match result {
+                Ok(()) => {
+                    outcome.updated.push(target.clone());
+                    announce(Step::Finished { index, ok: true });
                 }
-                announce(Step::Finished { index, ok: false });
+                Err(failure) => {
+                    report.push_str(&failure.details);
+                    diagnostics::record_failures(&report);
+                    match failure.blocked {
+                        Some(scripts) => outcome.blocked.push(Blocked {
+                            target: target.clone(),
+                            scripts,
+                        }),
+                        None => outcome.failed.push(target.name.clone()),
+                    }
+                    announce(Step::Finished { index, ok: false });
+                }
             }
         }
     }
 
     outcome
+}
+
+fn jobs(targets: &[UpdateTarget], choco_one_prompt: bool) -> Vec<Vec<usize>> {
+    let mut jobs: Vec<Vec<usize>> = Vec::new();
+    let mut choco_job: Option<usize> = None;
+    for (index, target) in targets.iter().enumerate() {
+        if choco_one_prompt && target.source == SourceKind::Choco {
+            if let Some(job) = choco_job {
+                jobs[job].push(index);
+                continue;
+            }
+            choco_job = Some(jobs.len());
+        }
+        jobs.push(vec![index]);
+    }
+    jobs
 }
 
 pub fn settle(approvals: &mut Vec<Blocked>, outcome: &Outcome) {
@@ -170,6 +197,70 @@ fn apply(sources: &[Box<dyn PackageSource>], target: &UpdateTarget) -> Result<()
         blocked: source.blocked_scripts(&String::from_utf8_lossy(&output.stderr)),
         details: describe_failure(target, &output),
     })
+}
+
+fn apply_together(
+    sources: &[Box<dyn PackageSource>],
+    group: &[UpdateTarget],
+) -> Vec<Result<(), Failure>> {
+    let first = &group[0];
+    let names: Vec<&str> = group.iter().map(|target| target.name.as_str()).collect();
+    let ran = source::source_for(sources, &first.name, first.source).and_then(|source| {
+        let output = source::run_change(
+            source.update_together(&names),
+            &names.join(", "),
+            first.source,
+        )?;
+        Ok((source, output))
+    });
+    let (source, output) = match ran {
+        Ok(ran) => ran,
+        Err(details) => return fail_group(group, details),
+    };
+
+    let installed = source.installed().ok();
+    let mut details = Some(diagnostics::command_report(
+        &format!(
+            "{} via {} under one prompt",
+            names.join(", "),
+            first.source.label()
+        ),
+        &output,
+    ));
+    changed_versions(group, installed.as_deref(), output.status.success())
+        .into_iter()
+        .map(|changed| {
+            if changed {
+                Ok(())
+            } else {
+                Err(Failure::from(details.take().unwrap_or_default()))
+            }
+        })
+        .collect()
+}
+
+fn fail_group(group: &[UpdateTarget], details: String) -> Vec<Result<(), Failure>> {
+    let mut details = Some(details);
+    group
+        .iter()
+        .map(|_| Err(Failure::from(details.take().unwrap_or_default())))
+        .collect()
+}
+
+fn changed_versions(
+    group: &[UpdateTarget],
+    installed: Option<&[Installed]>,
+    succeeded: bool,
+) -> Vec<bool> {
+    group
+        .iter()
+        .map(|target| match installed {
+            Some(listing) => listing
+                .iter()
+                .any(|item| item.name == target.name && item.version != target.from),
+            None => succeeded,
+        })
+        .collect()
 }
 
 fn describe_failure(target: &UpdateTarget, output: &std::process::Output) -> String {

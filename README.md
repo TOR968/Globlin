@@ -210,13 +210,15 @@ The window puts updates first:
   silently, and a machine-wide installer raises its own Windows prompt. choco always needs an
   administrator, so each choco update or uninstall asks once, through the standard Windows prompt —
   five choco packages in **Update all** means five prompts. Saying *No* fails that one package and the
-  queue moves on. Their rows, groups and Settings switches carry a small *may ask for admin* /
+  queue moves on. **One administrator prompt for all choco updates**, in Settings, runs every choco
+  package in the batch through a single prompt instead; their rows then finish together at the end, and
+  *No* fails all of them. Their rows, groups and Settings switches carry a small *may ask for admin* /
   *asks for admin* tag; hover it for the reason. Globlin's own entry is left out of the winget list, so
   it can't uninstall itself.
 - A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
   the same three packages every six hours.
 
-![Globlin's Settings view: Run at startup, Monochrome tray icon, Approve npm install scripts automatically, Update Globlin automatically and an available Globlin update under General, then one switch per source with its package count](docs/img/window-settings.png)
+![Globlin's Settings view: Run at startup, Monochrome tray icon, Approve npm install scripts automatically, One administrator prompt for all choco updates, Update Globlin automatically and an available Globlin update under General, then one switch per source with its package count](docs/img/window-settings.png)
 
 **Settings**, behind the button at the top right, holds the rest: *Run at startup*, *Monochrome tray icon*, *Approve npm install
 scripts automatically*, *Update Globlin automatically* (greyed out with the manager's name when winget
@@ -380,6 +382,7 @@ edits are never silently overwritten.
   "npm_cmd": null,
   "auto_update": false,
   "auto_approve_scripts": false,
+  "choco_one_prompt": false,
   "monochrome_icon": false,
   "last_self_notice": null
 }
@@ -399,6 +402,8 @@ edits are never silently overwritten.
 - **`auto_update`** — see [Keeping itself updated](#keeping-itself-updated).
 - **`auto_approve_scripts`** — the **Approve npm install scripts automatically** switch in the window's
   Settings; see [Using it](#using-it).
+- **`choco_one_prompt`** — the **One administrator prompt for all choco updates** switch in the window's
+  Settings (Windows only); see [Using it](#using-it).
 - **`monochrome_icon`** — the **Monochrome tray icon** switch in the window's Settings; see
   [Icon states](#icon-states).
 - **`last_self_notice`** — the version string of the last self-update failure a toast was already raised

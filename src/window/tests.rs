@@ -688,6 +688,24 @@ fn dump_window_screenshots() {
 }
 
 #[test]
+fn the_choco_one_prompt_switch_carries_the_setting_on_windows() {
+    let mut config = config();
+    config.choco_one_prompt = true;
+
+    assert_eq!(
+        snapshot(&view(&[], None), &config).choco_one_prompt,
+        Some(true)
+    );
+}
+
+#[test]
+fn a_platform_without_choco_has_no_choco_one_prompt_switch() {
+    let snapshot = snapshot_on(&view(&[], None), &config(), "linux");
+
+    assert_eq!(snapshot.choco_one_prompt, None);
+}
+
+#[test]
 fn a_winget_row_warns_that_it_may_ask_for_an_administrator() {
     let packages = vec![outdated("Git.Git", SourceKind::Winget, "2.47.1")];
     let snapshot = snapshot(&view(&packages, None), &config());
@@ -710,6 +728,23 @@ fn a_choco_row_says_windows_asks_once_per_package_by_default() {
     assert_eq!(elevation.label, "asks for admin");
     assert!(
         elevation.detail.contains("once for each choco update"),
+        "{}",
+        elevation.detail
+    );
+}
+
+#[test]
+fn a_choco_row_says_one_prompt_covers_the_batch_when_that_setting_is_on() {
+    let mut config = config();
+    config.choco_one_prompt = true;
+    let packages = vec![outdated("git", SourceKind::Choco, "2.47.1")];
+    let snapshot = snapshot(&view(&packages, None), &config);
+
+    let elevation = snapshot.packages[0].elevation.unwrap();
+    assert!(
+        elevation
+            .detail
+            .contains("once for all the choco updates in a batch"),
         "{}",
         elevation.detail
     );

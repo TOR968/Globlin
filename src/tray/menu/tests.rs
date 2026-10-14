@@ -720,3 +720,11 @@ fn the_rows_left_out_of_the_menu_are_counted_in_one_line() {
     );
     assert_eq!(hidden_batch_summary(&(0..3), 3), None);
 }
+
+#[test]
+fn the_choco_one_prompt_id_parses_back_to_its_action() {
+    assert_eq!(
+        Action::from_key(ID_CHOCO_ONE_PROMPT),
+        Some(Action::ToggleChocoOnePrompt)
+    );
+}

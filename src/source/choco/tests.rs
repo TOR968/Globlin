@@ -154,3 +154,26 @@ fn the_real_choco_listing_still_has_the_shape_the_parser_expects() {
         "a listing this large means the remote feed was queried, not the local one"
     );
 }
+
+#[test]
+fn one_prompt_upgrades_every_package_in_a_single_elevated_choco_run() {
+    let script = script(
+        &choco(Some("powershell"))
+            .update_together(&["git", "nodejs", "7zip.install"])
+            .unwrap(),
+    );
+
+    assert!(
+        script.contains("-ArgumentList 'upgrade', 'git', 'nodejs', '7zip.install', '-y'"),
+        "{script}"
+    );
+    assert_eq!(script.matches("-Verb RunAs").count(), 1, "{script}");
+}
+
+#[test]
+fn one_bad_name_in_the_group_builds_no_command_at_all() {
+    assert!(choco(Some("powershell"))
+        .update_together(&["git", "x'; Remove-Item C:\\; '"])
+        .is_none());
+    assert!(choco(Some("powershell")).update_together(&[]).is_none());
+}

@@ -84,6 +84,13 @@ impl PackageSource for Choco {
         self.elevated("upgrade", &[name])
     }
 
+    fn update_together(&self, names: &[&str]) -> Option<Command> {
+        if names.is_empty() {
+            return None;
+        }
+        self.elevated("upgrade", names)
+    }
+
     fn uninstall_command(&self, name: &str) -> Option<Command> {
         self.elevated("uninstall", &[name])
     }

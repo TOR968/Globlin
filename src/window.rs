@@ -27,6 +27,7 @@ pub struct Snapshot {
     pub autostart: bool,
     pub auto_update: bool,
     pub auto_approve: bool,
+    pub choco_one_prompt: Option<bool>,
     pub monochrome_icon: bool,
     pub self_update: Option<String>,
     pub managed_by: Option<&'static str>,
@@ -117,17 +118,20 @@ fn snapshot_on(view: &View, config: &Config, os: &str) -> Snapshot {
         autostart: view.autostart,
         auto_update,
         auto_approve: config.auto_approve_scripts,
+        choco_one_prompt: SourceKind::Choco
+            .available_on(os)
+            .then_some(config.choco_one_prompt),
         monochrome_icon: config.monochrome_icon,
         self_update,
         managed_by,
-        packages: package_rows(view.packages, &sources),
+        packages: package_rows(view.packages, &sources, config),
         sources,
         batch: batch_rows(view),
         approvals: view.approvals.iter().map(approval_row).collect(),
     }
 }
 
-fn package_rows(packages: &[Package], sources: &[SourceRow]) -> Vec<Row> {
+fn package_rows(packages: &[Package], sources: &[SourceRow], config: &Config) -> Vec<Row> {
     let mut ordered: Vec<&Package> = packages.iter().collect();
     ordered.sort_by_key(|package| {
         (
@@ -137,10 +141,13 @@ fn package_rows(packages: &[Package], sources: &[SourceRow]) -> Vec<Row> {
             !matches!(package.status, Status::Outdated { .. }),
         )
     });
-    ordered.into_iter().map(row).collect()
+    ordered
+        .into_iter()
+        .map(|package| row(package, config))
+        .collect()
 }
 
-fn row(package: &Package) -> Row {
+fn row(package: &Package, config: &Config) -> Row {
     Row {
         key: tray::key_of(package),
         name: package.name.clone(),
@@ -148,7 +155,7 @@ fn row(package: &Package) -> Row {
         current: package.current.clone(),
         latest: package.latest().map(ToString::to_string),
         status: package.status.label(),
-        elevation: elevation(package.source),
+        elevation: elevation(package.source, config),
         update_id: tray::update_id(package),
         ignore_id: tray::ignore_id(package),
         remove_id: tray::remove_id(package),
@@ -181,7 +188,7 @@ fn source_row(kind: SourceKind, packages: &[Package], config: &Config) -> Source
         label: kind.label(),
         id: tray::source_id(kind),
         enabled: config.source_enabled(kind),
-        elevation: elevation(kind),
+        elevation: elevation(kind, config),
         total: mine.len(),
         outdated: mine
             .iter()
@@ -190,11 +197,15 @@ fn source_row(kind: SourceKind, packages: &[Package], config: &Config) -> Source
     }
 }
 
-fn elevation(kind: SourceKind) -> Option<Elevation> {
+fn elevation(kind: SourceKind, config: &Config) -> Option<Elevation> {
     match kind {
         SourceKind::Winget => Some(Elevation {
             label: "may ask for admin",
             detail: "winget runs as you. A package installed for you alone updates without asking; one installed for the whole machine shows its own Windows administrator prompt.",
+        }),
+        SourceKind::Choco if config.choco_one_prompt => Some(Elevation {
+            label: "asks for admin",
+            detail: "Chocolatey needs an administrator for every change. Windows asks once for all the choco updates in a batch, and once for each uninstall.",
         }),
         SourceKind::Choco => Some(Elevation {
             label: "asks for admin",
