@@ -23,6 +23,7 @@ use crate::window::Window;
 use crate::{diagnostics, notice, platform, progress, window, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
+const SETTLE_DELAY: Duration = Duration::from_secs(2);
 const PATREON_URL: &str = "https://www.patreon.com/c/TOR968";
 
 pub enum Control {
@@ -225,7 +226,7 @@ impl App {
         }
         self.packages.retain(|package| package.source != kind);
         self.render();
-        self.start_check();
+        self.check_once_settled();
     }
 
     fn toggle_ignore(&mut self, name: &str) {
@@ -245,8 +246,12 @@ impl App {
         }
         self.render();
         if !ignoring {
-            self.start_check();
+            self.check_once_settled();
         }
+    }
+
+    fn check_once_settled(&mut self) {
+        self.next_check = Instant::now() + SETTLE_DELAY;
     }
 
     fn start_check(&mut self) {
@@ -443,7 +448,8 @@ impl App {
             selfupdate::supersedes(&release.version, self.pending_restart.as_ref())
         });
         match report.packages {
-            Ok(packages) => {
+            Ok(mut packages) => {
+                packages.retain(|package| self.config.source_enabled(package.source));
                 self.packages = packages;
                 self.failed = !report.skipped.is_empty();
                 self.announce_new_updates();

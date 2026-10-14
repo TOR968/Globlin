@@ -181,6 +181,14 @@ updates first: a hero card with the headline and **Update all**, the outdated pa
 Settings shows only what the snapshot carries; there is no interval picker because `Snapshot` has no
 interval.
 
+Switching a source on or off, and un-ignoring a package, does not start a check. It applies locally at
+once (a switched-off source's rows are dropped) and moves `next_check` to `now + SETTLE_DELAY` (2 s), so
+every further click pushes it out again and a run of toggles costs one check, not one per click. The same
+move covers a toggle made while a job is already running: the old code called `start_check`, which returned
+early on a busy `activity` and left the new source unchecked until the next scheduled interval. Because
+such an in-flight check was started with the old `Config`, `on_checked` drops rows from sources the
+current config has switched off.
+
 When an update finishes, `update::mark_updated` sets every package in `Outcome.updated` to `Current` at its
 target version before the follow-up check starts. Without it the window spent that check showing the
 same `old → new` rows under *Checking for updates*, which read as if nothing had been updated. The check
