@@ -436,6 +436,71 @@ fn a_package_that_failed_for_another_reason_keeps_its_approval_entry() {
     assert_eq!(approvals, vec![blocked("alpha", SourceKind::Npm)]);
 }
 
+fn outdated(name: &str, source: SourceKind) -> Package {
+    Package {
+        name: name.to_string(),
+        current: "1.0.0".to_string(),
+        source,
+        status: Status::Outdated {
+            latest: "2.0.0".to_string(),
+        },
+    }
+}
+
+#[test]
+fn an_updated_package_reads_current_at_its_new_version_before_the_recheck_returns() {
+    let mut packages = vec![outdated("alpha", SourceKind::Npm)];
+    let outcome = Outcome {
+        updated: vec![target("alpha")],
+        ..Outcome::default()
+    };
+
+    mark_updated(&mut packages, &outcome);
+
+    assert_eq!(packages[0].current, "2.0.0");
+    assert_eq!(packages[0].status, Status::Current);
+}
+
+#[test]
+fn a_failed_or_blocked_package_stays_outdated_until_the_recheck() {
+    let mut packages = vec![
+        outdated("alpha", SourceKind::Npm),
+        outdated("beta", SourceKind::Npm),
+    ];
+    let outcome = Outcome {
+        failed: vec!["alpha".to_string()],
+        blocked: vec![blocked("beta", SourceKind::Npm)],
+        ..Outcome::default()
+    };
+
+    mark_updated(&mut packages, &outcome);
+
+    assert_eq!(
+        packages,
+        vec![
+            outdated("alpha", SourceKind::Npm),
+            outdated("beta", SourceKind::Npm)
+        ]
+    );
+}
+
+#[test]
+fn updating_a_package_leaves_its_namesake_from_another_source_outdated() {
+    let mut packages = vec![
+        outdated("alpha", SourceKind::Npm),
+        outdated("alpha", SourceKind::Bun),
+    ];
+    let outcome = Outcome {
+        updated: vec![target("alpha")],
+        ..Outcome::default()
+    };
+
+    mark_updated(&mut packages, &outcome);
+
+    assert_eq!(packages[0].status, Status::Current);
+    assert_eq!(packages[1], outdated("alpha", SourceKind::Bun));
+}
+
 #[test]
 fn a_failure_report_names_both_versions_and_the_source() {
     let output = std::process::Output {

@@ -181,6 +181,11 @@ updates first: a hero card with the headline and **Update all**, the outdated pa
 Settings shows only what the snapshot carries; there is no interval picker because `Snapshot` has no
 interval.
 
+When an update finishes, `update::mark_updated` sets every package in `Outcome.updated` to `Current` at its
+target version before the follow-up check starts. Without it the window spent that check showing the
+same `old → new` rows under *Checking for updates*, which read as if nothing had been updated. The check
+still runs and corrects any package whose manager installed something other than the target.
+
 **The page is the only document the view will ever show.** `window::is_own_page` accepts `about:blank`
 and `data:text/html…` — what WebView2 reports for `with_html` (navigation is the `data:` URL, IPC
 arrives from `about:blank`; WKWebView and WebKitGTK report `about:blank`). The navigation handler
@@ -795,7 +800,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-561 tests on Windows: 531 run by default (no network, no side effects), 30 `#[ignore]`d because they
+564 tests on Windows: 534 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

@@ -502,6 +502,7 @@ impl App {
     fn on_updated(&mut self, outcome: &Outcome, target: &EventLoopWindowTarget<Message>) {
         self.activity = None;
         update::settle(&mut self.approvals, outcome);
+        update::mark_updated(&mut self.packages, outcome);
         let approved = update::auto_approvals(outcome, self.config.auto_approve_scripts);
         if !outcome.failed.is_empty() {
             platform::notify(
