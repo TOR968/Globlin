@@ -83,14 +83,6 @@ impl SourceKind {
         }
     }
 
-    pub const fn read_only(self) -> bool {
-        matches!(self, Self::Winget | Self::Choco)
-    }
-
-    pub const fn removable(self) -> bool {
-        !matches!(self, Self::Winget | Self::Choco)
-    }
-
     pub const fn installs_runtimes(self) -> bool {
         matches!(self, Self::Brew | Self::Scoop)
     }
@@ -206,9 +198,6 @@ impl Package {
     }
 
     pub fn update_target(&self) -> Option<UpdateTarget> {
-        if self.source.read_only() {
-            return None;
-        }
         Some(UpdateTarget {
             name: self.name.clone(),
             source: self.source,

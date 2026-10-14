@@ -155,16 +155,23 @@ fn a_self_update_is_an_activity_like_any_other() {
 }
 
 #[test]
-fn a_read_only_source_never_yields_an_update_target() {
+fn a_winget_package_that_is_behind_joins_a_batch_like_any_other() {
     let winget = sourced("Git.Git", "2.44.0", SourceKind::Winget, behind("2.47.1"));
 
-    assert_eq!(winget.update_target(), None);
-    assert_eq!(outdated(std::slice::from_ref(&winget)).len(), 1);
-    assert!(updatable(&[winget]).is_empty());
+    assert_eq!(
+        winget.update_target(),
+        Some(UpdateTarget {
+            name: "Git.Git".to_string(),
+            source: SourceKind::Winget,
+            from: "2.44.0".to_string(),
+            to: "2.47.1".to_string(),
+        })
+    );
+    assert_eq!(updatable(&[winget]).len(), 1);
 }
 
 #[test]
-fn a_read_only_package_still_stamps_so_it_can_be_announced_once() {
+fn a_winget_package_stamps_by_its_id_so_it_is_announced_once() {
     let winget = sourced("Git.Git", "2.44.0", SourceKind::Winget, behind("2.47.1"));
 
     assert_eq!(winget.stamp().as_deref(), Some("winget:Git.Git@2.47.1"));
@@ -204,15 +211,6 @@ fn every_status_reports_a_distinct_label() {
 }
 
 #[test]
-fn a_source_that_reports_its_own_versions_is_not_automatically_read_only() {
-    let pipx = sourced("black", "24.9.0", SourceKind::Pipx, behind("24.10.0"));
-
-    assert_ne!(SourceKind::Pipx.catalog(), Catalog::Npm);
-    assert!(!SourceKind::Pipx.read_only());
-    assert_eq!(updatable(std::slice::from_ref(&pipx)).len(), 1);
-}
-
-#[test]
 fn a_blocked_script_is_approved_pinned_to_the_version_npm_reported() {
     let script = BlockedScript {
         name: "@google/genai".to_string(),
@@ -246,28 +244,6 @@ fn an_update_target_is_identified_by_name_and_source_together() {
     assert!(target.is("vite", SourceKind::Npm));
     assert!(!target.is("vite", SourceKind::Pnpm));
     assert!(!target.is("vitest", SourceKind::Npm));
-}
-
-#[test]
-fn only_the_sources_that_need_elevation_are_read_only() {
-    let read_only: Vec<&str> = KINDS
-        .iter()
-        .filter(|kind| kind.read_only())
-        .map(|kind| kind.label())
-        .collect();
-
-    assert_eq!(read_only, vec!["winget", "choco"]);
-}
-
-#[test]
-fn only_winget_and_choco_cannot_be_removed() {
-    let not_removable: Vec<&str> = KINDS
-        .iter()
-        .filter(|kind| !kind.removable())
-        .map(|kind| kind.label())
-        .collect();
-
-    assert_eq!(not_removable, vec!["winget", "choco"]);
 }
 
 #[test]

@@ -214,7 +214,7 @@ fn the_tray_menu_no_longer_lists_packages() {
     target_os = "macos",
     ignore = "muda builds menus only on the main thread on macOS and libtest runs tests on worker threads; covered on Windows and Linux"
 )]
-fn update_all_counts_only_what_globlin_can_actually_update() {
+fn update_all_counts_winget_packages_alongside_the_rest() {
     let packages = vec![
         behind("prettier", "2.0.0"),
         Package {
@@ -235,7 +235,7 @@ fn update_all_counts_only_what_globlin_can_actually_update() {
         .find(|text| text.starts_with("Update all"))
         .expect("expected an update-all row");
 
-    assert_eq!(text, "Update all (1)");
+    assert_eq!(text, "Update all (2)");
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn update_all_counts_only_what_globlin_can_actually_update() {
     target_os = "macos",
     ignore = "muda builds menus only on the main thread on macOS and libtest runs tests on worker threads; covered on Windows and Linux"
 )]
-fn a_read_only_source_offers_no_update_all_row_of_its_own() {
+fn an_outdated_winget_package_alone_offers_update_all() {
     let packages = vec![Package {
         name: "Git.Git".to_string(),
         current: "2.44.0".to_string(),
@@ -254,7 +254,7 @@ fn a_read_only_source_offers_no_update_all_row_of_its_own() {
     }];
     let built = build(&view(&packages, None, 0)).unwrap();
 
-    assert!(!top_level_ids(&built).contains(&ID_UPDATE_ALL.to_string()));
+    assert!(top_level_ids(&built).contains(&ID_UPDATE_ALL.to_string()));
 }
 
 #[test]

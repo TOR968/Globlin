@@ -8,6 +8,7 @@ use crate::model::{Installed, SourceKind};
 use crate::Result;
 
 const EXECUTABLE: &str = "winget";
+const OWN_NAME: &str = "Globlin";
 
 const NAME: usize = 0;
 const ID: usize = 1;
@@ -25,6 +26,20 @@ impl Winget {
         let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("winget"))?;
         Ok(Self { command })
     }
+
+    fn change(&self, verb: &str, id: &str) -> Command {
+        let mut command = hidden_command(&self.command);
+        command.args([
+            verb,
+            "--id",
+            id,
+            "--exact",
+            "--silent",
+            "--disable-interactivity",
+            "--accept-source-agreements",
+        ]);
+        command
+    }
 }
 
 impl PackageSource for Winget {
@@ -41,12 +56,14 @@ impl PackageSource for Winget {
         listed(parse_table(&stdout_text(&output)), "winget list", &output)
     }
 
-    fn update_command(&self, _name: &str) -> Option<Command> {
-        None
+    fn update_command(&self, name: &str) -> Option<Command> {
+        let mut command = self.change("upgrade", name);
+        command.arg("--accept-package-agreements");
+        Some(command)
     }
 
-    fn uninstall_command(&self, _name: &str) -> Option<Command> {
-        None
+    fn uninstall_command(&self, name: &str) -> Option<Command> {
+        Some(self.change("uninstall", name))
     }
 }
 
@@ -109,7 +126,8 @@ fn slice(glyphs: &[char], start: usize, end: usize) -> String {
 fn to_installed(row: &[String], width: usize) -> Option<Installed> {
     let id = row.get(ID)?;
     let version = row.get(VERSION)?;
-    if id.is_empty() || version.is_empty() || row.get(NAME)?.is_empty() {
+    let name = row.get(NAME)?;
+    if id.is_empty() || version.is_empty() || name.is_empty() || name == OWN_NAME {
         return None;
     }
     let available = if width >= WITH_AVAILABLE {

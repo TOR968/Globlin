@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use super::{
-    find_on_path, hidden_command, listed, not_on_path, run_listing, stdout_text, PackageSource,
+    find_on_path, hidden_command, listed, not_on_path, plain_name, quoted, run_listing,
+    stdout_text, PackageSource,
 };
 use crate::model::{Installed, SourceKind};
 use crate::Result;
@@ -12,14 +13,41 @@ const EXECUTABLE: &str = "choco";
 
 const LOCAL_ONLY_UNTIL: u64 = 2;
 
+const SHELLS: [&str; 2] = ["powershell", "pwsh"];
+const REBOOT_PENDING: &str = "1641, 3010";
+
 pub struct Choco {
     command: PathBuf,
+    shell: Option<PathBuf>,
 }
 
 impl Choco {
     pub fn new() -> Result<Self> {
         let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("choco"))?;
-        Ok(Self { command })
+        let shell = SHELLS.into_iter().find_map(find_on_path);
+        Ok(Self { command, shell })
+    }
+
+    fn elevated(&self, verb: &str, names: &[&str]) -> Option<Command> {
+        let names = names
+            .iter()
+            .map(|name| plain_name(name).map(|name| format!("'{name}'")))
+            .collect::<Option<Vec<String>>>()?
+            .join(", ");
+        let shell = self.shell.as_ref()?;
+        let script = format!(
+            "$ErrorActionPreference = 'Stop'; \
+             $run = Start-Process -FilePath {} -ArgumentList '{verb}', {names}, '-y', '--no-progress' \
+             -Verb RunAs -WindowStyle Hidden -Wait -PassThru; \
+             if ($run.ExitCode -in {}) {{ exit 0 }}; \
+             [Console]::Error.WriteLine('choco exited with ' + $run.ExitCode + '; its own log is ' + $env:ChocolateyInstall + '\\logs\\chocolatey.log'); \
+             exit $run.ExitCode",
+            quoted(&self.command.to_string_lossy()),
+            REBOOT_PENDING,
+        );
+        let mut command = hidden_command(shell);
+        command.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+        Some(command)
     }
 
     fn run(&self, arguments: &[&str]) -> String {
@@ -52,12 +80,12 @@ impl PackageSource for Choco {
         )
     }
 
-    fn update_command(&self, _name: &str) -> Option<Command> {
-        None
+    fn update_command(&self, name: &str) -> Option<Command> {
+        self.elevated("upgrade", &[name])
     }
 
-    fn uninstall_command(&self, _name: &str) -> Option<Command> {
-        None
+    fn uninstall_command(&self, name: &str) -> Option<Command> {
+        self.elevated("uninstall", &[name])
     }
 }
 

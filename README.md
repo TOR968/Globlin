@@ -205,9 +205,14 @@ The window puts updates first:
   leaves the old version in place. **Approve npm install scripts automatically**, in Settings, skips the
   dialog and allows them straight away. It is off by default, because with it on any dependency's
   install scripts run without you seeing them. If the retry is refused again, the dialog opens as usual.
-- **winget and choco rows are read-only.** Both need an elevated process to upgrade anything, and Globlin
-  runs unelevated, so it reports them and leaves the doing to you. Their rows say `read-only`, can't be
-  ticked, and never join a queue.
+- **winget and choco update and uninstall like everything else, but may ask for an administrator.**
+  Globlin runs unelevated and never elevates itself. winget runs as you: a per-user package updates
+  silently, and a machine-wide installer raises its own Windows prompt. choco always needs an
+  administrator, so each choco update or uninstall asks once, through the standard Windows prompt —
+  five choco packages in **Update all** means five prompts. Saying *No* fails that one package and the
+  queue moves on. Their rows, groups and Settings switches carry a small *may ask for admin* /
+  *asks for admin* tag; hover it for the reason. Globlin's own entry is left out of the winget list, so
+  it can't uninstall itself.
 - A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
   the same three packages every six hours.
 
@@ -229,7 +234,7 @@ The tray menu stays short — the list lives in the window:
 Globlin — 3 updates available
 ─────────────────────────────────────
 Open Globlin
-Update all (2)
+Update all (3)
 Check now
 ☑ Run at startup
 Open last log
@@ -242,8 +247,7 @@ Support Globlin on Patreon
 Quit
 ```
 
-`Update all (2)` counts what Globlin can actually update — the third, a winget package, is reported but
-not actionable. While a batch runs, the menu also shows up to seven rows around the package being
+While a batch runs, the menu also shows up to seven rows around the package being
 updated and one `… N more` line; the full queue is in the window.
 
 ## Sources
@@ -263,14 +267,14 @@ updated and one `… N more` line; the full queue is in the window.
 | **psgallery** | `Get-InstalledModule` | the PowerShell Gallery's package redirect | `Update-Module -Scope CurrentUser` |
 | **gem** | `gem list --local` | `gem outdated` | `gem update <name>` |
 | **brew** | `brew info --json=v2 --installed` (formulae and casks) | the same reply — brew's `outdated` flag | `brew upgrade <name>` |
-| **winget** | `winget list` | winget's own `Available` column | read-only |
-| **choco** | `choco list -r` + `choco outdated -r` | choco's own report | read-only |
+| **winget** | `winget list` | winget's own `Available` column | `winget upgrade --id <id> --exact --silent` |
+| **choco** | `choco list -r` + `choco outdated -r` | choco's own report | `choco upgrade <name> -y`, elevated |
 
 Everything except psgallery, winget and choco is on by default. A source whose CLI isn't installed simply
 reports nothing — it is not an error, not even when none of them is installed, and one broken source never
 sinks the others. psgallery is off
 because it has to start PowerShell on every check, which costs about a second; winget and choco are off
-because both are slower to list and neither can be updated from an unelevated app. Turn any of them on
+because both are slower to list and updating them can raise administrator prompts. Turn any of them on
 from the window's Settings, or in `globlin.json`.
 
 **yarn means yarn classic (v1).** Yarn 2+ removed `yarn global` entirely; on a Berry install the source

@@ -241,10 +241,10 @@ fn a_source_that_is_not_built_is_reported_by_name() {
 }
 
 #[test]
-fn a_read_only_source_runs_nothing() {
-    let error = run_change(None, "Git.Git", SourceKind::Winget).unwrap_err();
+fn a_source_without_a_command_for_the_change_runs_nothing() {
+    let error = run_change(None, "gopls", SourceKind::Go).unwrap_err();
 
-    assert_eq!(error, "Git.Git: the winget source is read-only\n");
+    assert_eq!(error, "gopls: go has no command for this\n");
 }
 
 #[test]

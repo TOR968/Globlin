@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 564 tests (534 run, 30 ignored) on Windows, no network, no side effects
+cargo test                     # 571 tests (541 run, 30 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -80,7 +80,7 @@ posts those same id strings over IPC (`Message::Ipc`), so there is one action vo
 **The window is a WebView2 view over `App`'s state, never a second copy of it.** `window.rs` turns a
 `tray::View` into a `Snapshot` (plain serde structs) and hands it to the page as
 `window.globlin.render(<json>)`; the page renders and posts ids back. Everything with branch-worthy logic
-— which rows exist, what each id is, what counts as read-only — is built in `window.rs` and unit-tested
+— which rows exist, what each id is, what order they come in — is built in `window.rs` and unit-tested
 there; `window/ui.html` only filters and draws — the snapshot
 arrives already in display order. `window/shell.rs` is the only file that touches
 `wry`, on every platform. Animation frames go through `tick`, not
@@ -108,14 +108,16 @@ registry.npmjs.org. A version that cannot be compared reads `Unknown`, never `Cu
 versions as `String`, because winget and choco emit `1.2.3.4` and `2024.01.15`, which are not semver
 and must still be displayable. The full endpoint rationale is in `docs/DEVELOPMENT.md#seven-catalogs`.
 
-**Read-only sources are read-only in the type system.** `PackageSource::update_command` and
-`uninstall_command` return `Option<Command>`; winget and choco return `None` for both because both need
-elevation. `SourceKind::read_only` names those two directly and is deliberately not derived from the
-catalog, and `Package::update_target` returns `None` for them, so they can never enter a batch. They
-still show as `Outdated` — being told is the point. `SourceKind::removable` is a separate question: winget
-and choco are the only non-removable sources, and the window draws **Uninstall** from `removable`, not from
-`!read_only`. go has no uninstall command, so it removes itself through `PackageSource::remove_directly`,
-which deletes the binary from the Go bin directory.
+**Every source updates and uninstalls; elevation is Windows' job, never Globlin's.** winget runs as the
+user (`--id <id> --exact --silent`), so only a machine-scope installer raises its own UAC prompt. choco
+always needs an administrator, so `Choco::elevated` wraps each command in PowerShell
+`Start-Process -Verb RunAs` — one prompt per package, `$ErrorActionPreference = 'Stop'` so a declined
+prompt fails instead of exiting 0, and the name must pass `source::plain_name` because it is pasted into
+the script. Never add a way to skip or pre-approve the prompt: that is a UAC bypass. Globlin's own row
+(display name `Globlin`) is dropped from the winget listing so the app cannot uninstall itself.
+`PackageSource::uninstall_command` still returns `Option<Command>` because go has none; it removes itself
+through `PackageSource::remove_directly`, which deletes the binary from the Go bin directory. See
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#elevation-winget-and-choco).
 
 **Read path vs write path.** `check.rs` = sources → installed list → registry `dist-tags` →
 `Status` per package. `update.rs` = run the update command per target, announcing `Progress` between

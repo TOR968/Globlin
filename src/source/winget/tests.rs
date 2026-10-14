@@ -20,6 +20,71 @@ fn the_id_is_the_key_not_the_display_name() {
     assert_eq!(names, vec!["Git.Git", "Microsoft.Edge", "OpenJS.NodeJS"]);
 }
 
+fn arguments(command: &Command) -> Vec<String> {
+    command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect()
+}
+
+fn winget() -> Winget {
+    Winget {
+        command: PathBuf::from("winget"),
+    }
+}
+
+#[test]
+fn the_upgrade_names_the_exact_id_and_never_waits_for_an_answer() {
+    assert_eq!(
+        arguments(&winget().update_command("Git.Git").unwrap()),
+        vec![
+            "upgrade",
+            "--id",
+            "Git.Git",
+            "--exact",
+            "--silent",
+            "--disable-interactivity",
+            "--accept-source-agreements",
+            "--accept-package-agreements",
+        ]
+    );
+}
+
+#[test]
+fn the_uninstall_names_the_exact_id_even_for_an_entry_winget_only_found_in_the_registry() {
+    assert_eq!(
+        arguments(
+            &winget()
+                .uninstall_command(r"ARP\Machine\X64\{ABC}")
+                .unwrap()
+        ),
+        vec![
+            "uninstall",
+            "--id",
+            r"ARP\Machine\X64\{ABC}",
+            "--exact",
+            "--silent",
+            "--disable-interactivity",
+            "--accept-source-agreements",
+        ]
+    );
+}
+
+#[test]
+fn globlin_itself_is_left_out_so_it_can_never_uninstall_or_overwrite_itself() {
+    let table = "Name        Id                                                    Version  Source
+---------------------------------------------------------------------------------------
+Globlin     ARP\\User\\X64\\{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}_is1   0.4.9
+Git         Git.Git                                               2.44.0   winget
+";
+    let names: Vec<String> = parse_table(table)
+        .into_iter()
+        .map(|item| item.name)
+        .collect();
+
+    assert_eq!(names, vec!["Git.Git"]);
+}
+
 #[test]
 fn the_available_column_becomes_the_reported_upgrade() {
     let installed = parse_table(TABLE);
