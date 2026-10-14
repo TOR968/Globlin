@@ -416,6 +416,10 @@
         background: var(--red);
       }
 
+      .progress .skipped {
+        background: var(--faint);
+      }
+
       .progress .active {
         background: var(--sky);
       }
@@ -588,6 +592,12 @@
       .batch-row.failed .sign,
       .batch-row.failed .state {
         color: var(--red-text);
+      }
+
+      .batch-row.skipped .sign,
+      .batch-row.skipped .state,
+      .batch-row.skipped .name {
+        color: var(--muted);
       }
 
       .batch-row.active .state {
@@ -1071,6 +1081,7 @@
           <div id="progress" class="progress" hidden>
             <span class="done"></span>
             <span class="failed"></span>
+            <span class="skipped"></span>
             <span class="active"></span>
           </div>
         </div>
@@ -1126,6 +1137,13 @@
                 <span class="setting-note">Runs every choco update in a batch under a single Windows prompt. Their rows finish together when the last one is done.</span>
               </div>
               <button id="choco-one-prompt" class="switch" type="button" aria-pressed="false" aria-labelledby="choco-one-prompt-label"></button>
+            </div>
+            <div id="winget-one-prompt-row" class="setting" hidden>
+              <div class="setting-text">
+                <span class="setting-label" id="winget-one-prompt-label">One administrator prompt for all winget updates</span>
+                <span class="setting-note">Runs every winget update in a batch as administrator under a single Windows prompt. Their rows finish together when the last one is done. A few installers refuse to run as administrator and then fail.</span>
+              </div>
+              <button id="winget-one-prompt" class="switch" type="button" aria-pressed="false" aria-labelledby="winget-one-prompt-label"></button>
             </div>
             <div class="setting">
               <div class="setting-text">
@@ -1211,8 +1229,8 @@
       ];
 
       const PACKAGE_SIGNS = { current: "✓", unknown: "?", ignored: "·" };
-      const BATCH_SIGNS = { done: "✓", failed: "✗", queued: "·" };
-      const BATCH_WORDS = { done: "done", failed: "failed", active: "updating", queued: "queued" };
+      const BATCH_SIGNS = { done: "✓", failed: "✗", skipped: "–", queued: "·" };
+      const BATCH_WORDS = { done: "done", failed: "failed", skipped: "skipped", active: "updating", queued: "queued" };
 
       const state = {
         snapshot: null,
@@ -1287,7 +1305,7 @@
       };
 
       const tally = (rows) => {
-        const counts = { done: 0, failed: 0, active: 0, queued: 0 };
+        const counts = { done: 0, failed: 0, skipped: 0, active: 0, queued: 0 };
         for (const row of rows) counts[row.state] += 1;
         return counts;
       };
@@ -1304,9 +1322,10 @@
         const batch = snapshot.batch;
         if (batch.length) {
           const counts = tally(batch);
-          const position = Math.min(counts.done + counts.failed + 1, batch.length);
+          const position = Math.min(counts.done + counts.failed + counts.skipped + 1, batch.length);
           const parts = [counts.done + " done"];
           if (counts.failed) parts.push(counts.failed + " failed");
+          if (counts.skipped) parts.push(counts.skipped + " skipped");
           parts.push(counts.queued + " queued");
           return { title: "Updating " + position + " of " + batch.length, note: parts.join(" · ") };
         }
@@ -1337,6 +1356,7 @@
           const share = (count) => (100 * count) / batch.length + "%";
           progress.querySelector(".done").style.width = share(counts.done);
           progress.querySelector(".failed").style.width = share(counts.failed);
+          progress.querySelector(".skipped").style.width = share(counts.skipped);
           progress.querySelector(".active").style.width = share(counts.active);
         }
       };
@@ -1500,7 +1520,8 @@
       const groupState = (counts) => {
         if (counts.active) return "active";
         if (counts.queued) return "queued";
-        return counts.failed ? "failed" : "done";
+        if (counts.failed) return "failed";
+        return counts.done ? "done" : "skipped";
       };
 
       const renderBatchGroups = (host) => {
@@ -1512,6 +1533,7 @@
           const parts = [plural(members.length, "update", "updates")];
           if (counts.done) parts.push(counts.done + " done");
           if (counts.failed) parts.push(counts.failed + " failed");
+          if (counts.skipped) parts.push(counts.skipped + " skipped");
           const look = groupState(counts);
           const { head, open } = groupHead(key, look === "active" || counts.failed > 0, source, parts.join(" · "));
           head.append(make("span", "group-state " + look, BATCH_WORDS[look]));
@@ -1650,6 +1672,8 @@
         setSwitch(el("auto-approve"), snapshot.auto_approve);
         el("choco-one-prompt-row").hidden = snapshot.choco_one_prompt === null;
         setSwitch(el("choco-one-prompt"), Boolean(snapshot.choco_one_prompt));
+        el("winget-one-prompt-row").hidden = snapshot.winget_one_prompt === null;
+        setSwitch(el("winget-one-prompt"), Boolean(snapshot.winget_one_prompt));
         setSwitch(el("monochrome-icon"), snapshot.monochrome_icon);
         setSwitch(el("auto-update"), snapshot.auto_update);
         el("auto-update").disabled = Boolean(snapshot.managed_by);
@@ -1774,6 +1798,7 @@
       el("auto-update").onclick = () => send("auto-update");
       el("auto-approve").onclick = () => send("auto-approve");
       el("choco-one-prompt").onclick = () => send("choco-one-prompt");
+      el("winget-one-prompt").onclick = () => send("winget-one-prompt");
       el("monochrome-icon").onclick = () => send("monochrome-icon");
       el("self-update").onclick = () => send("update-self");
       el("footer-self").onclick = () => send("update-self");

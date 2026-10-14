@@ -1,14 +1,27 @@
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Output};
 
 use super::{
-    find_on_path, hidden_command, listed, not_on_path, run_listing, stdout_text, PackageSource,
+    find_on_path, hidden_command, listed, not_on_path, plain_name, quoted, run_listing,
+    stdout_text, PackageSource,
 };
-use crate::model::{Installed, SourceKind};
+use crate::model::{Installed, Refusal, SourceKind};
 use crate::Result;
 
 const EXECUTABLE: &str = "winget";
 const OWN_NAME: &str = "Globlin";
+const UNKNOWN_VERSION: &str = "Unknown";
+
+const SHELLS: [&str; 2] = ["powershell", "pwsh"];
+const UPGRADE_FLAGS: &str =
+    "--exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements";
+const DIAGNOSTICS: &str =
+    "\\Packages\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\LocalState\\DiagOutputDir";
+
+const UPDATE_NOT_APPLICABLE: u32 = 0x8A15_002B;
+const INSTALL_IN_PROGRESS: u32 = 0x8A15_0102;
+const INSTALL_CANCELLED_BY_USER: u32 = 0x8A15_010C;
+const OPERATION_CANCELLED: u32 = 0x8007_04C7;
 
 const NAME: usize = 0;
 const ID: usize = 1;
@@ -19,12 +32,40 @@ const SEPARATOR_WIDTH: usize = 10;
 
 pub struct Winget {
     command: PathBuf,
+    shell: Option<PathBuf>,
 }
 
 impl Winget {
     pub fn new() -> Result<Self> {
         let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("winget"))?;
-        Ok(Self { command })
+        let shell = SHELLS.into_iter().find_map(find_on_path);
+        Ok(Self { command, shell })
+    }
+
+    fn elevated_upgrade(&self, ids: &[&str]) -> Option<Command> {
+        let ids = ids
+            .iter()
+            .map(|id| plain_name(id).map(|id| format!("'{id}'")))
+            .collect::<Option<Vec<String>>>()?
+            .join(", ");
+        let shell = self.shell.as_ref()?;
+        let inner = format!(
+            "$code = 0; foreach ($id in {ids}) {{ & {} upgrade --id $id {UPGRADE_FLAGS}; \
+             if ($LASTEXITCODE) {{ $code = $LASTEXITCODE }} }}; exit $code",
+            quoted(&self.command.to_string_lossy()),
+        );
+        let script = format!(
+            "$ErrorActionPreference = 'Stop'; \
+             $run = Start-Process -FilePath {} -ArgumentList '-NoProfile', '-NonInteractive', '-Command', {} \
+             -Verb RunAs -WindowStyle Hidden -Wait -PassThru; \
+             if ($run.ExitCode) {{ [Console]::Error.WriteLine('winget exited with ' + $run.ExitCode + '; its own logs are in ' + $env:LOCALAPPDATA + '{DIAGNOSTICS}') }}; \
+             exit $run.ExitCode",
+            quoted(&shell.to_string_lossy()),
+            quoted(&inner),
+        );
+        let mut command = hidden_command(shell);
+        command.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+        Some(command)
     }
 
     fn change(&self, verb: &str, id: &str) -> Command {
@@ -62,8 +103,28 @@ impl PackageSource for Winget {
         Some(command)
     }
 
+    fn update_together(&self, names: &[&str]) -> Option<Command> {
+        if names.is_empty() {
+            return None;
+        }
+        self.elevated_upgrade(names)
+    }
+
     fn uninstall_command(&self, name: &str) -> Option<Command> {
         Some(self.change("uninstall", name))
+    }
+
+    fn refusal(&self, output: &Output) -> Option<Refusal> {
+        refusal_for(output.status.code()?)
+    }
+}
+
+fn refusal_for(code: i32) -> Option<Refusal> {
+    match code.cast_unsigned() {
+        UPDATE_NOT_APPLICABLE => Some(Refusal::NotApplicable),
+        INSTALL_CANCELLED_BY_USER | OPERATION_CANCELLED => Some(Refusal::Cancelled),
+        INSTALL_IN_PROGRESS => Some(Refusal::Busy),
+        _ => None,
     }
 }
 
@@ -135,7 +196,11 @@ fn to_installed(row: &[String], width: usize) -> Option<Installed> {
     } else {
         None
     };
-    Some(Installed::new(id, version, SourceKind::Winget).with_available(available))
+    Some(
+        Installed::new(id, version, SourceKind::Winget)
+            .with_available(available)
+            .with_external(version == UNKNOWN_VERSION),
+    )
 }
 
 #[cfg(test)]

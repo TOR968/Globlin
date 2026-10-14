@@ -240,7 +240,7 @@ fn a_running_batch_reaches_the_window_with_one_row_per_target_and_its_state() {
             to: "2.0.0".to_string(),
         },
     ]);
-    batch.finish(0, false);
+    batch.finish(0, RowState::Failed);
     batch.start(1);
     let activity = Activity::Updating { batch };
     let snapshot = snapshot(&view(&[], Some(&activity)), &config());
@@ -250,6 +250,21 @@ fn a_running_batch_reaches_the_window_with_one_row_per_target_and_its_state() {
     assert_eq!(snapshot.batch[0].state, "failed");
     assert_eq!(snapshot.batch[1].state, "active");
     assert_eq!(snapshot.batch[0].name, "alpha");
+}
+
+#[test]
+fn a_skipped_batch_row_reaches_the_page_as_skipped() {
+    let mut batch = Batch::new(vec![UpdateTarget {
+        name: "Docker.DockerDesktop".to_string(),
+        source: SourceKind::Winget,
+        from: "4.93.0".to_string(),
+        to: "4.95.0".to_string(),
+    }]);
+    batch.finish(0, RowState::Skipped);
+    let activity = Activity::Updating { batch };
+    let snapshot = snapshot(&view(&[], Some(&activity)), &config());
+
+    assert_eq!(snapshot.batch[0].state, "skipped");
 }
 
 #[test]
@@ -598,9 +613,9 @@ fn screenshot_config() -> Config {
 fn screenshot_activity(packages: &[Package]) -> Activity {
     let mut batch = Batch::new(packages.iter().filter_map(Package::update_target).collect());
     for position in 0..5 {
-        batch.finish(position, true);
+        batch.finish(position, RowState::Done);
     }
-    batch.finish(5, false);
+    batch.finish(5, RowState::Failed);
     batch.start(6);
     Activity::Updating { batch }
 }
@@ -703,6 +718,39 @@ fn a_platform_without_choco_has_no_choco_one_prompt_switch() {
     let snapshot = snapshot_on(&view(&[], None), &config(), "linux");
 
     assert_eq!(snapshot.choco_one_prompt, None);
+}
+
+#[test]
+fn the_winget_one_prompt_switch_carries_the_setting_on_windows_only() {
+    let mut config = config();
+    config.winget_one_prompt = true;
+
+    assert_eq!(
+        snapshot(&view(&[], None), &config).winget_one_prompt,
+        Some(true)
+    );
+    assert_eq!(
+        snapshot_on(&view(&[], None), &config, "linux").winget_one_prompt,
+        None
+    );
+}
+
+#[test]
+fn a_winget_row_says_one_prompt_covers_the_batch_when_that_setting_is_on() {
+    let mut config = config();
+    config.winget_one_prompt = true;
+    let packages = vec![outdated("Git.Git", SourceKind::Winget, "2.47.1")];
+    let snapshot = snapshot(&view(&packages, None), &config);
+
+    let elevation = snapshot.packages[0].elevation.unwrap();
+    assert_eq!(elevation.label, "asks for admin");
+    assert!(
+        elevation
+            .detail
+            .contains("once for all the winget updates in a batch"),
+        "{}",
+        elevation.detail
+    );
 }
 
 #[test]

@@ -132,3 +132,18 @@ fn saving_replaces_the_file_whole_and_leaves_no_staging_file_behind() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "{}");
     assert!(!dir.join("globlin.json.tmp").exists());
 }
+
+#[test]
+fn only_the_sources_whose_one_prompt_switch_is_on_share_a_prompt() {
+    let mut config = Config::default();
+    assert!(config.one_prompt_kinds().is_empty());
+
+    config.winget_one_prompt = true;
+    assert_eq!(config.one_prompt_kinds(), vec![SourceKind::Winget]);
+
+    config.choco_one_prompt = true;
+    assert_eq!(
+        config.one_prompt_kinds(),
+        vec![SourceKind::Choco, SourceKind::Winget]
+    );
+}

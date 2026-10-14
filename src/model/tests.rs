@@ -97,11 +97,14 @@ fn a_fresh_batch_has_recorded_nothing() {
 fn a_recorded_failure_stays_failed_for_the_rest_of_the_run() {
     let mut batch = batch_of(&["a", "b"]);
     batch.start(0);
-    batch.finish(0, false);
+    batch.finish(0, RowState::Failed);
     batch.start(1);
-    batch.finish(1, true);
+    batch.finish(1, RowState::Done);
 
-    assert_eq!(batch.results, vec![Some(false), Some(true)]);
+    assert_eq!(
+        batch.results,
+        vec![Some(RowState::Failed), Some(RowState::Done)]
+    );
     assert_eq!(batch.total(), 2);
 }
 
@@ -130,9 +133,9 @@ fn a_queued_target_is_never_reported_as_done() {
 fn a_finished_target_reports_its_own_outcome() {
     let mut batch = batch_of(&["a", "b"]);
     batch.start(0);
-    batch.finish(0, false);
+    batch.finish(0, RowState::Failed);
     batch.start(1);
-    batch.finish(1, true);
+    batch.finish(1, RowState::Done);
 
     assert_eq!(batch.state_of(0), RowState::Failed);
     assert_eq!(batch.state_of(1), RowState::Done);
@@ -143,10 +146,21 @@ fn the_batch_counts_only_the_targets_it_has_finished() {
     let mut batch = batch_of(&["a", "b", "c"]);
     assert_eq!(batch.done(), 0);
 
-    batch.finish(0, true);
-    batch.finish(1, false);
+    batch.finish(0, RowState::Done);
+    batch.finish(1, RowState::Failed);
 
     assert_eq!(batch.done(), 2);
+}
+
+#[test]
+fn a_skipped_target_counts_as_finished_but_reads_skipped_not_failed() {
+    let mut batch = batch_of(&["a", "b"]);
+    batch.start(0);
+    batch.finish(0, RowState::Skipped);
+    batch.start(1);
+
+    assert_eq!(batch.state_of(0), RowState::Skipped);
+    assert_eq!(batch.done(), 1);
 }
 
 #[test]

@@ -257,9 +257,27 @@ pub struct RemoveTarget {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refusal {
+    NotApplicable,
+    Cancelled,
+    Busy,
+}
+
+impl Refusal {
+    pub const fn reason(self) -> &'static str {
+        match self {
+            Self::NotApplicable => "no update applies to this system",
+            Self::Cancelled => "the administrator prompt was cancelled",
+            Self::Busy => "another installation was in progress",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RowState {
     Done,
     Failed,
+    Skipped,
     Active,
     Queued,
 }
@@ -268,7 +286,7 @@ pub enum RowState {
 pub struct Batch {
     pub targets: Vec<UpdateTarget>,
     pub index: usize,
-    pub results: Vec<Option<bool>>,
+    pub results: Vec<Option<RowState>>,
 }
 
 impl Batch {
@@ -298,8 +316,7 @@ impl Batch {
 
     pub fn state_of(&self, position: usize) -> RowState {
         match self.results.get(position) {
-            Some(Some(true)) => RowState::Done,
-            Some(Some(false)) => RowState::Failed,
+            Some(Some(state)) => *state,
             _ if position == self.index => RowState::Active,
             _ => RowState::Queued,
         }
@@ -309,9 +326,9 @@ impl Batch {
         self.index = position;
     }
 
-    pub fn finish(&mut self, position: usize, ok: bool) {
+    pub fn finish(&mut self, position: usize, state: RowState) {
         if let Some(slot) = self.results.get_mut(position) {
-            *slot = Some(ok);
+            *slot = Some(state);
         }
     }
 }

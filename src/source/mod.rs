@@ -6,7 +6,7 @@ use std::process::{Command, Output};
 use serde::Deserialize;
 
 use crate::config::Config;
-use crate::model::{BlockedScript, Installed, SourceKind, KINDS};
+use crate::model::{BlockedScript, Installed, Refusal, SourceKind, KINDS};
 use crate::process;
 use crate::Result;
 
@@ -64,6 +64,10 @@ pub trait PackageSource {
     }
 
     fn blocked_scripts(&self, _stderr: &str) -> Option<Vec<BlockedScript>> {
+        None
+    }
+
+    fn refusal(&self, _output: &Output) -> Option<Refusal> {
         None
     }
 

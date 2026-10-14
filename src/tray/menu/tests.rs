@@ -374,7 +374,7 @@ fn a_failed_row_never_renders_as_done() {
     let Activity::Updating { mut batch } = updating("alpha", 0, 2) else {
         panic!("expected an update activity");
     };
-    batch.finish(0, false);
+    batch.finish(0, RowState::Failed);
     batch.start(1);
     let activity = Activity::Updating { batch };
     let view = updating_view(&activity, Duration::ZERO);
@@ -386,11 +386,26 @@ fn a_failed_row_never_renders_as_done() {
 }
 
 #[test]
+fn a_skipped_row_says_skipped_rather_than_failed() {
+    let Activity::Updating { mut batch } = updating("alpha", 0, 2) else {
+        panic!("expected an update activity");
+    };
+    batch.finish(0, RowState::Skipped);
+    batch.start(1);
+    let activity = Activity::Updating { batch };
+    let view = updating_view(&activity, Duration::ZERO);
+
+    let skipped = batch_row_text(&view, 0).unwrap();
+    assert!(skipped.contains("skipped"), "{skipped}");
+    assert!(!skipped.contains("failed"), "{skipped}");
+}
+
+#[test]
 fn a_landed_row_reports_done_with_a_tick() {
     let Activity::Updating { mut batch } = updating("alpha", 0, 2) else {
         panic!("expected an update activity");
     };
-    batch.finish(0, true);
+    batch.finish(0, RowState::Done);
     batch.start(1);
     let activity = Activity::Updating { batch };
     let view = updating_view(&activity, Duration::ZERO);
@@ -726,5 +741,13 @@ fn the_choco_one_prompt_id_parses_back_to_its_action() {
     assert_eq!(
         Action::from_key(ID_CHOCO_ONE_PROMPT),
         Some(Action::ToggleChocoOnePrompt)
+    );
+}
+
+#[test]
+fn the_winget_one_prompt_id_parses_back_to_its_action() {
+    assert_eq!(
+        Action::from_key(ID_WINGET_ONE_PROMPT),
+        Some(Action::ToggleWingetOnePrompt)
     );
 }

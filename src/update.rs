@@ -1,12 +1,19 @@
+use std::time::Duration;
+
 use crate::config::Config;
 use crate::diagnostics;
-use crate::model::{Blocked, BlockedScript, Installed, Package, SourceKind, Status, UpdateTarget};
+use crate::model::{
+    Blocked, BlockedScript, Installed, Package, Refusal, RowState, SourceKind, Status, UpdateTarget,
+};
 use crate::source::{self, PackageSource};
+
+const BUSY_PAUSE: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Outcome {
     pub updated: Vec<UpdateTarget>,
     pub failed: Vec<String>,
+    pub skipped: Vec<Skipped>,
     pub blocked: Vec<Blocked>,
     pub retried: bool,
 }
@@ -18,6 +25,12 @@ impl Outcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Skipped {
+    pub name: String,
+    pub reason: Refusal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Step {
     Started {
         target: UpdateTarget,
@@ -26,13 +39,14 @@ pub enum Step {
     },
     Finished {
         index: usize,
-        ok: bool,
+        state: RowState,
     },
 }
 
 struct Failure {
     details: String,
     blocked: Option<Vec<BlockedScript>>,
+    refusal: Option<Refusal>,
 }
 
 impl From<String> for Failure {
@@ -40,6 +54,7 @@ impl From<String> for Failure {
         Self {
             details,
             blocked: None,
+            refusal: None,
         }
     }
 }
@@ -55,7 +70,10 @@ pub fn run(
         Err(error) => {
             return fail_all(
                 targets,
-                &format!("no package source is available: {error}\n"),
+                &format!(
+                    "no package source is available: {error}
+"
+                ),
             )
         }
     };
@@ -66,63 +84,170 @@ pub fn run(
         return fail_all(targets, &details);
     }
 
-    let mut outcome = Outcome {
+    let outcome = drive(
+        targets,
+        jobs(targets, &config.one_prompt_kinds()),
+        |job| execute(&sources, targets, job),
+        &announce,
+        BUSY_PAUSE,
+    );
+    Outcome {
         retried: !approvals.is_empty(),
-        ..Outcome::default()
-    };
+        ..outcome
+    }
+}
+
+fn drive(
+    targets: &[UpdateTarget],
+    jobs: Vec<Vec<usize>>,
+    execute: impl Fn(&[usize]) -> Vec<Result<(), Failure>>,
+    announce: &impl Fn(Step),
+    busy_pause: Duration,
+) -> Outcome {
+    let mut outcome = Outcome::default();
     let mut report = String::new();
+    let mut busy = Vec::new();
 
-    for job in jobs(targets, config.choco_one_prompt) {
-        announce(Step::Started {
-            target: targets[job[0]].clone(),
-            index: job[0],
-            total: targets.len(),
-        });
-
-        let results = if let [index] = job[..] {
-            vec![apply(&sources, &targets[index])]
-        } else {
-            let group: Vec<UpdateTarget> =
-                job.iter().map(|index| targets[*index].clone()).collect();
-            apply_together(&sources, &group)
-        };
-
-        for (index, result) in job.into_iter().zip(results) {
-            let target = &targets[index];
+    for job in jobs {
+        announce_start(announce, targets, job[0]);
+        for (index, result) in job.iter().copied().zip(execute(&job)) {
             match result {
-                Ok(()) => {
-                    outcome.updated.push(target.clone());
-                    announce(Step::Finished { index, ok: true });
-                }
-                Err(failure) => {
-                    report.push_str(&failure.details);
-                    diagnostics::record_failures(&report);
-                    match failure.blocked {
-                        Some(scripts) => outcome.blocked.push(Blocked {
-                            target: target.clone(),
-                            scripts,
-                        }),
-                        None => outcome.failed.push(target.name.clone()),
-                    }
-                    announce(Step::Finished { index, ok: false });
-                }
+                Err(failure) if failure.refusal == Some(Refusal::Busy) => busy.push(index),
+                result => record(
+                    &mut outcome,
+                    &mut report,
+                    &targets[index],
+                    result,
+                    |state| {
+                        announce(Step::Finished { index, state });
+                    },
+                ),
             }
+        }
+    }
+
+    if !busy.is_empty() {
+        std::thread::sleep(busy_pause);
+    }
+    for index in busy {
+        announce_start(announce, targets, index);
+        for result in execute(&[index]) {
+            record(
+                &mut outcome,
+                &mut report,
+                &targets[index],
+                result,
+                |state| {
+                    announce(Step::Finished { index, state });
+                },
+            );
         }
     }
 
     outcome
 }
 
-fn jobs(targets: &[UpdateTarget], choco_one_prompt: bool) -> Vec<Vec<usize>> {
+fn announce_start(announce: &impl Fn(Step), targets: &[UpdateTarget], index: usize) {
+    announce(Step::Started {
+        target: targets[index].clone(),
+        index,
+        total: targets.len(),
+    });
+}
+
+fn record(
+    outcome: &mut Outcome,
+    report: &mut String,
+    target: &UpdateTarget,
+    result: Result<(), Failure>,
+    finished: impl FnOnce(RowState),
+) {
+    let Err(failure) = result else {
+        outcome.updated.push(target.clone());
+        return finished(RowState::Done);
+    };
+    report.push_str(&failure.details);
+    diagnostics::record_failures(report);
+    let state = match (failure.blocked, failure.refusal) {
+        (Some(scripts), _) => {
+            outcome.blocked.push(Blocked {
+                target: target.clone(),
+                scripts,
+            });
+            RowState::Failed
+        }
+        (None, Some(reason @ (Refusal::NotApplicable | Refusal::Cancelled))) => {
+            outcome.skipped.push(Skipped {
+                name: target.name.clone(),
+                reason,
+            });
+            RowState::Skipped
+        }
+        (None, _) => {
+            outcome.failed.push(target.name.clone());
+            RowState::Failed
+        }
+    };
+    finished(state);
+}
+
+fn execute(
+    sources: &[Box<dyn PackageSource>],
+    targets: &[UpdateTarget],
+    job: &[usize],
+) -> Vec<Result<(), Failure>> {
+    if let [index] = job {
+        return vec![apply(sources, &targets[*index])];
+    }
+    let group: Vec<UpdateTarget> = job.iter().map(|index| targets[*index].clone()).collect();
+    apply_together(sources, &group)
+}
+
+pub fn toast(outcome: &Outcome) -> Option<(&'static str, String)> {
+    if !outcome.failed.is_empty() {
+        return Some((
+            "Globlin — update failed",
+            format!("{} (see Open last log)", outcome.failed.join(", ")),
+        ));
+    }
+    let lines: Vec<String> = outcome
+        .updated
+        .iter()
+        .map(|target| format!("{}{}", target.name, target.source.suffix()))
+        .chain(
+            outcome
+                .skipped
+                .iter()
+                .map(|skipped| format!("{} — {}", skipped.name, skipped.reason.reason())),
+        )
+        .collect();
+    if lines.is_empty() {
+        return None;
+    }
+    let title = if outcome.updated.is_empty() {
+        "Globlin — nothing updated"
+    } else {
+        "Globlin — updated"
+    };
+    Some((
+        title,
+        lines.join(
+            "
+",
+        ),
+    ))
+}
+
+fn jobs(targets: &[UpdateTarget], one_prompt: &[SourceKind]) -> Vec<Vec<usize>> {
     let mut jobs: Vec<Vec<usize>> = Vec::new();
-    let mut choco_job: Option<usize> = None;
+    let mut shared: Vec<(SourceKind, usize)> = Vec::new();
     for (index, target) in targets.iter().enumerate() {
-        if choco_one_prompt && target.source == SourceKind::Choco {
-            if let Some(job) = choco_job {
-                jobs[job].push(index);
+        if one_prompt.contains(&target.source) {
+            if let Some((_, job)) = shared.iter().find(|(kind, _)| *kind == target.source) {
+                jobs[*job].push(index);
                 continue;
             }
-            choco_job = Some(jobs.len());
+            shared.push((target.source, jobs.len()));
         }
         jobs.push(vec![index]);
     }
@@ -195,6 +320,7 @@ fn apply(sources: &[Box<dyn PackageSource>], target: &UpdateTarget) -> Result<()
     }
     Err(Failure {
         blocked: source.blocked_scripts(&String::from_utf8_lossy(&output.stderr)),
+        refusal: source.refusal(&output),
         details: describe_failure(target, &output),
     })
 }

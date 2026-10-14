@@ -30,7 +30,24 @@ fn arguments(command: &Command) -> Vec<String> {
 fn winget() -> Winget {
     Winget {
         command: PathBuf::from("winget"),
+        shell: None,
     }
+}
+
+fn elevating_winget() -> Winget {
+    Winget {
+        command: PathBuf::from(r"C:\Users\me\AppData\Local\Microsoft\WindowsApps\winget.exe"),
+        shell: Some(PathBuf::from("powershell")),
+    }
+}
+
+fn script(command: &Command) -> String {
+    let arguments = arguments(command);
+    assert_eq!(
+        arguments[..3],
+        ["-NoProfile", "-NonInteractive", "-Command"]
+    );
+    arguments[3].clone()
 }
 
 #[test]
@@ -155,4 +172,79 @@ fn the_real_winget_listing_still_has_the_shape_the_parser_expects() {
     assert!(installed
         .iter()
         .all(|item| item.source == SourceKind::Winget));
+}
+
+#[test]
+fn an_installed_version_winget_cannot_determine_reads_unknown_and_is_never_offered() {
+    let table = "Name       Id                 Version Available   Source
+--------------------------------------------------------
+Battle.net Blizzard.BattleNet Unknown 1.19.3.3219 winget
+Git        Git.Git            2.44.0  2.47.1      winget
+";
+    let installed = parse_table(table);
+
+    assert!(installed[0].external, "{:?}", installed[0]);
+    assert!(!installed[1].external, "{:?}", installed[1]);
+}
+
+#[test]
+fn winget_exit_codes_that_are_not_a_broken_update_are_told_apart() {
+    let code = |raw: u32| raw.cast_signed();
+
+    assert_eq!(refusal_for(code(0x8A15_002B)), Some(Refusal::NotApplicable));
+    assert_eq!(refusal_for(code(0x8A15_010C)), Some(Refusal::Cancelled));
+    assert_eq!(refusal_for(code(0x8007_04C7)), Some(Refusal::Cancelled));
+    assert_eq!(refusal_for(code(0x8A15_0102)), Some(Refusal::Busy));
+    assert_eq!(refusal_for(code(0x8A15_0003)), None);
+    assert_eq!(refusal_for(1), None);
+}
+
+#[test]
+fn one_prompt_upgrades_every_id_in_a_single_elevated_shell() {
+    let script = script(
+        &elevating_winget()
+            .update_together(&["GitHub.cli", "Obsidian.Obsidian"])
+            .unwrap(),
+    );
+
+    assert!(
+        script.starts_with("$ErrorActionPreference = 'Stop';"),
+        "{script}"
+    );
+    assert_eq!(script.matches("-Verb RunAs").count(), 1, "{script}");
+    assert!(
+        script.contains("foreach ($id in ''GitHub.cli'', ''Obsidian.Obsidian'')"),
+        "{script}"
+    );
+    assert!(
+        script.contains(
+            r"& ''C:\Users\me\AppData\Local\Microsoft\WindowsApps\winget.exe'' upgrade --id $id --exact --silent"
+        ),
+        "{script}"
+    );
+}
+
+#[test]
+fn an_elevated_run_never_carries_a_double_quote_the_inner_shell_would_strip() {
+    let script = script(&elevating_winget().update_together(&["Git.Git"]).unwrap());
+
+    assert!(!script.contains('"'), "{script}");
+}
+
+#[test]
+fn an_id_that_could_break_out_of_the_elevated_script_builds_no_command() {
+    let winget = elevating_winget();
+
+    assert!(winget
+        .update_together(&["Git.Git", "x'; Remove-Item C:\\; '"])
+        .is_none());
+    assert!(winget
+        .update_together(&[r"ARP\Machine\X64\{GUID}"])
+        .is_none());
+    assert!(winget.update_together(&[]).is_none());
+}
+
+#[test]
+fn without_powershell_there_is_no_shared_elevated_run() {
+    assert!(winget().update_together(&["Git.Git"]).is_none());
 }

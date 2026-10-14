@@ -2,6 +2,7 @@ use super::*;
 use crate::config::Sources;
 use crate::model::{BlockedScript, Installed, SourceKind};
 use std::sync::Mutex;
+use std::time::Duration;
 
 fn target(name: &str) -> UpdateTarget {
     UpdateTarget {
@@ -112,7 +113,7 @@ fn a_start_carries_both_versions_so_the_menu_can_show_them() {
 }
 
 #[test]
-fn a_target_that_cannot_be_started_finishes_with_ok_false() {
+fn a_target_that_cannot_be_started_finishes_as_failed() {
     let fake = UnrunnableNpm::new("finishes-false");
     let seen = Mutex::new(Vec::new());
 
@@ -125,7 +126,7 @@ fn a_target_that_cannot_be_started_finishes_with_ok_false() {
         seen[1],
         Step::Finished {
             index: 0,
-            ok: false
+            state: RowState::Failed
         }
     ));
 }
@@ -594,7 +595,10 @@ fn with_one_prompt_every_choco_target_joins_the_first_choco_job() {
         sourced("7zip", SourceKind::Choco),
     ];
 
-    assert_eq!(jobs(&targets, true), vec![vec![0, 2, 3], vec![1]]);
+    assert_eq!(
+        jobs(&targets, &[SourceKind::Choco]),
+        vec![vec![0, 2, 3], vec![1]]
+    );
 }
 
 #[test]
@@ -605,14 +609,205 @@ fn without_one_prompt_every_target_is_its_own_job() {
         sourced("nodejs", SourceKind::Choco),
     ];
 
-    assert_eq!(jobs(&targets, false), vec![vec![0], vec![1], vec![2]]);
+    assert_eq!(jobs(&targets, &[]), vec![vec![0], vec![1], vec![2]]);
 }
 
 #[test]
 fn one_prompt_never_groups_targets_from_other_sources() {
     let targets = vec![target("prettier"), target("vite")];
 
-    assert_eq!(jobs(&targets, true), vec![vec![0], vec![1]]);
+    assert_eq!(
+        jobs(&targets, &[SourceKind::Choco, SourceKind::Winget]),
+        vec![vec![0], vec![1]]
+    );
+}
+
+#[test]
+fn with_both_one_prompt_switches_winget_and_choco_each_get_their_own_shared_job() {
+    let targets = vec![
+        sourced("Git.Git", SourceKind::Winget),
+        sourced("git", SourceKind::Choco),
+        target("prettier"),
+        sourced("GitHub.cli", SourceKind::Winget),
+        sourced("nodejs", SourceKind::Choco),
+    ];
+
+    assert_eq!(
+        jobs(&targets, &[SourceKind::Choco, SourceKind::Winget]),
+        vec![vec![0, 3], vec![1, 4], vec![2]]
+    );
+}
+
+fn refused(refusal: Refusal) -> Result<(), Failure> {
+    Err(Failure {
+        details: format!(
+            "{refusal:?}
+"
+        ),
+        blocked: None,
+        refusal: Some(refusal),
+    })
+}
+
+fn driven(
+    targets: &[UpdateTarget],
+    attempts: Vec<Result<(), Failure>>,
+) -> (Outcome, Vec<Step>, usize) {
+    let attempts = Mutex::new(attempts.into_iter());
+    let calls = Mutex::new(0);
+    let seen = Mutex::new(Vec::new());
+    let jobs = (0..targets.len()).map(|index| vec![index]).collect();
+    let outcome = drive(
+        targets,
+        jobs,
+        |_| {
+            *calls.lock().unwrap() += 1;
+            vec![attempts.lock().unwrap().next().unwrap_or(Ok(()))]
+        },
+        &|step| seen.lock().unwrap().push(step),
+        Duration::ZERO,
+    );
+    let calls = *calls.lock().unwrap();
+    (outcome, seen.into_inner().unwrap(), calls)
+}
+
+#[test]
+fn an_update_refused_because_another_installer_was_running_is_tried_again_at_the_end() {
+    let targets = vec![target("Epic"), target("Gh")];
+
+    let (outcome, steps, calls) = driven(&targets, vec![refused(Refusal::Busy), Ok(()), Ok(())]);
+
+    assert_eq!(calls, 3);
+    assert_eq!(outcome.updated, vec![target("Gh"), target("Epic")]);
+    assert!(outcome.failed.is_empty());
+    assert!(matches!(
+        steps.last(),
+        Some(Step::Finished {
+            index: 0,
+            state: RowState::Done
+        })
+    ));
+}
+
+#[test]
+fn a_target_still_busy_on_its_second_try_fails_instead_of_retrying_forever() {
+    let (outcome, _, calls) = driven(
+        &[target("Epic")],
+        vec![refused(Refusal::Busy), refused(Refusal::Busy)],
+    );
+
+    assert_eq!(calls, 2);
+    assert_eq!(outcome.failed, vec!["Epic".to_string()]);
+}
+
+#[test]
+fn a_busy_target_is_left_queued_until_its_retry_rather_than_shown_as_failed() {
+    let (_, steps, _) = driven(&[target("Epic")], vec![refused(Refusal::Busy), Ok(())]);
+
+    let finishes: Vec<&Step> = steps
+        .iter()
+        .filter(|step| matches!(step, Step::Finished { .. }))
+        .collect();
+    assert_eq!(finishes.len(), 1);
+}
+
+#[test]
+fn an_update_that_does_not_apply_or_whose_prompt_was_cancelled_is_skipped_not_failed() {
+    let targets = vec![target("Docker"), target("LocalSend")];
+
+    let (outcome, steps, _) = driven(
+        &targets,
+        vec![refused(Refusal::NotApplicable), refused(Refusal::Cancelled)],
+    );
+
+    assert!(outcome.failed.is_empty());
+    assert_eq!(
+        outcome.skipped,
+        vec![
+            Skipped {
+                name: "Docker".to_string(),
+                reason: Refusal::NotApplicable
+            },
+            Skipped {
+                name: "LocalSend".to_string(),
+                reason: Refusal::Cancelled
+            },
+        ]
+    );
+    assert!(steps.iter().any(|step| matches!(
+        step,
+        Step::Finished {
+            index: 1,
+            state: RowState::Skipped
+        }
+    )));
+}
+
+#[test]
+fn a_batch_that_only_skipped_targets_changed_nothing_worth_rechecking() {
+    let outcome = Outcome {
+        skipped: vec![Skipped {
+            name: "Docker".to_string(),
+            reason: Refusal::NotApplicable,
+        }],
+        ..Outcome::default()
+    };
+
+    assert!(!outcome.changed_packages());
+}
+
+#[test]
+fn a_failure_outranks_everything_else_in_the_notification() {
+    let outcome = Outcome {
+        updated: vec![target("vite")],
+        failed: vec!["Obsidian.Obsidian".to_string()],
+        ..Outcome::default()
+    };
+
+    let (title, body) = toast(&outcome).unwrap();
+    assert_eq!(title, "Globlin — update failed");
+    assert_eq!(body, "Obsidian.Obsidian (see Open last log)");
+}
+
+#[test]
+fn skipped_targets_are_named_with_their_reason_beside_the_updated_ones() {
+    let outcome = Outcome {
+        updated: vec![sourced("GitHub.cli", SourceKind::Winget)],
+        skipped: vec![Skipped {
+            name: "Docker.DockerDesktop".to_string(),
+            reason: Refusal::NotApplicable,
+        }],
+        ..Outcome::default()
+    };
+
+    let (title, body) = toast(&outcome).unwrap();
+    assert_eq!(title, "Globlin — updated");
+    assert_eq!(
+        body,
+        "GitHub.cli (winget)
+Docker.DockerDesktop — no update applies to this system"
+    );
+}
+
+#[test]
+fn a_batch_that_only_skipped_says_nothing_was_updated() {
+    let outcome = Outcome {
+        skipped: vec![Skipped {
+            name: "LocalSend.LocalSend".to_string(),
+            reason: Refusal::Cancelled,
+        }],
+        ..Outcome::default()
+    };
+
+    assert_eq!(
+        toast(&outcome).map(|(title, _)| title),
+        Some("Globlin — nothing updated")
+    );
+}
+
+#[test]
+fn a_batch_with_nothing_to_report_raises_no_notification() {
+    assert_eq!(toast(&Outcome::default()), None);
 }
 
 #[test]

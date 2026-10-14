@@ -87,7 +87,8 @@ would otherwise be a downgrade. Versions neither comparison understands (`7.1_1`
 still read `Outdated` when they differ, since the tool itself reported them.
 
 **A package installed from somewhere else is never looked up or updated.** `Installed.external` marks
-an npm-family package that did not come from the registry Globlin would compare it against, and
+an npm-family package that did not come from the registry Globlin would compare it against (and a
+winget row whose installed version is `Unknown`, see [Refusals](#refusals-that-are-not-failures)), and
 `check.rs` leaves it out of the registry request and reads it as `Unknown`, which also means it never
 gets an **Update** button. npm reads `<npm root -g>/.package-lock.json`: an entry marked `link`, or one
 whose `resolved` URL is neither `https://registry.npmjs.org/` nor the configured `npm config get
@@ -169,9 +170,26 @@ rest, and the elevation is left to Windows' own prompt:
   name makes `update_together` return `None` and fails the group rather than silently dropping a package.
   The 30-minute `CHANGE_LIMIT` covers the whole group, and on expiry only the unelevated PowerShell is
   stopped — an unelevated parent cannot kill the elevated choco it started.
+- **`winget_one_prompt` does the same for winget**, through the same `update::jobs` fold
+  (`Config::one_prompt_kinds` names every source whose switch is on, and each gets its own shared job).
+  `Winget::update_together` cannot hand winget several ids, because `winget upgrade --id` takes one, so
+  the elevated process is a second PowerShell: `Start-Process -FilePath <powershell> -ArgumentList
+  '-NoProfile', '-NonInteractive', '-Command', '<inner>' -Verb RunAs`, where `<inner>` is `foreach ($id
+  in 'a', 'b') { & '<winget>' upgrade --id $id --exact --silent … }` and exits with the last non-zero
+  code. `Start-Process` joins `-ArgumentList` with spaces and the inner PowerShell re-parses that as a
+  command line, which strips double quotes, so the inner script uses single quotes only (a test pins
+  that). Every id must pass `plain_name`, so an `ARP\…\{GUID}` id fails the group rather than being
+  pasted into a script. Results are read back by version, as for choco, which means a refusal code from
+  one package (below) is out of reach in this mode: an unchanged version is simply failed. The point of
+  the switch is less the prompt count than the hang: per-package, a machine-scope installer's UAC prompt
+  that nobody answers holds the batch for the whole `CHANGE_LIMIT` (a `.NET Desktop Runtime` dependency
+  pulled in by Vortex and Obsidian's `/allusers` installer each burned 30 minutes this way), while an
+  elevated batch never raises one. The cost is that per-user installers then run as administrator, and
+  a few refuse to.
 - **The window says so before the prompt appears.** `window::elevation` gives winget and choco rows and
   their Settings switches an `Elevation { label, detail }` — *may ask for admin* for winget, *asks for
-  admin* for choco, with a detail that changes when `choco_one_prompt` is on. `ui.html` draws the label
+  admin* for choco (and for winget while `winget_one_prompt` is on), with a detail that changes when
+  either one-prompt switch is on. `ui.html` draws the label
   as a tag beside the package name (outdated and current rows alike, since **Uninstall** prompts too),
   appends it to the group's note, and puts it beside the source's switch, with the detail as the
   tooltip. The tag sits where the old `read-only` tag was, so the text is decided in Rust and tested
@@ -189,6 +207,32 @@ implements `PackageSource::remove_directly`, which `remove::apply` tries before 
 the binary with `go version -m <bin dir>` (the untagged header line of each block carries the file path),
 matches it by package path and deletes that file, refusing any file whose parent is not the Go bin
 directory.
+
+### Refusals that are not failures
+
+`PackageSource::refusal` reads a failed update's exit code; only winget implements it, through
+`winget::refusal_for`. These codes are not a broken update:
+
+- `0x8A15002B` (`APPINSTALLER_CLI_ERROR_UPDATE_NOT_APPLICABLE`) — the catalog has a newer version, but
+  not one for this system or installer type. `winget upgrade` with no arguments still lists these
+  packages (checked against winget 1.29), so the check cannot filter them out cheaply.
+- `0x8A15010C` (the installer reported a user cancel) and `0x800704C7` (`ERROR_CANCELLED`, the UAC prompt
+  itself was declined).
+- `0x8A150102` (`APPINSTALLER_CLI_ERROR_INSTALL_IN_PROGRESS`, MSI's 1618) — another MSI holds the
+  installer mutex. Seen right after the EA app updated in two seconds: its EXE bootstrapper most likely
+  handed off to `msiexec` and exited, and the next three MSI packages in the queue were refused.
+
+A not-applicable or cancelled update lands in `Outcome.skipped` with its `Refusal`, finishes its row
+as `RowState::Skipped`, and never raises *update failed*; `update::toast` lists each one with
+`Refusal::reason` beside the updated packages. Skips do not count as `changed_packages`, so a batch of
+only skips triggers no recheck. A `Busy` refusal does not finish its row at all: `update::drive` sets the index aside, leaves the row queued, sleeps `BUSY_PAUSE`
+(30 s) once after the last job, and runs each of those packages one more time; a second refusal of any
+kind is final. `drive` takes the job runner as a closure precisely so this is testable without a real
+winget.
+
+winget also reports some installed versions as the literal `Unknown` (Battle.net). `winget upgrade` hides
+those without `--include-unknown` and refuses to upgrade them, so `winget::to_installed` marks such a row
+`external`, which `check.rs` reads as `Unknown` — never `Outdated`, never offered by **Update all**.
 
 ### The window
 
@@ -864,7 +908,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-582 tests on Windows: 552 run by default (no network, no side effects), 30 `#[ignore]`d because they
+605 tests on Windows: 575 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

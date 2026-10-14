@@ -28,6 +28,7 @@ pub struct Snapshot {
     pub auto_update: bool,
     pub auto_approve: bool,
     pub choco_one_prompt: Option<bool>,
+    pub winget_one_prompt: Option<bool>,
     pub monochrome_icon: bool,
     pub self_update: Option<String>,
     pub managed_by: Option<&'static str>,
@@ -121,6 +122,9 @@ fn snapshot_on(view: &View, config: &Config, os: &str) -> Snapshot {
         choco_one_prompt: SourceKind::Choco
             .available_on(os)
             .then_some(config.choco_one_prompt),
+        winget_one_prompt: SourceKind::Winget
+            .available_on(os)
+            .then_some(config.winget_one_prompt),
         monochrome_icon: config.monochrome_icon,
         self_update,
         managed_by,
@@ -199,6 +203,10 @@ fn source_row(kind: SourceKind, packages: &[Package], config: &Config) -> Source
 
 fn elevation(kind: SourceKind, config: &Config) -> Option<Elevation> {
     match kind {
+        SourceKind::Winget if config.winget_one_prompt => Some(Elevation {
+            label: "asks for admin",
+            detail: "Windows asks once for all the winget updates in a batch, and each one then runs as administrator. An uninstall still runs as you.",
+        }),
         SourceKind::Winget => Some(Elevation {
             label: "may ask for admin",
             detail: "winget runs as you. A package installed for you alone updates without asking; one installed for the whole machine shows its own Windows administrator prompt.",
@@ -256,6 +264,7 @@ fn state_label(batch: &Batch, position: usize) -> &'static str {
     match batch.state_of(position) {
         RowState::Done => "done",
         RowState::Failed => "failed",
+        RowState::Skipped => "skipped",
         RowState::Active => "active",
         RowState::Queued => "queued",
     }

@@ -173,6 +173,7 @@ impl App {
             Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::ToggleAutoApprove => self.toggle_auto_approve(),
             Action::ToggleChocoOnePrompt => self.toggle_choco_one_prompt(),
+            Action::ToggleWingetOnePrompt => self.toggle_winget_one_prompt(),
             Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
             Action::OpenLog => open_log(),
             Action::OpenPatreon => open_patreon(),
@@ -356,6 +357,11 @@ impl App {
         self.save_setting();
     }
 
+    fn toggle_winget_one_prompt(&mut self) {
+        self.config.winget_one_prompt = !self.config.winget_one_prompt;
+        self.save_setting();
+    }
+
     fn toggle_monochrome_icon(&mut self) {
         self.config.monochrome_icon = !self.config.monochrome_icon;
         self.save_setting();
@@ -441,7 +447,7 @@ impl App {
         if let Some(Activity::Updating { batch }) = self.activity.as_mut() {
             match step {
                 Step::Started { index, .. } => batch.start(*index),
-                Step::Finished { index, ok } => batch.finish(*index, *ok),
+                Step::Finished { index, state } => batch.finish(*index, *state),
             }
         }
         self.step_started = Instant::now();
@@ -516,19 +522,8 @@ impl App {
         update::settle(&mut self.approvals, outcome);
         update::mark_updated(&mut self.packages, outcome);
         let approved = update::auto_approvals(outcome, self.config.auto_approve_scripts);
-        if !outcome.failed.is_empty() {
-            platform::notify(
-                "Globlin — update failed",
-                &format!("{} (see Open last log)", outcome.failed.join(", ")),
-            )
-            .ok();
-        } else if !outcome.updated.is_empty() {
-            let names: Vec<String> = outcome
-                .updated
-                .iter()
-                .map(|target| format!("{}{}", target.name, target.source.suffix()))
-                .collect();
-            platform::notify("Globlin — updated", &names.join("\n")).ok();
+        if let Some((title, body)) = update::toast(outcome) {
+            platform::notify(title, &body).ok();
         }
         if !approved.is_empty() {
             self.recheck_after_retry |= outcome.changed_packages();

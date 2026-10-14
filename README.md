@@ -212,9 +212,18 @@ The window puts updates first:
   five choco packages in **Update all** means five prompts. Saying *No* fails that one package and the
   queue moves on. **One administrator prompt for all choco updates**, in Settings, runs every choco
   package in the batch through a single prompt instead; their rows then finish together at the end, and
-  *No* fails all of them. Their rows, groups and Settings switches carry a small *may ask for admin* /
+  *No* fails all of them. **One administrator prompt for all winget updates** does the same for winget:
+  one prompt, after which every winget update in the batch runs as administrator, so no installer is
+  left waiting on a prompt nobody sees. A few installers refuse to run as administrator and then fail.
+  Their rows, groups and Settings switches carry a small *may ask for admin* /
   *asks for admin* tag; hover it for the reason. Globlin's own entry is left out of the winget list, so
   it can't uninstall itself.
+- **Not every refused update is a failure.** When winget says no update applies to this system (Docker
+  Desktop on an unsupported setup, for instance) or the administrator prompt was cancelled, the row reads
+  *skipped* and the notification names the reason instead of reporting a failure. When an installer is
+  refused because another installation is still running, Globlin tries that package once more at the end
+  of the batch. A winget package whose installed version winget itself reports as `Unknown` reads *not
+  checked*, since winget refuses to upgrade it anyway.
 - A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
   the same three packages every six hours.
 
@@ -383,6 +392,7 @@ edits are never silently overwritten.
   "auto_update": false,
   "auto_approve_scripts": false,
   "choco_one_prompt": false,
+  "winget_one_prompt": false,
   "monochrome_icon": false,
   "last_self_notice": null
 }
@@ -404,6 +414,8 @@ edits are never silently overwritten.
   Settings; see [Using it](#using-it).
 - **`choco_one_prompt`** — the **One administrator prompt for all choco updates** switch in the window's
   Settings (Windows only); see [Using it](#using-it).
+- **`winget_one_prompt`** — the **One administrator prompt for all winget updates** switch in the
+  window's Settings (Windows only); see [Using it](#using-it).
 - **`monochrome_icon`** — the **Monochrome tray icon** switch in the window's Settings; see
   [Icon states](#icon-states).
 - **`last_self_notice`** — the version string of the last self-update failure a toast was already raised

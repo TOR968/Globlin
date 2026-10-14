@@ -23,6 +23,7 @@ pub struct Config {
     pub auto_update: bool,
     pub auto_approve_scripts: bool,
     pub choco_one_prompt: bool,
+    pub winget_one_prompt: bool,
     pub monochrome_icon: bool,
     pub last_self_notice: Option<String>,
 }
@@ -59,6 +60,7 @@ impl Default for Config {
             auto_update: false,
             auto_approve_scripts: false,
             choco_one_prompt: false,
+            winget_one_prompt: false,
             monochrome_icon: false,
             last_self_notice: None,
         }
@@ -128,6 +130,16 @@ impl Config {
 
     pub fn is_ignored(&self, name: &str) -> bool {
         self.ignore.iter().any(|ignored| ignored == name)
+    }
+
+    pub fn one_prompt_kinds(&self) -> Vec<SourceKind> {
+        [
+            (SourceKind::Choco, self.choco_one_prompt),
+            (SourceKind::Winget, self.winget_one_prompt),
+        ]
+        .into_iter()
+        .filter_map(|(kind, on)| on.then_some(kind))
+        .collect()
     }
 
     pub fn source_enabled(&self, kind: SourceKind) -> bool {

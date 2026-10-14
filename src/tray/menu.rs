@@ -25,6 +25,7 @@ const ID_UPDATE_SELF: &str = "update-self";
 const ID_AUTO_UPDATE: &str = "auto-update";
 const ID_AUTO_APPROVE: &str = "auto-approve";
 const ID_CHOCO_ONE_PROMPT: &str = "choco-one-prompt";
+const ID_WINGET_ONE_PROMPT: &str = "winget-one-prompt";
 const ID_MONOCHROME_ICON: &str = "monochrome-icon";
 const ID_OPEN_LOG: &str = "open-log";
 const ID_OPEN_PATREON: &str = "open-patreon";
@@ -60,6 +61,7 @@ pub enum Action {
     ToggleAutoUpdate,
     ToggleAutoApprove,
     ToggleChocoOnePrompt,
+    ToggleWingetOnePrompt,
     ToggleMonochromeIcon,
     OpenLog,
     OpenPatreon,
@@ -110,6 +112,7 @@ impl Action {
             ID_AUTO_UPDATE => Some(Self::ToggleAutoUpdate),
             ID_AUTO_APPROVE => Some(Self::ToggleAutoApprove),
             ID_CHOCO_ONE_PROMPT => Some(Self::ToggleChocoOnePrompt),
+            ID_WINGET_ONE_PROMPT => Some(Self::ToggleWingetOnePrompt),
             ID_MONOCHROME_ICON => Some(Self::ToggleMonochromeIcon),
             ID_OPEN_LOG => Some(Self::OpenLog),
             ID_OPEN_PATREON => Some(Self::OpenPatreon),
@@ -304,6 +307,7 @@ pub fn batch_row_text(view: &View, position: usize) -> Option<String> {
     Some(match batch.state_of(position) {
         RowState::Done => format!("{}   done", target_label(target, '✓')),
         RowState::Failed => format!("{}   failed", target_label(target, '✗')),
+        RowState::Skipped => format!("{}   skipped", target_label(target, '–')),
         RowState::Queued => format!("{}   queued", target_label(target, '·')),
         RowState::Active => format!(
             "{}   {}",
