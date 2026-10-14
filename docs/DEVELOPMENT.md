@@ -383,18 +383,23 @@ cargo test -- --ignored --exact window::tests::dump_window_screenshots
 Then headless Edge renders each page at the window's own 960×640, at 2× for sharp text.
 `--force-dark-mode` pins the colour scheme: without it headless Edge follows the Windows setting, so a
 machine in light mode would produce light screenshots, and these are meant to show the default dark
-theme. (`--blink-settings=preferredColorScheme=1` renders the light theme instead, for checking it.) A
-fresh `--user-data-dir` keeps it from attaching to a running Edge, and the `| Out-Null` is load-bearing:
-`msedge.exe` is a GUI binary, so without a pipe PowerShell returns at once, the next run attaches to the
-first one's profile, and only one of the three PNGs gets written:
+theme. (`--blink-settings=preferredColorScheme=1` renders the light theme instead, for checking it.)
+`msedge.exe` is a GUI binary, so PowerShell does not wait for it on its own; a run that starts while the
+previous one is still alive attaches to its profile, and only the first of the three PNGs gets written.
+`Start-Process -Wait` waits for each run, and a fresh `--user-data-dir` per page keeps one run from ever
+attaching to another. (Piping to `| Out-Null` with one shared profile was the earlier workaround; it
+still left two of the three pages unwritten.) Check the three PNGs' timestamps afterwards:
 
 ```
 $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 foreach ($name in "updates", "batch", "settings") {
     $page = "$env:GLOBLIN_SCREENSHOT_DIR\$name.html" -replace '\\', '/'
-    & $edge --headless=new --disable-gpu --hide-scrollbars --force-dark-mode `
-        --user-data-dir="$env:TEMP\globlin-edge-profile" --force-device-scale-factor=2 `
-        --window-size=960,640 --screenshot="$PWD\docs\img\window-$name.png" "file:///$page" | Out-Null
+    $userData = "$env:TEMP\globlin-edge-profile-$name"
+    Remove-Item -Recurse -Force $userData -ErrorAction SilentlyContinue
+    Start-Process -FilePath $edge -Wait -ArgumentList "--headless=new", "--disable-gpu",
+        "--hide-scrollbars", "--force-dark-mode", "--user-data-dir=$userData",
+        "--force-device-scale-factor=2", "--window-size=960,640",
+        "--screenshot=$PWD\docs\img\window-$name.png", "file:///$page"
     Copy-Item "docs\img\window-$name.png" "site\img\window-$name.png"
 }
 ```
