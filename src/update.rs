@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::diagnostics;
-use crate::model::{Blocked, BlockedScript, UpdateTarget};
+use crate::model::{Blocked, BlockedScript, Package, Status, UpdateTarget};
 use crate::source::{self, PackageSource};
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -114,6 +114,18 @@ pub fn settle(approvals: &mut Vec<Blocked>, outcome: &Outcome) {
                 .any(|fresh| fresh.target.is(&entry.target.name, entry.target.source))
     });
     approvals.extend(outcome.blocked.iter().cloned());
+}
+
+pub fn mark_updated(packages: &mut [Package], outcome: &Outcome) {
+    for done in &outcome.updated {
+        if let Some(package) = packages
+            .iter_mut()
+            .find(|package| done.is(&package.name, package.source))
+        {
+            package.current.clone_from(&done.to);
+            package.status = Status::Current;
+        }
+    }
 }
 
 pub fn auto_approvals(outcome: &Outcome, enabled: bool) -> Vec<Blocked> {
