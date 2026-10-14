@@ -53,6 +53,10 @@ pub trait PackageSource {
         self.update_command(name)
     }
 
+    fn update_together(&self, _names: &[&str]) -> Option<Command> {
+        None
+    }
+
     fn uninstall_command(&self, name: &str) -> Option<Command>;
 
     fn remove_directly(&self, _name: &str) -> Option<Result<()>> {

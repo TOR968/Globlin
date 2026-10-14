@@ -577,3 +577,88 @@ fn a_retry_that_is_blocked_again_goes_to_the_dialog_instead_of_looping() {
 
     assert!(auto_approvals(&outcome, true).is_empty());
 }
+
+fn sourced(name: &str, source: SourceKind) -> UpdateTarget {
+    UpdateTarget {
+        source,
+        ..target(name)
+    }
+}
+
+#[test]
+fn with_one_prompt_every_choco_target_joins_the_first_choco_job() {
+    let targets = vec![
+        sourced("git", SourceKind::Choco),
+        target("prettier"),
+        sourced("nodejs", SourceKind::Choco),
+        sourced("7zip", SourceKind::Choco),
+    ];
+
+    assert_eq!(jobs(&targets, true), vec![vec![0, 2, 3], vec![1]]);
+}
+
+#[test]
+fn without_one_prompt_every_target_is_its_own_job() {
+    let targets = vec![
+        sourced("git", SourceKind::Choco),
+        target("prettier"),
+        sourced("nodejs", SourceKind::Choco),
+    ];
+
+    assert_eq!(jobs(&targets, false), vec![vec![0], vec![1], vec![2]]);
+}
+
+#[test]
+fn one_prompt_never_groups_targets_from_other_sources() {
+    let targets = vec![target("prettier"), target("vite")];
+
+    assert_eq!(jobs(&targets, true), vec![vec![0], vec![1]]);
+}
+
+#[test]
+fn after_a_shared_run_a_package_counts_as_updated_only_if_its_version_moved() {
+    let group = vec![
+        sourced("git", SourceKind::Choco),
+        sourced("nodejs", SourceKind::Choco),
+        sourced("7zip", SourceKind::Choco),
+    ];
+    let listing = vec![
+        Installed::new("git", "2.0.0", SourceKind::Choco),
+        Installed::new("nodejs", "1.0.0", SourceKind::Choco),
+    ];
+
+    assert_eq!(
+        changed_versions(&group, Some(&listing), false),
+        vec![true, false, false]
+    );
+}
+
+#[test]
+fn when_the_listing_cannot_be_read_the_exit_code_decides_for_the_whole_group() {
+    let group = vec![
+        sourced("git", SourceKind::Choco),
+        sourced("nodejs", SourceKind::Choco),
+    ];
+
+    assert_eq!(changed_versions(&group, None, true), vec![true, true]);
+    assert_eq!(changed_versions(&group, None, false), vec![false, false]);
+}
+
+#[test]
+fn a_group_that_could_not_run_logs_its_reason_once_and_fails_every_member() {
+    let group = vec![
+        sourced("git", SourceKind::Choco),
+        sourced("nodejs", SourceKind::Choco),
+    ];
+
+    let results = fail_group(&group, "choco: no shell\n".to_string());
+    let details: Vec<String> = results
+        .into_iter()
+        .map(|result| result.err().unwrap().details)
+        .collect();
+
+    assert_eq!(
+        details,
+        vec!["choco: no shell\n".to_string(), String::new()]
+    );
+}

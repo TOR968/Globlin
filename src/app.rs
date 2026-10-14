@@ -172,6 +172,7 @@ impl App {
             }
             Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::ToggleAutoApprove => self.toggle_auto_approve(),
+            Action::ToggleChocoOnePrompt => self.toggle_choco_one_prompt(),
             Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
             Action::OpenLog => open_log(),
             Action::OpenPatreon => open_patreon(),
@@ -347,6 +348,11 @@ impl App {
 
     fn toggle_auto_approve(&mut self) {
         self.config.auto_approve_scripts = !self.config.auto_approve_scripts;
+        self.save_setting();
+    }
+
+    fn toggle_choco_one_prompt(&mut self) {
+        self.config.choco_one_prompt = !self.config.choco_one_prompt;
         self.save_setting();
     }
 

@@ -13,6 +13,7 @@ const FILE_NAME: &str = "globlin.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Config {
     pub check_interval_hours: u64,
     pub sources: Sources,
@@ -21,6 +22,7 @@ pub struct Config {
     pub npm_cmd: Option<PathBuf>,
     pub auto_update: bool,
     pub auto_approve_scripts: bool,
+    pub choco_one_prompt: bool,
     pub monochrome_icon: bool,
     pub last_self_notice: Option<String>,
 }
@@ -56,6 +58,7 @@ impl Default for Config {
             npm_cmd: None,
             auto_update: false,
             auto_approve_scripts: false,
+            choco_one_prompt: false,
             monochrome_icon: false,
             last_self_notice: None,
         }

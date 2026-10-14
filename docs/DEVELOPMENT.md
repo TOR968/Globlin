@@ -152,12 +152,26 @@ rest, and the elevation is left to Windows' own prompt:
   because an elevated process's output cannot be captured by an unelevated parent. The package name is
   pasted into the script, so it must pass `source::plain_name` (`[A-Za-z0-9._-]`, the same rule
   psgallery uses) or no command is built at all.
-- **One prompt per package**, so the queue's per-row progress keeps working for choco. A
+- **One prompt per package by default**, so the queue's per-row progress keeps working for choco. A
   batch of five choco packages shows five prompts; saying *No* fails that one package and the queue moves
   on.
+- **`choco_one_prompt` puts the whole batch under one prompt.** `update::jobs` folds every choco target
+  into the job at the first choco target's position (other sources stay one job per target), and
+  `update::apply_together` runs `PackageSource::update_together` — for choco, the same `Start-Process
+  -Verb RunAs` script with every name in `-ArgumentList`, so `choco upgrade a b c -y` — once. The batch
+  marks the first choco row running and finishes all of them together. Which ones actually updated is
+  read back afterwards, not from the run: the elevated process's output is out of reach, and having it
+  write a results file to a path the unelevated app chose would let any program running as the user
+  aim an administrator's write at a file of its choosing (a link in `%TEMP%`). So `apply_together` calls
+  `installed()` unelevated and `update::changed_versions` counts a package as updated when its version
+  is no longer the target's `from`; only if that listing fails does the run's exit code decide for the
+  whole group. The run's log goes onto the first failed package only, so it is written once. One bad
+  name makes `update_together` return `None` and fails the group rather than silently dropping a package.
+  The 30-minute `CHANGE_LIMIT` covers the whole group, and on expiry only the unelevated PowerShell is
+  stopped — an unelevated parent cannot kill the elevated choco it started.
 - **The window says so before the prompt appears.** `window::elevation` gives winget and choco rows and
   their Settings switches an `Elevation { label, detail }` — *may ask for admin* for winget, *asks for
-  admin* for choco. `ui.html` draws the label
+  admin* for choco, with a detail that changes when `choco_one_prompt` is on. `ui.html` draws the label
   as a tag beside the package name (outdated and current rows alike, since **Uninstall** prompts too),
   appends it to the group's note, and puts it beside the source's switch, with the detail as the
   tooltip. The tag sits where the old `read-only` tag was, so the text is decided in Rust and tested
@@ -788,6 +802,11 @@ manager to name, and
 Globlin manages itself — so the auto-update checkbox cannot be rendered in a state where ticking it would
 do nothing.
 
+`Config`, `Sources` and `Snapshot` carry `#[allow(clippy::struct_excessive_bools)]` for the opposite
+reason: every bool there is one independent user switch (`auto_update`, `auto_approve_scripts`,
+`choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
+rename them. The allow goes on such a struct only when that is true of every field.
+
 ### When the installer owns the directory
 
 `installer/globlin.iss` is an Inno Setup 6 script for a **per-user** install: `PrivilegesRequired=lowest`,
@@ -840,7 +859,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-571 tests on Windows: 541 run by default (no network, no side effects), 30 `#[ignore]`d because they
+582 tests on Windows: 552 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
