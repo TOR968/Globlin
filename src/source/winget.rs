@@ -50,8 +50,10 @@ impl Winget {
             .join(", ");
         let shell = self.shell.as_ref()?;
         let inner = format!(
-            "$code = 0; foreach ($id in {ids}) {{ & {} upgrade --id $id {UPGRADE_FLAGS}; \
-             if ($LASTEXITCODE) {{ $code = $LASTEXITCODE }} }}; exit $code",
+            "$codes = @(); foreach ($id in {ids}) {{ & {} upgrade --id $id {UPGRADE_FLAGS}; \
+             if ($LASTEXITCODE) {{ $codes += $LASTEXITCODE }} }}; \
+             $shared = @($codes | Select-Object -Unique); \
+             if ($shared.Count -eq 1) {{ exit $shared[0] }}; exit [int]($codes.Count -gt 0)",
             quoted(&self.command.to_string_lossy()),
         );
         let script = format!(

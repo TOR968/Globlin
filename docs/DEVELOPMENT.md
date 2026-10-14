@@ -175,12 +175,16 @@ rest, and the elevation is left to Windows' own prompt:
   `Winget::update_together` cannot hand winget several ids, because `winget upgrade --id` takes one, so
   the elevated process is a second PowerShell: `Start-Process -FilePath <powershell> -ArgumentList
   '-NoProfile', '-NonInteractive', '-Command', '<inner>' -Verb RunAs`, where `<inner>` is `foreach ($id
-  in 'a', 'b') { & '<winget>' upgrade --id $id --exact --silent … }` and exits with the last non-zero
-  code. `Start-Process` joins `-ArgumentList` with spaces and the inner PowerShell re-parses that as a
-  command line, which strips double quotes, so the inner script uses single quotes only (a test pins
-  that). Every id must pass `plain_name`, so an `ARP\…\{GUID}` id fails the group rather than being
-  pasted into a script. Results are read back by version, as for choco, which means a refusal code from
-  one package (below) is out of reach in this mode: an unchanged version is simply failed. The point of
+  in 'a', 'b') { & '<winget>' upgrade --id $id --exact --silent … }`, collecting every non-zero code.
+  It exits 0 when there are none, with the code itself when they are all the same, and with 1 when
+  they differ. `Start-Process` joins `-ArgumentList` with spaces and the inner PowerShell re-parses that
+  as a command line, which strips double quotes, so the inner script uses single quotes only (a test
+  pins that). Every id must pass `plain_name`, so an `ARP\…\{GUID}` id fails the group rather than being
+  pasted into a script. Results are read back by version, as for choco; a member whose version did not
+  move then takes the refusal (below) the run's exit code maps to, through `update::group_results`.
+  That is sound only because of the "all the same" rule: an exit code of `0x8A15002B` promises that
+  every package which failed was not applicable, so three inapplicable packages read *skipped*, while
+  one inapplicable package beside one broken one reads *failed* for both. The point of
   the switch is less the prompt count than the hang: per-package, a machine-scope installer's UAC prompt
   that nobody answers holds the batch for the whole `CHANGE_LIMIT` (a `.NET Desktop Runtime` dependency
   pulled in by Vortex and Obsidian's `/allusers` installer each burned 30 minutes this way), while an
@@ -225,9 +229,10 @@ directory.
 A not-applicable or cancelled update lands in `Outcome.skipped` with its `Refusal`, finishes its row
 as `RowState::Skipped`, and never raises *update failed*; `update::toast` lists each one with
 `Refusal::reason` beside the updated packages. Skips do not count as `changed_packages`, so a batch of
-only skips triggers no recheck. A `Busy` refusal does not finish its row at all: `update::drive` sets the index aside, leaves the row queued, sleeps `BUSY_PAUSE`
-(30 s) once after the last job, and runs each of those packages one more time; a second refusal of any
-kind is final. `drive` takes the job runner as a closure precisely so this is testable without a real
+only skips triggers no recheck. A `Busy` refusal does not finish its row at all: `update::drive` sets
+the index aside, leaves the row queued, sleeps `BUSY_PAUSE` (30 s) once after the last job, and runs
+those packages one more time, the busy members of a shared job together as one smaller shared job (so
+one more prompt, not one per package); a second refusal of any kind is final. `drive` takes the job runner as a closure precisely so this is testable without a real
 winget.
 
 winget also reports some installed versions as the literal `Unknown` (Battle.net). `winget upgrade` hides
@@ -908,7 +913,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-605 tests on Windows: 575 run by default (no network, no side effects), 30 `#[ignore]`d because they
+608 tests on Windows: 578 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

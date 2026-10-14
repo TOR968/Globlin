@@ -640,10 +640,7 @@ fn with_both_one_prompt_switches_winget_and_choco_each_get_their_own_shared_job(
 
 fn refused(refusal: Refusal) -> Result<(), Failure> {
     Err(Failure {
-        details: format!(
-            "{refusal:?}
-"
-        ),
+        details: format!("{refusal:?}\n"),
         blocked: None,
         refusal: Some(refusal),
     })
@@ -856,4 +853,59 @@ fn a_group_that_could_not_run_logs_its_reason_once_and_fails_every_member() {
         details,
         vec!["choco: no shell\n".to_string(), String::new()]
     );
+}
+
+#[test]
+fn in_a_shared_run_every_unchanged_member_carries_the_refusal_the_whole_run_ended_with() {
+    let results = group_results(
+        vec![false, true, false],
+        "winget: not applicable\n".to_string(),
+        Some(Refusal::NotApplicable),
+    );
+
+    let refusals: Vec<Option<Option<Refusal>>> = results
+        .iter()
+        .map(|result| result.as_ref().err().map(|failure| failure.refusal))
+        .collect();
+    assert_eq!(
+        refusals,
+        vec![
+            Some(Some(Refusal::NotApplicable)),
+            None,
+            Some(Some(Refusal::NotApplicable))
+        ]
+    );
+    assert_eq!(
+        results[0].as_ref().err().unwrap().details,
+        "winget: not applicable\n"
+    );
+    assert_eq!(results[2].as_ref().err().unwrap().details, "");
+}
+
+#[test]
+fn busy_members_of_a_shared_run_are_retried_together_under_one_more_prompt() {
+    let targets = vec![
+        sourced("Epic", SourceKind::Winget),
+        sourced("Gh", SourceKind::Winget),
+        sourced("Vortex", SourceKind::Winget),
+    ];
+    let runs = Mutex::new(Vec::new());
+
+    let outcome = drive(
+        &targets,
+        vec![vec![0, 1, 2]],
+        |job| {
+            runs.lock().unwrap().push(job.to_vec());
+            if job.len() == 3 {
+                vec![refused(Refusal::Busy), Ok(()), refused(Refusal::Busy)]
+            } else {
+                job.iter().map(|_| Ok(())).collect()
+            }
+        },
+        &|_| {},
+        Duration::ZERO,
+    );
+
+    assert_eq!(runs.into_inner().unwrap(), vec![vec![0, 1, 2], vec![0, 2]]);
+    assert_eq!(outcome.updated.len(), 3);
 }

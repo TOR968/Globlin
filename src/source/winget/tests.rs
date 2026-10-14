@@ -225,6 +225,22 @@ fn one_prompt_upgrades_every_id_in_a_single_elevated_shell() {
 }
 
 #[test]
+fn a_shared_run_ends_with_a_refusal_code_only_when_every_failure_gave_that_same_code() {
+    let script = script(&elevating_winget().update_together(&["Git.Git"]).unwrap());
+
+    assert!(
+        script.contains("$shared = @($codes | Select-Object -Unique);"),
+        "{script}"
+    );
+    assert!(
+        script.contains(
+            "if ($shared.Count -eq 1) { exit $shared[0] }; exit [int]($codes.Count -gt 0)"
+        ),
+        "{script}"
+    );
+}
+
+#[test]
 fn an_elevated_run_never_carries_a_double_quote_the_inner_shell_would_strip() {
     let script = script(&elevating_winget().update_together(&["Git.Git"]).unwrap());
 

@@ -110,37 +110,25 @@ fn drive(
 
     for job in jobs {
         announce_start(announce, targets, job[0]);
+        let mut refused = Vec::new();
         for (index, result) in job.iter().copied().zip(execute(&job)) {
             match result {
-                Err(failure) if failure.refusal == Some(Refusal::Busy) => busy.push(index),
-                result => record(
-                    &mut outcome,
-                    &mut report,
-                    &targets[index],
-                    result,
-                    |state| {
-                        announce(Step::Finished { index, state });
-                    },
-                ),
+                Err(failure) if failure.refusal == Some(Refusal::Busy) => refused.push(index),
+                result => record(&mut outcome, &mut report, targets, index, result, announce),
             }
+        }
+        if !refused.is_empty() {
+            busy.push(refused);
         }
     }
 
     if !busy.is_empty() {
         std::thread::sleep(busy_pause);
     }
-    for index in busy {
-        announce_start(announce, targets, index);
-        for result in execute(&[index]) {
-            record(
-                &mut outcome,
-                &mut report,
-                &targets[index],
-                result,
-                |state| {
-                    announce(Step::Finished { index, state });
-                },
-            );
+    for job in busy {
+        announce_start(announce, targets, job[0]);
+        for (index, result) in job.iter().copied().zip(execute(&job)) {
+            record(&mut outcome, &mut report, targets, index, result, announce);
         }
     }
 
@@ -158,10 +146,13 @@ fn announce_start(announce: &impl Fn(Step), targets: &[UpdateTarget], index: usi
 fn record(
     outcome: &mut Outcome,
     report: &mut String,
-    target: &UpdateTarget,
+    targets: &[UpdateTarget],
+    index: usize,
     result: Result<(), Failure>,
-    finished: impl FnOnce(RowState),
+    announce: &impl Fn(Step),
 ) {
+    let target = &targets[index];
+    let finished = |state| announce(Step::Finished { index, state });
     let Err(failure) = result else {
         outcome.updated.push(target.clone());
         return finished(RowState::Done);
@@ -345,21 +336,38 @@ fn apply_together(
     };
 
     let installed = source.installed().ok();
-    let mut details = Some(diagnostics::command_report(
+    let refusal = source.refusal(&output);
+    let details = diagnostics::command_report(
         &format!(
             "{} via {} under one prompt",
             names.join(", "),
             first.source.label()
         ),
         &output,
-    ));
-    changed_versions(group, installed.as_deref(), output.status.success())
+    );
+    group_results(
+        changed_versions(group, installed.as_deref(), output.status.success()),
+        details,
+        refusal,
+    )
+}
+
+fn group_results(
+    changed: Vec<bool>,
+    details: String,
+    refusal: Option<Refusal>,
+) -> Vec<Result<(), Failure>> {
+    let mut details = Some(details);
+    changed
         .into_iter()
         .map(|changed| {
             if changed {
                 Ok(())
             } else {
-                Err(Failure::from(details.take().unwrap_or_default()))
+                Err(Failure {
+                    refusal,
+                    ..Failure::from(details.take().unwrap_or_default())
+                })
             }
         })
         .collect()
