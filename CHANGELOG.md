@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.13](https://github.com/TOR968/Globlin/compare/v0.4.12...v0.4.13) - 2026-10-15
+
+### Fixed
+
+- find package managers listed after a stray quote in PATH
+
 ## [0.4.12](https://github.com/TOR968/Globlin/compare/v0.4.11...v0.4.12) - 2026-10-14
 
 ### Fixed
