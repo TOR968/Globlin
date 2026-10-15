@@ -202,7 +202,24 @@ pub(crate) fn find_on_path(name: &str) -> Option<PathBuf> {
 }
 
 fn find_in(path: &std::ffi::OsStr, name: &str) -> Option<PathBuf> {
-    std::env::split_paths(path).find_map(|dir| executable_in(&dir, name))
+    path_entries(path)
+        .into_iter()
+        .find_map(|dir| executable_in(&dir, name))
+}
+
+#[cfg(windows)]
+fn path_entries(path: &std::ffi::OsStr) -> Vec<PathBuf> {
+    path.to_string_lossy()
+        .split(';')
+        .map(|entry| entry.replace('"', ""))
+        .filter(|entry| !entry.trim().is_empty())
+        .map(PathBuf::from)
+        .collect()
+}
+
+#[cfg(not(windows))]
+fn path_entries(path: &std::ffi::OsStr) -> Vec<PathBuf> {
+    std::env::split_paths(path).collect()
 }
 
 #[cfg(windows)]

@@ -167,6 +167,33 @@ fn the_first_path_directory_that_has_the_tool_wins() {
     assert_eq!(find_in(&path, "fake-tool"), Some(first.join(&file_name)));
 }
 
+#[cfg(windows)]
+#[test]
+fn a_stray_quote_in_an_earlier_path_entry_does_not_hide_the_directories_after_it() {
+    let broken = scratch_dir("stray-quote");
+    let after = scratch_dir("after-stray-quote");
+    std::fs::write(after.join("fake-tool.cmd"), "@exit 0").unwrap();
+    let path = format!("{}\";{}", broken.display(), after.display());
+
+    assert_eq!(
+        find_in(std::ffi::OsStr::new(&path), "fake-tool"),
+        Some(after.join("fake-tool.cmd"))
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_quoted_path_entry_is_searched_without_its_quotes() {
+    let dir = scratch_dir("quoted-entry");
+    std::fs::write(dir.join("fake-tool.cmd"), "@exit 0").unwrap();
+    let path = format!("\"{}\"", dir.display());
+
+    assert_eq!(
+        find_in(std::ffi::OsStr::new(&path), "fake-tool"),
+        Some(dir.join("fake-tool.cmd"))
+    );
+}
+
 #[test]
 fn an_empty_listing_names_the_command_and_carries_its_stderr() {
     let output = std::process::Output {

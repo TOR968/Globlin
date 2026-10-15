@@ -913,7 +913,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-608 tests on Windows: 578 run by default (no network, no side effects), 30 `#[ignore]`d because they
+610 tests on Windows: 580 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
@@ -1115,8 +1115,13 @@ suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
 - `source::find_on_path` takes a bare name. On Windows it tries `exe`, `cmd`, `bat` in that order in each
   `PATH` directory, so the first directory holding any of them wins, as in a shell — not `PATHEXT`,
   which can list `.JS` or `.PS1` files `Command::new` cannot spawn. On Unix it requires the execute bit.
-  Only npm's `default_location` (`%APPDATA%\npm\npm.cmd`) and `hidden_command` (`CREATE_NO_WINDOW`) are
-  still `cfg`-split.
+  On Windows `PATH` is split on `;` with every `"` dropped from each entry, not with
+  `std::env::split_paths`: that one honours quotes, so a single stray `"` — the GitHub CLI 2.102.0 MSI
+  appends `C:\Program Files\GitHub CLI"` to the machine `PATH` — swallows every directory after it,
+  the whole user `PATH` included, and winget, scoop, cargo and uv silently read as not installed. cmd and
+  PowerShell tolerate that entry, so Globlin must too.
+  Only npm's `default_location` (`%APPDATA%\npm\npm.cmd`), `hidden_command` (`CREATE_NO_WINDOW`) and
+  `path_entries` are still `cfg`-split.
 - `SourceKind::available_on(os)` — scoop, winget and choco exist only on Windows, Homebrew everywhere
   but Windows. `source::enabled` skips the rest, and the window's Settings (`window::snapshot_on`) does
   not list them at all, so a Mac never shows a scoop row and Windows never shows brew. The config keeps
