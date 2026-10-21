@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
 
     <title>Globlin — Keep Your Global Packages Updated on Windows, macOS and Linux</title>
-    <meta name="description" content="A free tray app for Windows, macOS and Linux (beta) that watches your global npm, pnpm, cargo, pipx, Homebrew, winget and other packages and tells you the moment one falls behind. One window, filters, bulk updates, installer or portable, open source.">
+    <meta name="description" content="A free tray app for Windows, macOS and Linux (beta) that watches your global npm, pnpm, cargo, pipx, Homebrew, winget and other packages, plus your skills.sh agent skills, and tells you the moment one falls behind. One window, filters, bulk updates, installer or portable, open source.">
     <link rel="canonical" href="https://globlin.pages.dev/">
     <link rel="icon" href="/img/logo.png?v=0.4.0" type="image/png">
 
@@ -14,7 +14,7 @@
     <meta property="og:site_name" content="Globlin">
     <meta property="og:url" content="https://globlin.pages.dev/">
     <meta property="og:title" content="Globlin — Keep Your Global Packages Updated on Windows, macOS and Linux">
-    <meta property="og:description" content="A tray icon for Windows, macOS and Linux (beta) that watches your global packages across fifteen package managers and tells you when one falls behind. One click to update.">
+    <meta property="og:description" content="A tray icon for Windows, macOS and Linux (beta) that watches your global packages across fifteen package managers, plus your skills.sh agent skills, and tells you when one falls behind. One click to update.">
     <meta property="og:image" content="https://globlin.pages.dev/img/og.png?v=0.4.0">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -22,7 +22,7 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Globlin — Keep Your Global Packages Updated on Windows, macOS and Linux">
-    <meta name="twitter:description" content="A tray icon for Windows, macOS and Linux (beta) that watches your global packages across fifteen package managers and tells you when one falls behind. One click to update.">
+    <meta name="twitter:description" content="A tray icon for Windows, macOS and Linux (beta) that watches your global packages across fifteen package managers, plus your skills.sh agent skills, and tells you when one falls behind. One click to update.">
     <meta name="twitter:image" content="https://globlin.pages.dev/img/og.png?v=0.4.0">
 
     <script type="application/ld+json">
@@ -30,7 +30,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Globlin",
-        "description": "A tray application for Windows, macOS and Linux, in beta, that watches globally installed packages across npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem, Homebrew, scoop, winget, choco and the PowerShell Gallery, reports which ones are outdated, and updates them on a click.",
+        "description": "A tray application for Windows, macOS and Linux, in beta, that watches globally installed packages across npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem, Homebrew, scoop, winget, choco and the PowerShell Gallery, plus global agent skills installed with skills.sh, reports which ones are outdated, and updates them on a click.",
         "url": "https://globlin.pages.dev/",
         "downloadUrl": "https://github.com/TOR968/Globlin/releases/latest",
         "applicationCategory": "DeveloperApplication",
@@ -851,11 +851,13 @@
           <p class="lede">Globlin never touches anything on its own unless you turn that on.</p>
           <div class="grid">
             <article class="card">
-              <h3>Fifteen package managers, one list</h3>
+              <h3>Fifteen package managers and your agent skills, one list</h3>
               <p>
                 npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem and Homebrew are checked out of the
                 box, plus scoop on Windows; the PowerShell Gallery, winget and choco can be switched on. The
                 same package installed under two of them stays distinguishable — each row names its source.
+                Agent skills installed globally with skills.sh are checked too, against the GitHub
+                repository each one came from, and update with the same click.
               </p>
             </article>
             <article class="card">
