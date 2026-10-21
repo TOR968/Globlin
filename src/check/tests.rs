@@ -462,3 +462,23 @@ fn a_package_installed_from_outside_its_registry_is_never_looked_up_or_offered()
         Status::Unknown
     );
 }
+
+#[test]
+fn a_skill_marked_external_reads_unknown_and_an_offered_hash_reads_outdated() {
+    let unchecked =
+        Installed::new("n8n-loops-official", "1111111", SourceKind::Skills).with_external(true);
+    let changed = Installed::new("n8n-agents-official", "cf295b0", SourceKind::Skills)
+        .with_available(Some("9d1e4a2".to_string()));
+    let latest = Latest::default();
+
+    assert_eq!(
+        classify(unchecked, &Config::default(), &latest).status,
+        Status::Unknown
+    );
+    assert_eq!(
+        classify(changed, &Config::default(), &latest).status,
+        Status::Outdated {
+            latest: "9d1e4a2".to_string()
+        }
+    );
+}

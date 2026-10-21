@@ -19,6 +19,7 @@ fn only(kinds: &[SourceKind]) -> Config {
             brew: false,
             winget: false,
             choco: false,
+            skills: false,
         },
         ..Default::default()
     };

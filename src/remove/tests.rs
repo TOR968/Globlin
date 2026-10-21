@@ -28,6 +28,7 @@ fn removing_without_any_enabled_source_fails_instead_of_reporting_success() {
             brew: false,
             winget: false,
             choco: false,
+            skills: false,
         },
         ..Default::default()
     };
@@ -59,6 +60,7 @@ fn a_source_that_cannot_be_started_fails_instead_of_reporting_success() {
             brew: false,
             winget: false,
             choco: false,
+            skills: false,
         },
         ..Default::default()
     };

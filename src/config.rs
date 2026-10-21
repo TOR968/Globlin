@@ -47,6 +47,7 @@ pub struct Sources {
     pub brew: bool,
     pub winget: bool,
     pub choco: bool,
+    pub skills: bool,
 }
 
 impl Default for Config {
@@ -85,6 +86,7 @@ impl Default for Sources {
             brew: true,
             winget: false,
             choco: false,
+            skills: true,
         }
     }
 }
@@ -159,6 +161,7 @@ impl Config {
             SourceKind::Brew => self.sources.brew,
             SourceKind::Winget => self.sources.winget,
             SourceKind::Choco => self.sources.choco,
+            SourceKind::Skills => self.sources.skills,
         }
     }
 
@@ -179,6 +182,7 @@ impl Config {
             SourceKind::Brew => &mut self.sources.brew,
             SourceKind::Winget => &mut self.sources.winget,
             SourceKind::Choco => &mut self.sources.choco,
+            SourceKind::Skills => &mut self.sources.skills,
         };
         *slot = enabled;
     }

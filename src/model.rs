@@ -15,6 +15,7 @@ pub enum SourceKind {
     Brew,
     Winget,
     Choco,
+    Skills,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +29,7 @@ pub enum Catalog {
     SelfReported,
 }
 
-pub const KINDS: [SourceKind; 15] = [
+pub const KINDS: [SourceKind; 16] = [
     SourceKind::Npm,
     SourceKind::Bun,
     SourceKind::Pnpm,
@@ -44,6 +45,7 @@ pub const KINDS: [SourceKind; 15] = [
     SourceKind::Brew,
     SourceKind::Winget,
     SourceKind::Choco,
+    SourceKind::Skills,
 ];
 
 impl SourceKind {
@@ -64,6 +66,7 @@ impl SourceKind {
             Self::Brew => "brew",
             Self::Winget => "winget",
             Self::Choco => "choco",
+            Self::Skills => "skills",
         }
     }
 
@@ -79,7 +82,7 @@ impl SourceKind {
             Self::PsGallery => Catalog::PsGallery,
             Self::Uv | Self::Scoop | Self::Go | Self::Gem | Self::Brew => Catalog::SelfResolved,
             Self::Cargo => Catalog::Crates,
-            Self::Winget | Self::Choco => Catalog::SelfReported,
+            Self::Winget | Self::Choco | Self::Skills => Catalog::SelfReported,
         }
     }
 
@@ -120,6 +123,7 @@ impl SourceKind {
             Self::Brew => " (brew)",
             Self::Winget => " (winget)",
             Self::Choco => " (choco)",
+            Self::Skills => " (skills)",
         }
     }
 }

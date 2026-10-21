@@ -22,6 +22,7 @@ mod pipx;
 mod pnpm;
 mod psgallery;
 mod scoop;
+mod skills;
 mod uv;
 mod winget;
 mod yarn;
@@ -38,6 +39,7 @@ pub use pipx::Pipx;
 pub use pnpm::Pnpm;
 pub use psgallery::PsGallery;
 pub use scoop::Scoop;
+pub use skills::Skills;
 pub use uv::Uv;
 pub use winget::Winget;
 pub use yarn::Yarn;
@@ -146,6 +148,7 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
         SourceKind::Brew => Box::new(Brew::new()?),
         SourceKind::Winget => Box::new(Winget::new()?),
         SourceKind::Choco => Box::new(Choco::new()?),
+        SourceKind::Skills => Box::new(Skills::new(config.npm_cmd.as_deref())?),
     })
 }
 
