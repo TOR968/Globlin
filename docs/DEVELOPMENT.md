@@ -44,7 +44,7 @@ version to compare against come from, and what does its absence mean?*
 | `NuGet` | dotnet | `registry::nuget_latest`, the flat-container `index.json` | `registry::numeric_is_newer` |
 | `PsGallery` | psgallery | `registry::psgallery_latest`, the package endpoint's redirect | `registry::numeric_is_newer` |
 | `SelfResolved` | uv, scoop, go, gem, brew | the source fills `Installed.available` | `registry::is_newer`, falling back to inequality |
-| `SelfReported` | winget, choco | the source fills `Installed.available` | presence |
+| `SelfReported` | winget, choco, skills | the source fills `Installed.available` | presence |
 
 The first five are remote: the source reports only what is installed, and `check.rs` asks the registry
 for the union of names in that catalog. A name the registry did not answer for is `Unknown`, never
@@ -239,6 +239,51 @@ the index aside, leaves the row queued, sleeps `BUSY_PAUSE` (30 s) once after th
 those packages one more time, the busy members of a shared job together as one smaller shared job (so
 one more prompt, not one per package); a second refusal of any kind is final. `drive` takes the job runner as a closure precisely so this is testable without a real
 winget.
+
+### skills.sh
+
+Global agent skills installed with the skills.sh CLI (`npx skills add <repo> -g`) are the sixteenth
+source, `SourceKind::Skills` in `src/source/skills.rs`. Claude Code plugins are deliberately not covered:
+Claude Code updates its marketplace plugins itself.
+
+- **The lock file is the listing.** `installed()` reads `$XDG_STATE_HOME/skills/.skill-lock.json`, or
+  `<home>/.agents/.skill-lock.json` without `XDG_STATE_HOME`, on every platform — the same rule as the
+  CLI's `getSkillLockPath` (checked against `skills` 1.7.4). No lock file is `NotInstalled`. A lock whose
+  `version` is below 3 lists nothing, because the CLI itself treats such a file as empty. Skills placed by
+  hand, with no lock entry, are not shown: nothing records where they came from.
+- **There are no versions, only folder hashes.** Each entry carries `skillFolderHash`, the git tree SHA of
+  the skill's folder at install time. The row shows its first seven characters.
+- **The check mirrors the CLI's own.** skills.sh has no read-only "what is outdated" command (`skills
+  update` checks and installs in one go), so the source asks GitHub itself: one
+  `GET /repos/<source>/git/trees/<ref, or HEAD, main, master>?recursive=1` per distinct source + ref
+  (`registry::github_trees`), then finds the `tree` entry whose path is the skill's folder (the whole
+  tree's `sha` for a root-level `SKILL.md`; `\` in a Windows-written `skillPath` is read as `/`).
+  Requests go out anonymously; a 401, 403 or 404 is retried once with `GITHUB_TOKEN`, else `GH_TOKEN`,
+  as the CLI does.
+- **`SelfReported`, not `SelfResolved`.** `available` is set only when the upstream hash differs, which is
+  exactly `SelfReported`'s "present means upgrade". Hashes are compared for equality only: `SelfResolved`
+  would run them through `registry::is_newer`, which reads a digits-only hash as a number and could call a
+  changed hash `Current`.
+- **Anything the source could not check is `external`, which reads `Unknown`.** That covers non-GitHub
+  entries (`git`, `local`, `well-known`), an empty hash, a repository that did not answer or hit the
+  60-requests-per-hour anonymous limit, and a folder missing from the upstream tree (moved, deleted, or
+  cut off by a `"truncated": true` reply). None of these goes into `Report.skipped`: a private repository
+  without a token, or a limit spent by other tools on the same IP, would otherwise keep the icon red on
+  every check.
+- **The CLI does every write.** Update is `npx --yes skills update <name> -g -y`, uninstall is
+  `npx --yes skills remove <name> -g -y`; Globlin never edits the lock file or a skill folder. `npx` is
+  looked for beside a configured `npm_cmd` first, then on `PATH`. Without it the skills are still listed
+  and checked, and an update or removal fails with "skills has no command for this" — hiding the button
+  would need window changes for a machine that has skills.sh but no Node. Names must pass `plain_name`
+  and must not start with `-`, because `plain_name` alone accepts `--all`.
+- **The CLI is not pinned.** `npx --yes skills` runs the newest release, as a user typing the command
+  would; the CLI changes often (1.5.19 and 1.7.4 were both current within weeks), and a pinned copy would
+  drift from the lock format it writes.
+- **What the real run showed** (`the_real_skills_cli_updates_and_lists_without_a_prompt`): an update
+  finishes in seconds and never prompts with stdin closed. `runUpdate` sets exit code 1 when any update
+  fails, so a single update's exit code is trusted and the recheck after the batch is the read-back. A
+  name the CLI cannot find exits 0. Node on Windows sometimes dies on exit with a libuv
+  `UV_HANDLE_CLOSING` assertion (exit 127), which reads as a failed update until the next check.
 
 winget also reports some installed versions as the literal `Unknown` (Battle.net). `winget upgrade` hides
 those without `--include-unknown` and refuses to upgrade them, so `winget::to_installed` marks such a row
@@ -918,16 +963,16 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-611 tests on Windows: 581 run by default (no network, no side effects), 30 `#[ignore]`d because they
+638 tests on Windows: 606 run by default (no network, no side effects), 32 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
 window screenshot pages (`dump_window_screenshots`), two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
-this machine), four that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index and the
-Gallery redirect), and twelve that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
-`cargo`, `go`, `dotnet`, PowerShell, `gem` and `brew`. Those last twelve exist because
+this machine), five that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index, the
+Gallery redirect and a GitHub tree), and thirteen that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
+`cargo`, `go`, `dotnet`, PowerShell, `gem`, `brew` and `npx skills`. Those last thirteen exist because
 the parsers below are pinned against captured output, and captured output cannot notice the day a tool
 changes its format — run them after a winget or Chocolatey upgrade. Each carries its own exact invocation
 in its

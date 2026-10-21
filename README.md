@@ -4,7 +4,8 @@
   # Globlin
 
   A tray icon that watches your global packages — npm, bun, pnpm, yarn, pipx, uv, scoop, cargo, go,
-  dotnet, PowerShell Gallery, gem, Homebrew, winget, choco — and tells you when one falls behind.
+  dotnet, PowerShell Gallery, gem, Homebrew, winget, choco, and skills.sh agent skills — and tells you when
+  one falls behind.
 
   [![CI](https://github.com/TOR968/Globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/Globlin/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/TOR968/Globlin)](https://github.com/TOR968/Globlin/releases/latest)
@@ -280,6 +281,7 @@ updated and one `… N more` line; the full queue is in the window.
 | **brew** | `brew info --json=v2 --installed` (formulae and casks) | the same reply — brew's `outdated` flag | `brew upgrade <name>` |
 | **winget** | `winget list` | winget's own `Available` column | `winget upgrade --id <id> --exact --silent` |
 | **choco** | `choco list -r` + `choco outdated -r` | choco's own report | `choco upgrade <name> -y`, elevated |
+| **skills** | the skills.sh lock file (`~/.agents/.skill-lock.json`) | GitHub's tree for the skill's folder | `npx --yes skills update <name> -g -y` |
 
 Everything except psgallery, winget and choco is on by default. A source whose CLI isn't installed simply
 reports nothing — it is not an error, not even when none of them is installed, and one broken source never
@@ -384,7 +386,8 @@ edits are never silently overwritten.
     "gem": true,
     "brew": true,
     "winget": false,
-    "choco": false
+    "choco": false,
+    "skills": true
   },
   "ignore": ["npm", "@anthropic-ai/claude-code"],
   "last_notified": [],

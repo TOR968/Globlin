@@ -286,3 +286,26 @@ fn a_name_that_could_inject_arguments_gets_no_command() {
     assert!(with_npx().update_command("--all").is_none());
     assert!(with_npx().uninstall_command("--all").is_none());
 }
+
+#[test]
+#[ignore = "runs the real npx skills against the user's global skills: SKILL_TARGET=<installed skill> cargo test -- --ignored --exact source::skills::tests::the_real_skills_cli_updates_and_lists_without_a_prompt"]
+fn the_real_skills_cli_updates_and_lists_without_a_prompt() {
+    let target = std::env::var("SKILL_TARGET").unwrap();
+    let skills = Skills::new(None).unwrap();
+    let mut command = skills.update_command(&target).unwrap();
+
+    let output =
+        crate::process::output_within(&mut command, std::time::Duration::from_mins(3)).unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(skills
+        .installed()
+        .unwrap()
+        .iter()
+        .any(|skill| skill.name == target));
+}
