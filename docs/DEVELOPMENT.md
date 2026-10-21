@@ -259,7 +259,9 @@ Claude Code updates its marketplace plugins itself.
   (`registry::github_trees`), then finds the `tree` entry whose path is the skill's folder (the whole
   tree's `sha` for a root-level `SKILL.md`; `\` in a Windows-written `skillPath` is read as `/`).
   Requests go out anonymously; a 401, 403 or 404 is retried once with `GITHUB_TOKEN`, else `GH_TOKEN`,
-  as the CLI does.
+  as the CLI does (it also falls back to `gh` authentication, which Globlin does not). A repository whose
+  skills are all in the ignore list is not requested (`repos_to_check`), so the README's "ignored
+  packages are never looked up" holds here too.
 - **`SelfReported`, not `SelfResolved`.** `available` is set only when the upstream hash differs, which is
   exactly `SelfReported`'s "present means upgrade". Hashes are compared for equality only: `SelfResolved`
   would run them through `registry::is_newer`, which reads a digits-only hash as a number and could call a
@@ -282,7 +284,12 @@ Claude Code updates its marketplace plugins itself.
 - **What the real run showed** (`the_real_skills_cli_updates_and_lists_without_a_prompt`): an update
   finishes in seconds and never prompts with stdin closed. `runUpdate` sets exit code 1 when any update
   fails, so a single update's exit code is trusted and the recheck after the batch is the read-back. A
-  name the CLI cannot find exits 0. Node on Windows sometimes dies on exit with a libuv
+  name the CLI cannot find exits 0. So does a run whose own check failed: when the CLI's GitHub
+  request fails, or any sibling skill of the same repository has moved, it falls back to `git clone`, and
+  a failed clone (no `git` on a login-started tray app's `PATH`, no network) is only logged, not counted
+  as a failure. The row then reads updated and the recheck shows it outdated again; it never reads
+  `Current`. Switching to `skills add <sourceUrl> --skill <name> -g -y` would give an honest exit code but
+  means re-implementing the CLI's `buildUpdateInstallSource`. Node on Windows sometimes dies on exit with a libuv
   `UV_HANDLE_CLOSING` assertion (exit 127), which reads as a failed update until the next check.
 
 winget also reports some installed versions as the literal `Unknown` (Battle.net). `winget upgrade` hides
@@ -963,7 +970,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-638 tests on Windows: 606 run by default (no network, no side effects), 32 `#[ignore]`d because they
+641 tests on Windows: 609 run by default (no network, no side effects), 32 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

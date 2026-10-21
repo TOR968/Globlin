@@ -8,6 +8,7 @@ use serde::Deserialize;
 use super::{
     executable_in, find_on_path, hidden_command, not_installed, plain_name, PackageSource,
 };
+use crate::config::Config;
 use crate::model::{Installed, SourceKind};
 use crate::{platform, registry, Result};
 
@@ -24,10 +25,11 @@ const CLI: &str = "skills";
 pub struct Skills {
     lock: PathBuf,
     npx: Option<PathBuf>,
+    ignored: Vec<String>,
 }
 
 impl Skills {
-    pub fn new(npm_cmd: Option<&Path>) -> Result<Self> {
+    pub fn new(config: &Config) -> Result<Self> {
         let lock = lock_path(
             std::env::var_os("XDG_STATE_HOME").map(PathBuf::from),
             platform::home_dir(),
@@ -35,7 +37,10 @@ impl Skills {
         .ok_or_else(|| {
             not_installed("no home directory to look for the skills.sh lock file in".into())
         })?;
-        Self::at(lock, npx_beside(npm_cmd))
+        Ok(Self {
+            ignored: config.ignore.clone(),
+            ..Self::at(lock, npx_beside(config.npm_cmd.as_deref()))?
+        })
     }
 
     fn at(lock: PathBuf, npx: Option<PathBuf>) -> Result<Self> {
@@ -44,7 +49,11 @@ impl Skills {
                 "the skills.sh lock file was not found".into(),
             ));
         }
-        Ok(Self { lock, npx })
+        Ok(Self {
+            lock,
+            npx,
+            ignored: Vec::new(),
+        })
     }
 
     fn cli(&self, verb: &str, name: &str) -> Option<Command> {
@@ -62,12 +71,9 @@ impl PackageSource for Skills {
 
     fn installed(&self) -> Result<Vec<Installed>> {
         let entries = parse_lock(&fs::read_to_string(&self.lock)?)?;
-        let repos: Vec<String> = entries
-            .iter()
-            .filter_map(repo_key)
-            .collect::<BTreeSet<String>>()
-            .into_iter()
-            .collect();
+        let repos = repos_to_check(&entries, |name| {
+            self.ignored.iter().any(|ignored| ignored == name)
+        });
         Ok(resolve(&entries, &registry::github_trees(&repos)))
     }
 
@@ -144,6 +150,16 @@ fn parse_lock(raw: &str) -> Result<Vec<Entry>> {
         .collect())
 }
 
+fn repos_to_check(entries: &[Entry], ignored: impl Fn(&str) -> bool) -> Vec<String> {
+    entries
+        .iter()
+        .filter(|entry| !ignored(&entry.name))
+        .filter_map(repo_key)
+        .collect::<BTreeSet<String>>()
+        .into_iter()
+        .collect()
+}
+
 fn repo_key(entry: &Entry) -> Option<String> {
     let checkable = entry.source_type == CHECKABLE_TYPE
         && !entry.source.is_empty()
@@ -172,11 +188,14 @@ fn folder_hash(tree_json: &str, skill_path: &str) -> Option<String> {
 
 fn skill_folder(skill_path: &str) -> String {
     let path = skill_path.replace('\\', "/");
-    let folder = if path.to_lowercase().ends_with(SKILL_FILE) {
-        &path[..path.len() - SKILL_FILE.len()]
-    } else {
-        &path
-    };
+    let folder = path
+        .len()
+        .checked_sub(SKILL_FILE.len())
+        .filter(|start| {
+            path.get(*start..)
+                .is_some_and(|tail| tail.eq_ignore_ascii_case(SKILL_FILE))
+        })
+        .map_or(path.as_str(), |start| &path[..start]);
     folder.trim_end_matches('/').to_string()
 }
 

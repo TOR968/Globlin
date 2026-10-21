@@ -148,7 +148,7 @@ fn build(kind: SourceKind, config: &Config) -> Result<Box<dyn PackageSource>> {
         SourceKind::Brew => Box::new(Brew::new()?),
         SourceKind::Winget => Box::new(Winget::new()?),
         SourceKind::Choco => Box::new(Choco::new()?),
-        SourceKind::Skills => Box::new(Skills::new(config.npm_cmd.as_deref())?),
+        SourceKind::Skills => Box::new(Skills::new(config)?),
     })
 }
 

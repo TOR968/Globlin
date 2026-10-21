@@ -229,6 +229,7 @@ fn with_npx() -> Skills {
     Skills {
         lock: PathBuf::from("unused"),
         npx: Some(PathBuf::from("npx")),
+        ignored: Vec::new(),
     }
 }
 
@@ -276,6 +277,7 @@ fn without_npx_a_skill_can_be_listed_but_offers_no_command() {
     let skills = Skills {
         lock: PathBuf::from("unused"),
         npx: None,
+        ignored: Vec::new(),
     };
     assert!(skills.update_command("n8n-agents-official").is_none());
     assert!(skills.uninstall_command("n8n-agents-official").is_none());
@@ -291,7 +293,7 @@ fn a_name_that_could_inject_arguments_gets_no_command() {
 #[ignore = "runs the real npx skills against the user's global skills: SKILL_TARGET=<installed skill> cargo test -- --ignored --exact source::skills::tests::the_real_skills_cli_updates_and_lists_without_a_prompt"]
 fn the_real_skills_cli_updates_and_lists_without_a_prompt() {
     let target = std::env::var("SKILL_TARGET").unwrap();
-    let skills = Skills::new(None).unwrap();
+    let skills = Skills::new(&crate::config::Config::default()).unwrap();
     let mut command = skills.update_command(&target).unwrap();
 
     let output =
@@ -308,4 +310,32 @@ fn the_real_skills_cli_updates_and_lists_without_a_prompt() {
         .unwrap()
         .iter()
         .any(|skill| skill.name == target));
+}
+
+#[test]
+fn a_repository_whose_skills_are_all_ignored_is_not_sent_to_github() {
+    let ignored = ["n8n-agents-official", "n8n-loops-official"];
+    assert_eq!(
+        repos_to_check(&entries(), |name| ignored.contains(&name)),
+        ["owner/repo#v2"]
+    );
+}
+
+#[test]
+fn a_repository_is_still_checked_while_one_of_its_skills_is_not_ignored() {
+    assert_eq!(
+        repos_to_check(&entries(), |name| name == "n8n-agents-official"),
+        ["n8n-io/skills", "owner/repo#v2"]
+    );
+}
+
+#[test]
+fn a_skill_path_ending_in_a_unicode_lookalike_of_skill_md_does_not_panic() {
+    assert_eq!(
+        folder_hash(
+            &tree(UPSTREAM),
+            "skills/n8n-agents-official/S\u{212A}ILL.md"
+        ),
+        None
+    );
 }

@@ -500,7 +500,8 @@ the app checks before it updates itself (see *If Windows Defender flags the down
 
 ### Privacy
 
-Globlin has no telemetry, no analytics, no crash reports and no account, and sends no identifier of any kind. It
+Globlin has no telemetry, no analytics, no crash reports and no account, and sends no identifier of its own — the one exception, a GitHub token you already set, is
+explained under *Skill lookups* below. It
 goes on the network only to do what it is for, and every request it makes names Globlin in its user agent:
 
 - **Version lookups:** the names of your installed packages are sent to the public registry of their
@@ -508,6 +509,11 @@ goes on the network only to do what it is for, and every request it makes names 
   `api.nuget.org` (dotnet) and `www.powershellgallery.com` (PowerShell Gallery). Switching a source off in
   Settings stops its lookups, and ignored packages are never looked up. An npm, bun, pnpm or yarn package
   installed from git, a local path, a link or a private registry is never sent to the public registry.
+- **Skill lookups:** for skills installed with skills.sh, the `owner/repo` names from its lock file are
+  sent to `api.github.com` to read each repository's file tree. Requests are anonymous; only when GitHub
+  answers 401, 403 or 404 does Globlin repeat that one request with the `GITHUB_TOKEN` or `GH_TOKEN`
+  already set in its environment, which is what the skills.sh CLI itself does. A repository whose skills
+  are all ignored is not asked about. Switching the skills source off stops these lookups.
 - **Its own updates:** `api.github.com` is asked for the latest Globlin release, and an update is
   downloaded from GitHub's release storage. Builds owned by winget or a system package manager skip this.
 - **The package managers themselves** contact their own servers when Globlin runs their list, outdated,
