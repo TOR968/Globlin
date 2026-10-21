@@ -425,7 +425,7 @@ cargo test -- --ignored --exact icon::tests::dump_readme_images
 That writes `docs/img/logo.png` (128 px, idle state) and `docs/img/icon-{idle,updates,error,busy}.png`
 (32 px each). Commit the results alongside the render change.
 
-**The landing page's artwork (`site/img/*.png`) is generated the same way, by a second ignored test.**
+**The landing page's artwork (`site/public/img/*.png`) is generated the same way, by a second ignored test.**
 Regenerate it after any change to `src/icon/render.rs`, or after any change to the Open Graph card layout
 in `src/icon/tests.rs`:
 
@@ -433,8 +433,8 @@ in `src/icon/tests.rs`:
 cargo test -- --ignored --exact icon::tests::dump_site_images
 ```
 
-That writes six files: `site/img/logo.png` (256 px, idle state), `site/img/icon-{idle,updates,error,busy}.png`
-(64 px each), and `site/img/og.png`, the Open Graph card the landing page's meta tags point social
+That writes six files: `site/public/img/logo.png` (256 px, idle state), `site/public/img/icon-{idle,updates,error,busy}.png`
+(64 px each), and `site/public/img/og.png`, the Open Graph card the landing page's meta tags point social
 previews at (1200×630, the size Facebook, Twitter/X and Slack all expect without cropping). Commit the
 results alongside the render change.
 
@@ -461,18 +461,19 @@ while offset < len(data):
     offset += 12 + length
 raw = zlib.decompress(idat)
 print(f'{sys.argv[1]}: {width}x{height}, inflated {len(raw)} bytes, IDAT {len(idat)} bytes')
-" site/img/og.png
+" site/public/img/og.png
 ```
 
-Verified against `site/img/og.png` on Python 3.14.4, which printed
-`site/img/og.png: 1200x630, inflated 3024630 bytes, IDAT 50126 bytes` — `3024630` is exactly
+Verified against `site/public/img/og.png` on Python 3.14.4, which printed
+`site/public/img/og.png: 1200x630, inflated 3024630 bytes, IDAT 50126 bytes` — `3024630` is exactly
 `(1200 * 4 + 1) * 630`, the filtered-row stride times the height, which is what a correctly-shaped stream
 inflates to regardless of what the encoder's own reader would have accepted.
 
 ### The window screenshots
 
 The README's and the landing page's pictures of the window (`docs/img/window-{updates,batch,settings}.png`,
-copied unchanged into `site/img/`) are generated too, in two steps. An ignored test builds three realistic
+copied unchanged into `site/src/assets/window/` as `updates.png`, `batch.png` and `settings.png`) are
+generated too, in two steps. An ignored test builds three realistic
 `Snapshot`s through the real `window::snapshot` — 23 packages across npm, bun, go and scoop with three
 outdated; a 12-target batch with five done, one failed, one running and five queued; and the same
 packages with a Globlin release waiting — and writes each as a self-contained copy of `ui.html` that
@@ -506,7 +507,7 @@ foreach ($name in "updates", "batch", "settings") {
         "--hide-scrollbars", "--force-dark-mode", "--user-data-dir=$userData",
         "--force-device-scale-factor=2", "--window-size=960,640",
         "--screenshot=$PWD\docs\img\window-$name.png", "file:///$page"
-    Copy-Item "docs\img\window-$name.png" "site\img\window-$name.png"
+    Copy-Item "docs\img\window-$name.png" "site\src\assets\window\$name.png"
 }
 ```
 
@@ -746,10 +747,50 @@ Things about the environment the code has to work around, all verified rather th
 
 ## The landing page
 
-`site/` is the marketing page at [globlin.pages.dev](https://globlin.pages.dev). Cloudflare Pages is
-pointed at the `site` directory on the `master` branch with no build command — every push republishes
-it verbatim. There is no bundler, no `package.json`, and no third-party request at render time; the CSS
-and the one script are inline in `site/index.html`.
+`site/` is the marketing page at [globlin.pages.dev](https://globlin.pages.dev), an Astro project built
+with Bun. Cloudflare Pages builds it on every push to `master` (and a preview for every other branch):
+root directory `site`, build command `bun run check && bun run build`, output directory `dist`, and the
+build variable `BUN_VERSION`, because the build image's own Bun is too old to read `bun.lock`. Those
+four settings live in the Pages dashboard, not in the repository. A failed build leaves the previous
+deployment live, so a type error never takes the page down.
+
+```
+cd site
+bun install
+bun run dev      # http://localhost:4321
+bun run check    # astro check, 0 errors before every commit
+bun run build    # writes dist/
+```
+
+The layout follows the knowledge-base Astro playbook: `src/layouts/Base.astro` owns `<head>` (meta tags,
+Open Graph, both JSON-LD blocks), `src/pages/index.astro` is the page, repeated markup is a typed array in
+`src/data/` rendered through a component (features, icon states, FAQ, platform cards, download buttons),
+and the one script is TypeScript in `src/scripts/release.ts`, bundled and inlined by Astro. The CSS is
+`src/styles/site.css`, inlined at build time (`inlineStylesheets: 'always'`). Every URL and the image
+cache-busting version come from `src/data/site.ts`. The FAQ's JSON-LD is generated from the same
+`src/data/faq.ts` entries the page renders, so the structured data can no longer drift from the visible
+answers. `compressHTML` is off on purpose: Astro's compressor drops the whitespace between `·` and the
+link that follows it on a new line, which glued "checksums and signatures" and the platform links
+together. Everything with a fixed URL — `img/`, `_headers`, `llms.txt`, `robots.txt`, `sitemap.xml`,
+the Search Console file — sits in `site/public/` and is copied to `dist/` as is. The logo, the four
+state icons and the Open Graph card stay there because the dump test writes them by name and the meta
+tags and the `?v=` scheme below need stable URLs. The three window screenshots are the exception: they
+live in `site/src/assets/window/` and go through `astro:assets` `<Picture>` as AVIF and WebP at five
+widths, because the 1920-pixel PNGs were the page's largest cost on a phone (Lighthouse estimated 381 KiB
+of savings and mobile LCP was 2.7 s). The hero screenshot loads eagerly with `fetchpriority="high"`.
+
+`src/pages/404.astro` exists so an unknown path returns a real 404. Without it Pages answered every path
+with the front page and a 200: a soft 404 for search engines, and Lighthouse's Agentic Browsing check read
+`/.well-known/ai-catalog.json` as a malformed manifest because it got HTML back. The 404 page renders
+through `Base` with `notFound`, which swaps the title, adds `noindex` and drops the canonical link, the
+social tags and both JSON-LD blocks. The header's links are `/#section` rather than `#section` so they
+also work from it.
+
+The Astro rewrite (2026-10-22) was checked against the hand-written page it replaced: the visible text
+and every link, image and class attribute were identical, and headless Edge screenshots at 1280 and
+390 px wide were pixel-identical. The SEO pass that followed (404 page, screenshot formats, a 158-character
+meta description, a first sentence that says what Globlin is) took local Lighthouse to 100 in all five
+categories, including Agentic Browsing, over three runs.
 
 See [The icon](#the-icon) section above for how the landing page's artwork is regenerated.
 
@@ -768,7 +809,7 @@ the symptom to look for is missing data rather than a failure.
 Images under `/img/` are cached for a day, and every reference to one in `index.html` carries a
 `?v=<version>` query. They were cached for a year as `immutable` until the goblin replaced the `G` logo:
 the files are regenerated in place under the same names, so browsers kept showing the old logo with no
-way to refresh it. Bump the `?v=` value whenever the dump tests rewrite `site/img/`.
+way to refresh it. Bump the `?v=` value whenever the dump tests rewrite `site/public/img/`.
 
 `site/llms.txt` describes the project for AI agents, in the format Lighthouse's agentic-browsing
 category checks for: a title, a one-line summary, a few paragraphs of prose, and link sections pointing

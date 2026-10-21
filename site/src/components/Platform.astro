@@ -1,0 +1,25 @@
+---
+interface Props {
+  icon: string;
+  name: string;
+  meta: string;
+  experimental?: boolean;
+}
+
+const { icon, name, meta, experimental = false } = Astro.props;
+---
+
+<article class="platform">
+  <div class="platform-head">
+    <svg class="platform-logo" aria-hidden="true"><use href={`#os-${icon}`}></use></svg>
+    <div>
+      <h3>{name}{experimental && <> <span class="tag">Experimental</span></>}</h3>
+      <p class="platform-meta">{meta}</p>
+    </div>
+  </div>
+  <slot />
+  <div class="platform-actions">
+    <slot name="actions" />
+  </div>
+  <slot name="alt" />
+</article>

@@ -1,0 +1,21 @@
+---
+import { ISSUES, RELEASES, REPO } from '@/data/site';
+
+const links = [
+  { href: REPO, label: 'GitHub' },
+  { href: RELEASES, label: 'Releases' },
+  { href: `${REPO}/blob/master/CHANGELOG.md`, label: 'Changelog' },
+  { href: ISSUES, label: 'Report an issue' },
+  { href: `${REPO}#code-signing-policy`, label: 'Code signing policy' },
+  { href: 'https://www.patreon.com/c/TOR968', label: 'Support on Patreon' },
+];
+---
+
+<footer class="site-footer">
+  <div class="shell">
+    <span>Globlin — Copyright © 2026 TOR968. GPL-3.0.</span>
+    <nav>
+      {links.map((link) => <a href={link.href}>{link.label}</a>)}
+    </nav>
+  </div>
+</footer>

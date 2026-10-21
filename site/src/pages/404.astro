@@ -1,0 +1,24 @@
+---
+import Base from '@/layouts/Base.astro';
+import SiteFooter from '@/components/SiteFooter.astro';
+import SiteHeader from '@/components/SiteHeader.astro';
+---
+
+<Base notFound>
+  <SiteHeader />
+
+  <main>
+    <section class="section">
+      <div class="shell">
+        <p class="eyebrow">404</p>
+        <h1>This page does not exist</h1>
+        <p class="lede">The goblin looked everywhere. Everything Globlin has to say is on the front page.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="/">Back to Globlin</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <SiteFooter />
+</Base>
