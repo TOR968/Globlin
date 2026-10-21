@@ -296,3 +296,30 @@ fn a_name_cannot_change_the_path_or_the_query_of_a_registry_request() {
         "https://pypi.org/rss/project/a%2fb%26c/releases.xml"
     );
 }
+
+#[test]
+fn a_repository_without_a_ref_is_tried_at_head_then_main_then_master() {
+    assert_eq!(
+        tree_urls("n8n-io/skills"),
+        vec![
+            "https://api.github.com/repos/n8n-io/skills/git/trees/HEAD?recursive=1",
+            "https://api.github.com/repos/n8n-io/skills/git/trees/main?recursive=1",
+            "https://api.github.com/repos/n8n-io/skills/git/trees/master?recursive=1",
+        ]
+    );
+}
+
+#[test]
+fn a_pinned_ref_is_the_only_tree_asked_for_and_is_percent_encoded() {
+    assert_eq!(
+        tree_urls("owner/repo#release/v2"),
+        vec!["https://api.github.com/repos/owner/repo/git/trees/release%2fv2?recursive=1"]
+    );
+}
+
+#[test]
+#[ignore = "hits the real GitHub API: cargo test -- --ignored --exact registry::tests::github_answers_a_public_skills_repository"]
+fn github_answers_a_public_skills_repository() {
+    let trees = github_trees(&["vercel-labs/skills".to_string()]);
+    assert!(trees["vercel-labs/skills"].contains("\"tree\""));
+}
