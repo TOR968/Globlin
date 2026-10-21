@@ -296,9 +296,9 @@ fn the_state_row_on_the_open_graph_card_paints_its_first_and_last_mark() {
 }
 
 #[test]
-#[ignore = "writes the landing-page PNGs into site/img: cargo test -- --ignored --exact icon::tests::dump_site_images"]
+#[ignore = "writes the landing-page PNGs into site/public/img: cargo test -- --ignored --exact icon::tests::dump_site_images"]
 fn dump_site_images() {
-    let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("site/img");
+    let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("site/public/img");
     fs::create_dir_all(&directory).unwrap();
 
     let logo_size = 256;

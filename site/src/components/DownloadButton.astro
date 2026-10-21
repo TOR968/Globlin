@@ -1,0 +1,24 @@
+---
+import { download } from '@/data/site';
+
+interface Props {
+  file: string;
+  icon: string;
+  label: string;
+  primary?: boolean;
+  os?: string;
+}
+
+const { file, icon, label, primary = false, os } = Astro.props;
+---
+
+<a
+  class:list={['button', primary ? 'button-primary' : 'button-ghost']}
+  data-os={os}
+  href={download(file)}
+  data-file={os ? file : undefined}
+  rel="nofollow"
+>
+  <svg class="os-icon" aria-hidden="true"><use href={`#os-${icon}`}></use></svg>
+  {label}
+</a>

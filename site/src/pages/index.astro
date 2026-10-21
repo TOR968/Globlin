@@ -1,0 +1,221 @@
+---
+import Base from '@/layouts/Base.astro';
+import DownloadButton from '@/components/DownloadButton.astro';
+import OsSprite from '@/components/OsSprite.astro';
+import Platform from '@/components/Platform.astro';
+import SiteFooter from '@/components/SiteFooter.astro';
+import SiteHeader from '@/components/SiteHeader.astro';
+import { faq } from '@/data/faq';
+import { features } from '@/data/features';
+import { ISSUES, LATEST_RELEASE, RELEASES, download, image } from '@/data/site';
+import { states } from '@/data/states';
+
+const heroStates = [
+  { className: 'state state-a', icon: 'icon-idle.png' },
+  { className: 'state state-b', icon: 'icon-updates.png' },
+  { className: 'state state-c', icon: 'icon-busy.png' },
+  { className: 'state state-d', icon: 'icon-error.png' },
+];
+
+const badges = [
+  'Installer or portable',
+  'Windows x64 and ARM64',
+  'macOS on Apple Silicon',
+  'Linux deb, rpm and AppImage',
+  'Signed updates',
+  'Open source, GPL-3.0',
+];
+---
+
+<Base>
+  <OsSprite />
+  <SiteHeader />
+
+  <main>
+    <section class="hero">
+      <div class="shell">
+        <div class="hero-grid">
+          <div>
+            <p class="eyebrow">Tray app for Windows, macOS and Linux · <span class="tag">Beta</span></p>
+            <h1>Keep every global package up to date</h1>
+            <p>
+              Global CLIs rot silently. Nothing tells you <code>@salesforce/cli</code> is six versions
+              behind until a command breaks in a way that turns out to be &ldquo;oh, I&rsquo;m ancient.&rdquo;
+              Globlin sits in the Windows tray, the macOS menu bar or the Linux system tray, checks on a
+              schedule across every package manager you have installed, and puts what has fallen behind
+              first.
+            </p>
+            <div class="hero-actions os-buttons">
+              <DownloadButton os="windows" file="globlin-setup-x64.exe" icon="windows" label="Windows" primary />
+              <DownloadButton os="macos" file="globlin-macos-apple-silicon.zip" icon="apple" label="macOS" />
+              <DownloadButton os="linux" file="globlin-amd64.deb" icon="linux" label="Linux" />
+            </div>
+            <p class="download-note">
+              <span id="download-file">globlin-setup-x64.exe</span> · <span data-version>latest</span> ·
+              <a href={LATEST_RELEASE}>checksums and signatures</a> ·
+              <a href="#install">every download</a>
+            </p>
+            <p class="beta-note">
+              Globlin is in beta. The Windows builds are in daily use; the installer, the ARM64 builds and
+              the macOS and Linux builds are new.
+              <a href={ISSUES}>Report anything that breaks</a>.
+            </p>
+          </div>
+          <div class="hero-art">
+            <img class="mascot" src={image('logo.png')} width="256" height="256" alt="Globlin, a chibi goblin with big glossy eyes" />
+            {heroStates.map((state) => <img class={state.className} src={image(state.icon)} width="64" height="64" alt="" />)}
+          </div>
+        </div>
+        <ul class="badges">
+          {badges.map((badge) => <li>{badge}</li>)}
+        </ul>
+        <figure class="shot shot-hero">
+          <img src={image('window-updates.png')} width="1920" height="1280" alt="The Globlin window: three updates ready at the top with an Update all button, grouped by package manager, and every other package manager summarised as up to date below" />
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="window">
+      <div class="shell">
+        <p class="eyebrow">What you actually see</p>
+        <h2>Updates first, everything else one click away</h2>
+        <p class="lede">
+          What has fallen behind sits at the top, grouped by package manager, with one button for all of
+          it. Everything that is current folds into a tile per package manager. Even a hundred updates
+          stay readable: groups collapse, a long group shows its first rows and a &ldquo;show more&rdquo;.
+        </p>
+        <div class="shots">
+          <figure class="shot">
+            <img src={image('window-batch.png')} width="1920" height="1280" loading="lazy" alt="A batch update running: a progress bar with done, failed and active counts, and the queue below it" />
+            <figcaption>A batch runs as one queue with a progress bar, and Homebrew always goes last.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src={image('window-settings.png')} width="1920" height="1280" loading="lazy" alt="The settings page: run at startup, automatic npm script approval, Globlin updates, and a switch per package manager" />
+            <figcaption>Settings: startup, Globlin&rsquo;s own updates, and a switch per package manager.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="shell">
+        <p class="eyebrow">Features</p>
+        <h2>It watches, it tells you, it waits for your click</h2>
+        <p class="lede">Globlin never touches anything on its own unless you turn that on.</p>
+        <div class="grid">
+          {
+            features.map((feature) => (
+              <article class="card">
+                <h3>{feature.title}</h3>
+                <p>{feature.body}</p>
+              </article>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="states">
+      <div class="shell">
+        <p class="eyebrow">Icon states</p>
+        <h2>The goblin&rsquo;s colour is the status</h2>
+        <p class="lede">
+          The tray goblin is drawn from code, not loaded from an image file, so what it shows always
+          matches what it found.
+        </p>
+        <ul class="states">
+          {
+            states.map((state) => (
+              <li>
+                <img src={image(state.icon)} width="48" height="48" alt="" />
+                <span><strong>{state.name}</strong> {state.text}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="install">
+      <div class="shell">
+        <p class="eyebrow">Install</p>
+        <h2>Pick the build for your machine</h2>
+        <p class="lede">
+          The same app for every platform, all of it beta. Checksums and minisign signatures for every
+          file are on the <a href={LATEST_RELEASE}>release page</a>.
+        </p>
+        <div class="platforms">
+          <Platform icon="windows" name="Windows" meta="Windows 10 and 11 · x64, ARM64">
+            <p class="platform-text">
+              Installs for your user with no administrator prompt, adds Globlin to the Start menu and to
+              Settings → Apps, and can start it at sign-in.
+            </p>
+            <DownloadButton slot="actions" file="globlin-setup-x64.exe" icon="windows" label="Installer" />
+            <p slot="alt" class="platform-alt">
+              Also: <a href={download('globlin-setup-arm64.exe')} rel="nofollow">ARM64</a> ·
+              <a href={download('globlin.exe')} rel="nofollow">portable</a> ·
+              <a href={download('globlin-arm64.exe')} rel="nofollow">portable ARM64</a>
+            </p>
+          </Platform>
+          <Platform icon="apple" name="macOS" meta="macOS 11 or later · Apple Silicon" experimental>
+            <ol class="platform-text">
+              <li>Download the .zip, unzip it, drag Globlin.app into Applications.</li>
+              <li>Open it. When macOS says it could not verify Globlin, choose Done.</li>
+              <li>System Settings → Privacy &amp; Security → Open Anyway. It is signed ad hoc, not notarised, so this is needed once.</li>
+            </ol>
+            <DownloadButton slot="actions" file="globlin-macos-apple-silicon.zip" icon="apple" label="Download .zip" />
+            <p slot="alt" class="platform-alt">Lives in the menu bar; in the Dock only while its window is open.</p>
+          </Platform>
+          <Platform icon="linux" name="Linux" meta="glibc 2.35 or later · x64, ARM64" experimental>
+            <p class="platform-text">
+              Install the package with apt or dnf, or run the AppImage, which updates itself. GNOME
+              needs the AppIndicator extension to show the tray icon; packages do not update themselves.
+            </p>
+            <DownloadButton slot="actions" file="globlin-amd64.deb" icon="debian" label=".deb" />
+            <DownloadButton slot="actions" file="globlin-x86_64.rpm" icon="fedora" label=".rpm" />
+            <DownloadButton slot="actions" file="globlin-x86_64.AppImage" icon="linux" label="AppImage" />
+            <p slot="alt" class="platform-alt">
+              ARM64: <a href={download('globlin-arm64.deb')} rel="nofollow">.deb</a> ·
+              <a href={download('globlin-aarch64.rpm')} rel="nofollow">.rpm</a> ·
+              <a href={download('globlin-aarch64.AppImage')} rel="nofollow">AppImage</a>
+            </p>
+          </Platform>
+        </div>
+        <ol class="steps" role="list">
+          <li>
+            <strong>Run it</strong>
+            The window opens and the first check starts. Starting it again later brings the same window
+            back.
+          </li>
+          <li>
+            <strong>Optional: tick Run at startup</strong>
+            From the tray menu or the window. At sign-in it then starts quietly in the tray.
+          </li>
+        </ol>
+        <div class="hero-actions">
+          <a class="button button-ghost" href={RELEASES}>All releases</a>
+        </div>
+        <p class="download-note">Latest: <span data-version>latest</span></p>
+      </div>
+    </section>
+
+    <section class="section faq" id="faq">
+      <div class="shell">
+        <p class="eyebrow">FAQ</p>
+        <h2>Questions worth answering</h2>
+        {
+          faq.map((entry) => (
+            <details>
+              <summary>{entry.question}</summary>
+              <p set:html={entry.answer} />
+            </details>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+
+  <SiteFooter />
+
+  <script src="@/scripts/release.ts"></script>
+</Base>
