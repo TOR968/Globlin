@@ -42,6 +42,7 @@ impl UnrunnableNpm {
                     brew: false,
                     winget: false,
                     choco: false,
+                    skills: false,
                 },
                 ..Default::default()
             },
@@ -173,6 +174,7 @@ fn a_target_whose_source_is_disabled_is_reported_rather_than_skipped_silently() 
             brew: false,
             winget: false,
             choco: false,
+            skills: false,
         },
         ..Default::default()
     };
@@ -261,6 +263,7 @@ impl FakeNpmRun {
                     brew: false,
                     winget: false,
                     choco: false,
+                    skills: false,
                 },
                 ..Default::default()
             },

@@ -29,6 +29,7 @@ fn round_trips_through_json() {
             brew: false,
             winget: false,
             choco: false,
+            skills: false,
         },
         ..Default::default()
     };

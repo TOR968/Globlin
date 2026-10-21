@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 611 tests (581 run, 30 ignored) on Windows, no network, no side effects
+cargo test                     # 641 tests (609 run, 32 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -25,12 +25,12 @@ Run one test: `cargo test -- --exact check::tests::versions_compare_numerically_
 a test that records a failure cannot show up in an installed Globlin's *Open last log*. Every module reaches
 the directory through that one function — keep it that way.
 
-Thirty tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
+Thirty-two tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
 real `npm install -g` x2, one that runs the real `npm config get/set` against a temporary userconfig,
-an icon dump, a README-image dump, a site-image dump, a macOS iconset dump, a Linux hicolor icon dump, a window-screenshot page dump, two that hit the real GitHub releases API, four
-that hit a real remote catalog — PyPI, crates.io, NuGet, the PowerShell Gallery — one that builds a real
-WebView2 window, and twelve that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`, `cargo`,
-`go`, `dotnet`, PowerShell, `gem` and `brew` to confirm their output still has the shape the parsers expect).
+an icon dump, a README-image dump, a site-image dump, a macOS iconset dump, a Linux hicolor icon dump, a window-screenshot page dump, two that hit the real GitHub releases API, five
+that hit a real remote catalog — PyPI, crates.io, NuGet, the PowerShell Gallery, a GitHub tree — one that builds a real
+WebView2 window, and thirteen that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`, `cargo`,
+`go`, `dotnet`, PowerShell, `gem`, `brew` and `npx skills` to confirm their output still has the shape the parsers expect).
 They never run in CI. Each carries its exact invocation in its `#[ignore = "…"]` message —
 `grep -rn "#\[ignore" src/` — read it before running one; `updates_a_package_for_real` installs globally
 for real and is driven by `$env:UPDATE_TARGET`.
@@ -99,7 +99,7 @@ from and what its absence means. Five are remote and resolved in `registry.rs` f
 megabytes), `NuGet` (dotnet — the flat-container index) and `PsGallery` (psgallery — the version read
 from the package endpoint's 302 `Location`, no body downloaded); the last three compare with
 `registry::numeric_is_newer`, because PEP 440 and NuGet are not semver. Two are filled by the source into
-`Installed.available`, and they differ only in what `None` means: `SelfReported` (winget, choco) —
+`Installed.available`, and they differ only in what `None` means: `SelfReported` (winget, choco, skills) —
 `None` is "no upgrade"; `SelfResolved` (uv, scoop, go, gem, brew) — the source always fills the version it
 compared against, so `None` can only mean it could not find out, and reads `Unknown`. uv and gem are
 `SelfResolved` because their outdated reports list *only* outdated packages, so a failed report and an
@@ -140,7 +140,7 @@ and uninstall `Command`s. `source::enabled` walks `model::KINDS` in order, skips
 off, and fails only when *no* source could be built and at least one installed source broke; one broken
 source does not sink a working one. A program that is simply not installed is `source::NotInstalled`,
 not a failure — a machine with none of the enabled managers gets an empty check ("nothing found"), not a
-red icon and a toast listing fifteen missing programs. Every source's "not on PATH" error must be built
+red icon and a toast listing sixteen missing programs. Every source's "not on PATH" error must be built
 with `not_on_path`/`not_installed`, or a missing CLI turns back into a failure.
 Adding a source means a `SourceKind` variant, a module, a `build` arm, and a `Sources` field — the
 `KINDS` array and the tests that iterate it will tell you what you missed.

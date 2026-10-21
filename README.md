@@ -4,7 +4,8 @@
   # Globlin
 
   A tray icon that watches your global packages — npm, bun, pnpm, yarn, pipx, uv, scoop, cargo, go,
-  dotnet, PowerShell Gallery, gem, Homebrew, winget, choco — and tells you when one falls behind.
+  dotnet, PowerShell Gallery, gem, Homebrew, winget, choco, and skills.sh agent skills — and tells you when
+  one falls behind.
 
   [![CI](https://github.com/TOR968/Globlin/actions/workflows/ci.yml/badge.svg)](https://github.com/TOR968/Globlin/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/TOR968/Globlin)](https://github.com/TOR968/Globlin/releases/latest)
@@ -280,6 +281,7 @@ updated and one `… N more` line; the full queue is in the window.
 | **brew** | `brew info --json=v2 --installed` (formulae and casks) | the same reply — brew's `outdated` flag | `brew upgrade <name>` |
 | **winget** | `winget list` | winget's own `Available` column | `winget upgrade --id <id> --exact --silent` |
 | **choco** | `choco list -r` + `choco outdated -r` | choco's own report | `choco upgrade <name> -y`, elevated |
+| **skills** | the skills.sh lock file (`~/.agents/.skill-lock.json`) | GitHub's tree for the skill's folder | `npx --yes skills update <name> -g -y` |
 
 Everything except psgallery, winget and choco is on by default. A source whose CLI isn't installed simply
 reports nothing — it is not an error, not even when none of them is installed, and one broken source never
@@ -384,7 +386,8 @@ edits are never silently overwritten.
     "gem": true,
     "brew": true,
     "winget": false,
-    "choco": false
+    "choco": false,
+    "skills": true
   },
   "ignore": ["npm", "@anthropic-ai/claude-code"],
   "last_notified": [],
@@ -497,7 +500,8 @@ the app checks before it updates itself (see *If Windows Defender flags the down
 
 ### Privacy
 
-Globlin has no telemetry, no analytics, no crash reports and no account, and sends no identifier of any kind. It
+Globlin has no telemetry, no analytics, no crash reports and no account, and sends no identifier of its own — the one exception, a GitHub token you already set, is
+explained under *Skill lookups* below. It
 goes on the network only to do what it is for, and every request it makes names Globlin in its user agent:
 
 - **Version lookups:** the names of your installed packages are sent to the public registry of their
@@ -505,6 +509,11 @@ goes on the network only to do what it is for, and every request it makes names 
   `api.nuget.org` (dotnet) and `www.powershellgallery.com` (PowerShell Gallery). Switching a source off in
   Settings stops its lookups, and ignored packages are never looked up. An npm, bun, pnpm or yarn package
   installed from git, a local path, a link or a private registry is never sent to the public registry.
+- **Skill lookups:** for skills installed with skills.sh, the `owner/repo` names from its lock file are
+  sent to `api.github.com` to read each repository's file tree. Requests are anonymous; only when GitHub
+  answers 401, 403 or 404 does Globlin repeat that one request with the `GITHUB_TOKEN` or `GH_TOKEN`
+  already set in its environment, which is what the skills.sh CLI itself does. A repository whose skills
+  are all ignored is not asked about. Switching the skills source off stops these lookups.
 - **Its own updates:** `api.github.com` is asked for the latest Globlin release, and an update is
   downloaded from GitHub's release storage. Builds owned by winget or a system package manager skip this.
 - **The package managers themselves** contact their own servers when Globlin runs their list, outdated,

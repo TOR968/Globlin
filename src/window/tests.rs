@@ -58,6 +58,7 @@ fn config() -> Config {
             brew: false,
             winget: true,
             choco: false,
+            skills: false,
         },
         ignore: Vec::new(),
         ..Default::default()
@@ -136,7 +137,7 @@ fn the_sidebar_lists_busy_sources_first_and_switched_off_ones_last() {
     let labels: Vec<&str> = snapshot.sources.iter().map(|row| row.label).collect();
 
     assert_eq!(&labels[..5], ["winget", "npm", "scoop", "pnpm", "bun"]);
-    assert_eq!(labels.last(), Some(&"choco"));
+    assert_eq!(labels.last(), Some(&"skills"));
 }
 
 #[test]
