@@ -1,4 +1,9 @@
 ---
+import type { ImageOutputFormat } from 'astro';
+import { Picture } from 'astro:assets';
+import batchShot from '@/assets/window/batch.png';
+import settingsShot from '@/assets/window/settings.png';
+import updatesShot from '@/assets/window/updates.png';
 import Base from '@/layouts/Base.astro';
 import DownloadButton from '@/components/DownloadButton.astro';
 import OsSprite from '@/components/OsSprite.astro';
@@ -25,6 +30,14 @@ const badges = [
   'Signed updates',
   'Open source, GPL-3.0',
 ];
+
+const shot: { formats: ImageOutputFormat[]; fallbackFormat: ImageOutputFormat; widths: number[] } = {
+  formats: ['avif', 'webp'],
+  fallbackFormat: 'webp',
+  widths: [480, 768, 1072, 1440, 1920],
+};
+const heroSizes = '(max-width: 1120px) calc(100vw - 48px), 1072px';
+const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) calc(50vw - 36px), 524px';
 ---
 
 <Base>
@@ -39,11 +52,12 @@ const badges = [
             <p class="eyebrow">Tray app for Windows, macOS and Linux · <span class="tag">Beta</span></p>
             <h1>Keep every global package up to date</h1>
             <p>
-              Global CLIs rot silently. Nothing tells you <code>@salesforce/cli</code> is six versions
-              behind until a command breaks in a way that turns out to be &ldquo;oh, I&rsquo;m ancient.&rdquo;
-              Globlin sits in the Windows tray, the macOS menu bar or the Linux system tray, checks on a
-              schedule across every package manager you have installed, and puts what has fallen behind
-              first.
+              Globlin is a free, open-source tray app that checks your globally installed packages across
+              every package manager you have, plus your skills.sh agent skills, and updates what has fallen
+              behind in one click. Global CLIs rot silently: nothing tells you <code>@salesforce/cli</code>
+              is six versions behind until a command breaks in a way that turns out to be &ldquo;oh,
+              I&rsquo;m ancient.&rdquo; Globlin sits in the Windows tray, the macOS menu bar or the Linux
+              system tray, checks on a schedule, and puts what has fallen behind first.
             </p>
             <div class="hero-actions os-buttons">
               <DownloadButton os="windows" file="globlin-setup-x64.exe" icon="windows" label="Windows" primary />
@@ -70,7 +84,7 @@ const badges = [
           {badges.map((badge) => <li>{badge}</li>)}
         </ul>
         <figure class="shot shot-hero">
-          <img src={image('window-updates.png')} width="1920" height="1280" alt="The Globlin window: three updates ready at the top with an Update all button, grouped by package manager, and every other package manager summarised as up to date below" />
+          <Picture src={updatesShot} {...shot} sizes={heroSizes} loading="eager" fetchpriority="high" alt="The Globlin window: three updates ready at the top with an Update all button, grouped by package manager, and every other package manager summarised as up to date below" />
         </figure>
       </div>
     </section>
@@ -86,11 +100,11 @@ const badges = [
         </p>
         <div class="shots">
           <figure class="shot">
-            <img src={image('window-batch.png')} width="1920" height="1280" loading="lazy" alt="A batch update running: a progress bar with done, failed and active counts, and the queue below it" />
+            <Picture src={batchShot} {...shot} sizes={pairSizes} alt="A batch update running: a progress bar with done, failed and active counts, and the queue below it" />
             <figcaption>A batch runs as one queue with a progress bar, and Homebrew always goes last.</figcaption>
           </figure>
           <figure class="shot">
-            <img src={image('window-settings.png')} width="1920" height="1280" loading="lazy" alt="The settings page: run at startup, automatic npm script approval, Globlin updates, and a switch per package manager" />
+            <Picture src={settingsShot} {...shot} sizes={pairSizes} alt="The settings page: run at startup, automatic npm script approval, Globlin updates, and a switch per package manager" />
             <figcaption>Settings: startup, Globlin&rsquo;s own updates, and a switch per package manager.</figcaption>
           </figure>
         </div>

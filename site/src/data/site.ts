@@ -8,7 +8,7 @@ export const ASSET_VERSION = '0.4.0';
 
 export const TITLE = 'Globlin — Keep Your Global Packages Updated on Windows, macOS and Linux';
 export const DESCRIPTION =
-  'A free tray app for Windows, macOS and Linux (beta) that watches your global npm, pnpm, cargo, pipx, Homebrew, winget and other packages, plus your skills.sh agent skills, and tells you the moment one falls behind. One window, filters, bulk updates, installer or portable, open source.';
+  'Free, open-source tray app for Windows, macOS and Linux that watches your global npm, cargo, pipx, Homebrew and winget packages and updates them in one click.';
 export const SOCIAL_DESCRIPTION =
   'A tray icon for Windows, macOS and Linux (beta) that watches your global packages across fifteen package managers, plus your skills.sh agent skills, and tells you when one falls behind. One click to update.';
 

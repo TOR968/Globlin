@@ -472,7 +472,8 @@ inflates to regardless of what the encoder's own reader would have accepted.
 ### The window screenshots
 
 The README's and the landing page's pictures of the window (`docs/img/window-{updates,batch,settings}.png`,
-copied unchanged into `site/public/img/`) are generated too, in two steps. An ignored test builds three realistic
+copied unchanged into `site/src/assets/window/` as `updates.png`, `batch.png` and `settings.png`) are
+generated too, in two steps. An ignored test builds three realistic
 `Snapshot`s through the real `window::snapshot` — 23 packages across npm, bun, go and scoop with three
 outdated; a 12-target batch with five done, one failed, one running and five queued; and the same
 packages with a Globlin release waiting — and writes each as a self-contained copy of `ui.html` that
@@ -506,7 +507,7 @@ foreach ($name in "updates", "batch", "settings") {
         "--hide-scrollbars", "--force-dark-mode", "--user-data-dir=$userData",
         "--force-device-scale-factor=2", "--window-size=960,640",
         "--screenshot=$PWD\docs\img\window-$name.png", "file:///$page"
-    Copy-Item "docs\img\window-$name.png" "site\public\img\window-$name.png"
+    Copy-Item "docs\img\window-$name.png" "site\src\assets\window\$name.png"
 }
 ```
 
@@ -771,13 +772,25 @@ cache-busting version come from `src/data/site.ts`. The FAQ's JSON-LD is generat
 answers. `compressHTML` is off on purpose: Astro's compressor drops the whitespace between `·` and the
 link that follows it on a new line, which glued "checksums and signatures" and the platform links
 together. Everything with a fixed URL — `img/`, `_headers`, `llms.txt`, `robots.txt`, `sitemap.xml`,
-the Search Console file — sits in `site/public/` and is copied to `dist/` as is. The images stay there
-rather than going through `astro:assets` because the dump tests write them by name and the `?v=` scheme
-below depends on stable URLs.
+the Search Console file — sits in `site/public/` and is copied to `dist/` as is. The logo, the four
+state icons and the Open Graph card stay there because the dump test writes them by name and the meta
+tags and the `?v=` scheme below need stable URLs. The three window screenshots are the exception: they
+live in `site/src/assets/window/` and go through `astro:assets` `<Picture>` as AVIF and WebP at five
+widths, because the 1920-pixel PNGs were the page's largest cost on a phone (Lighthouse estimated 381 KiB
+of savings and mobile LCP was 2.7 s). The hero screenshot loads eagerly with `fetchpriority="high"`.
+
+`src/pages/404.astro` exists so an unknown path returns a real 404. Without it Pages answered every path
+with the front page and a 200: a soft 404 for search engines, and Lighthouse's Agentic Browsing check read
+`/.well-known/ai-catalog.json` as a malformed manifest because it got HTML back. The 404 page renders
+through `Base` with `notFound`, which swaps the title, adds `noindex` and drops the canonical link, the
+social tags and both JSON-LD blocks. The header's links are `/#section` rather than `#section` so they
+also work from it.
 
 The Astro rewrite (2026-10-22) was checked against the hand-written page it replaced: the visible text
 and every link, image and class attribute were identical, and headless Edge screenshots at 1280 and
-390 px wide were pixel-identical.
+390 px wide were pixel-identical. The SEO pass that followed (404 page, screenshot formats, a 158-character
+meta description, a first sentence that says what Globlin is) took local Lighthouse to 100 in all five
+categories, including Agentic Browsing, over three runs.
 
 See [The icon](#the-icon) section above for how the landing page's artwork is regenerated.
 
