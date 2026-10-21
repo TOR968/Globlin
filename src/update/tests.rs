@@ -709,6 +709,31 @@ fn a_busy_target_is_left_queued_until_its_retry_rather_than_shown_as_failed() {
 }
 
 #[test]
+fn a_portable_package_whose_program_is_running_is_skipped_not_failed() {
+    let (outcome, steps, calls) = driven(
+        &[target("ClaudeCodeUsageMonitor")],
+        vec![refused(Refusal::InUse)],
+    );
+
+    assert_eq!(calls, 1);
+    assert!(outcome.failed.is_empty());
+    assert_eq!(
+        outcome.skipped,
+        vec![Skipped {
+            name: "ClaudeCodeUsageMonitor".to_string(),
+            reason: Refusal::InUse
+        }]
+    );
+    assert!(matches!(
+        steps.last(),
+        Some(Step::Finished {
+            index: 0,
+            state: RowState::Skipped
+        })
+    ));
+}
+
+#[test]
 fn an_update_that_does_not_apply_or_whose_prompt_was_cancelled_is_skipped_not_failed() {
     let targets = vec![target("Docker"), target("LocalSend")];
 

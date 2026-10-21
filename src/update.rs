@@ -167,7 +167,7 @@ fn record(
             });
             RowState::Failed
         }
-        (None, Some(reason @ (Refusal::NotApplicable | Refusal::Cancelled))) => {
+        (None, Some(reason @ (Refusal::NotApplicable | Refusal::Cancelled | Refusal::InUse))) => {
             outcome.skipped.push(Skipped {
                 name: target.name.clone(),
                 reason,

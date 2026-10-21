@@ -195,6 +195,7 @@ fn winget_exit_codes_that_are_not_a_broken_update_are_told_apart() {
     assert_eq!(refusal_for(code(0x8A15_010C)), Some(Refusal::Cancelled));
     assert_eq!(refusal_for(code(0x8007_04C7)), Some(Refusal::Cancelled));
     assert_eq!(refusal_for(code(0x8A15_0102)), Some(Refusal::Busy));
+    assert_eq!(refusal_for(code(0x8A15_0052)), Some(Refusal::InUse));
     assert_eq!(refusal_for(code(0x8A15_0003)), None);
     assert_eq!(refusal_for(1), None);
 }

@@ -19,6 +19,7 @@ const DIAGNOSTICS: &str =
     "\\Packages\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\LocalState\\DiagOutputDir";
 
 const UPDATE_NOT_APPLICABLE: u32 = 0x8A15_002B;
+const PORTABLE_INSTALL_FAILED: u32 = 0x8A15_0052;
 const INSTALL_IN_PROGRESS: u32 = 0x8A15_0102;
 const INSTALL_CANCELLED_BY_USER: u32 = 0x8A15_010C;
 const OPERATION_CANCELLED: u32 = 0x8007_04C7;
@@ -126,6 +127,7 @@ fn refusal_for(code: i32) -> Option<Refusal> {
         UPDATE_NOT_APPLICABLE => Some(Refusal::NotApplicable),
         INSTALL_CANCELLED_BY_USER | OPERATION_CANCELLED => Some(Refusal::Cancelled),
         INSTALL_IN_PROGRESS => Some(Refusal::Busy),
+        PORTABLE_INSTALL_FAILED => Some(Refusal::InUse),
         _ => None,
     }
 }

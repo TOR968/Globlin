@@ -225,8 +225,13 @@ directory.
 - `0x8A150102` (`APPINSTALLER_CLI_ERROR_INSTALL_IN_PROGRESS`, MSI's 1618) — another MSI holds the
   installer mutex. Seen right after the EA app updated in two seconds: its EXE bootstrapper most likely
   handed off to `msiexec` and exited, and the next three MSI packages in the queue were refused.
+- `0x8A150052` (`APPINSTALLER_CLI_ERROR_PORTABLE_INSTALL_FAILED`) — a portable package's program is
+  running from its `WinGet\Packages\…` directory, so winget cannot remove the old `.exe`
+  (`remove: Access is denied.`, seen with `CodeZeno.ClaudeCodeUsageMonitor` left open in the tray). Globlin
+  never closes another program for the user; the row is skipped with *close it and update again*, and the
+  next check still offers the update.
 
-A not-applicable or cancelled update lands in `Outcome.skipped` with its `Refusal`, finishes its row
+A not-applicable, cancelled or in-use update lands in `Outcome.skipped` with its `Refusal`, finishes its row
 as `RowState::Skipped`, and never raises *update failed*; `update::toast` lists each one with
 `Refusal::reason` beside the updated packages. Skips do not count as `changed_packages`, so a batch of
 only skips triggers no recheck. A `Busy` refusal does not finish its row at all: `update::drive` sets
@@ -913,7 +918,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-610 tests on Windows: 580 run by default (no network, no side effects), 30 `#[ignore]`d because they
+611 tests on Windows: 581 run by default (no network, no side effects), 30 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

@@ -261,6 +261,7 @@ pub enum Refusal {
     NotApplicable,
     Cancelled,
     Busy,
+    InUse,
 }
 
 impl Refusal {
@@ -269,6 +270,7 @@ impl Refusal {
             Self::NotApplicable => "no update applies to this system",
             Self::Cancelled => "the administrator prompt was cancelled",
             Self::Busy => "another installation was in progress",
+            Self::InUse => "its program is running; close it and update again",
         }
     }
 }
