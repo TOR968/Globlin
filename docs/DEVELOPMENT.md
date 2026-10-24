@@ -298,6 +298,10 @@ Claude Code updates its marketplace plugins itself.
 winget also reports some installed versions as the literal `Unknown` (Battle.net). `winget upgrade` hides
 those without `--include-unknown` and refuses to upgrade them, so `winget::to_installed` marks such a row
 `external`, which `check.rs` reads as `Unknown` — never `Outdated`, never offered by **Update all**.
+A row that is both `Unknown` and registry-only (an `ARP\…` id — Steam games, Riot, a `.sdb`
+compatibility database) is dropped instead: it has no catalog entry and no version, so nothing can ever
+check it, and twenty Steam games would otherwise keep the winget card at `?` forever. Their own launcher
+updates and uninstalls them.
 
 ### The window
 

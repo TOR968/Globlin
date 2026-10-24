@@ -188,6 +188,25 @@ Git        Git.Git            2.44.0  2.47.1      winget
 }
 
 #[test]
+fn a_registry_only_entry_without_a_version_is_left_out_because_nothing_can_ever_check_it() {
+    let table = "Name        Id                                  Version Available   Source
+--------------------------------------------------------------------------------
+Dota 2      ARP\\Machine\\X64\\Steam App 570        Unknown
+Battle.net  Blizzard.BattleNet                  Unknown 1.19.3.3219 winget
+Tftpd64     ARP\\Machine\\X86\\Tftpd64              4.64
+";
+    let names: Vec<String> = parse_table(table)
+        .into_iter()
+        .map(|item| item.name)
+        .collect();
+
+    assert_eq!(
+        names,
+        vec!["Blizzard.BattleNet", r"ARP\Machine\X86\Tftpd64"]
+    );
+}
+
+#[test]
 fn winget_exit_codes_that_are_not_a_broken_update_are_told_apart() {
     let code = |raw: u32| raw.cast_signed();
 

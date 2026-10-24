@@ -224,7 +224,8 @@ The window puts updates first:
   *skipped* and the notification names the reason instead of reporting a failure. When an installer is
   refused because another installation is still running, Globlin tries that package once more at the end
   of the batch. A winget package whose installed version winget itself reports as `Unknown` reads *not
-  checked*, since winget refuses to upgrade it anyway.
+  checked*, since winget refuses to upgrade it anyway. An entry winget only found in *Installed apps*
+  with no version at all (Steam games, for one) is left out of the list: its own launcher keeps it current.
 - A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
   the same three packages every six hours.
 

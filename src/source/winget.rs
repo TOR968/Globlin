@@ -11,6 +11,7 @@ use crate::Result;
 const EXECUTABLE: &str = "winget";
 const OWN_NAME: &str = "Globlin";
 const UNKNOWN_VERSION: &str = "Unknown";
+const REGISTRY_ONLY: &str = "ARP\\";
 
 const SHELLS: [&str; 2] = ["powershell", "pwsh"];
 const UPGRADE_FLAGS: &str =
@@ -193,6 +194,9 @@ fn to_installed(row: &[String], width: usize) -> Option<Installed> {
     let version = row.get(VERSION)?;
     let name = row.get(NAME)?;
     if id.is_empty() || version.is_empty() || name.is_empty() || name == OWN_NAME {
+        return None;
+    }
+    if version == UNKNOWN_VERSION && id.starts_with(REGISTRY_ONLY) {
         return None;
     }
     let available = if width >= WITH_AVAILABLE {
