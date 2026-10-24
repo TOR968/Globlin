@@ -251,6 +251,30 @@ fn a_shared_folder_or_any_folder_above_one_is_never_used_to_find_programs() {
 }
 
 #[test]
+fn a_running_service_from_the_package_folder_is_listed_and_marked_as_a_service() {
+    let script = running_script(r"c:\program files\windowsapps\openai.codex_1_x64__x\");
+
+    assert!(script.contains("Win32_Service"), "{script}");
+    assert!(script.contains(SERVICE_SUFFIX), "{script}");
+    assert!(script.contains(r"$root = 'c:\program files\windowsapps\openai.codex_1_x64__x\'"));
+}
+
+#[test]
+fn closing_stops_the_services_before_the_programs_they_may_restart() {
+    let script = close_script(r"c:\program files\git\");
+
+    let services = script.find("Stop-Service").unwrap();
+    let programs = script.find("Stop-Process").unwrap();
+    assert!(services < programs, "{script}");
+}
+
+#[test]
+fn the_close_script_survives_being_elevated_because_it_carries_no_double_quote() {
+    assert!(!close_script(r"c:\program files\git\").contains('"'));
+    assert!(!running_script(r"c:\program files\git\").contains('"'));
+}
+
+#[test]
 fn winget_exit_codes_that_are_not_a_broken_update_are_told_apart() {
     let code = |raw: u32| raw.cast_signed();
 
