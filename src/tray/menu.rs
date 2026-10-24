@@ -8,7 +8,7 @@ use tray_icon::menu::{
 
 use crate::install::Manager;
 use crate::model::{
-    self, Activity, Batch, Blocked, Package, PackageRef, RowState, SourceKind, UpdateTarget,
+    self, Activity, Batch, Blocked, InUse, Package, PackageRef, RowState, SourceKind, UpdateTarget,
 };
 use crate::progress;
 use crate::selfupdate::Release;
@@ -39,6 +39,7 @@ const REMOVE_PREFIX: &str = "remove:";
 const SOURCE_PREFIX: &str = "source:";
 const APPROVE_PREFIX: &str = "approve:";
 const DISMISS_PREFIX: &str = "dismiss:";
+const CLOSE_UPDATE_PREFIX: &str = "close-update:";
 const REF_SEPARATOR: char = '|';
 
 const DOT_CYCLE: u32 = 4;
@@ -53,6 +54,7 @@ pub enum Action {
     ToggleSource { kind: SourceKind },
     Approve { name: String, source: SourceKind },
     Dismiss { name: String, source: SourceKind },
+    CloseAndUpdate { name: String, source: SourceKind },
     UpdateAll,
     CheckNow,
     OpenWindow,
@@ -91,6 +93,7 @@ pub struct View<'a> {
     pub packages: &'a [Package],
     pub activity: Option<&'a Activity>,
     pub approvals: &'a [Blocked],
+    pub in_use: &'a [InUse],
     pub autostart: bool,
     pub self_update: SelfUpdate<'a>,
     pub pending_restart: Option<&'a Version>,
@@ -127,7 +130,8 @@ impl Action {
                 .or_else(|| Self::parse_remove(other))
                 .or_else(|| Self::parse_source(other))
                 .or_else(|| Self::parse_approve(other))
-                .or_else(|| Self::parse_dismiss(other)),
+                .or_else(|| Self::parse_dismiss(other))
+                .or_else(|| Self::parse_close_update(other)),
         }
     }
 
@@ -180,6 +184,14 @@ impl Action {
     fn parse_dismiss(key: &str) -> Option<Self> {
         let reference = package_ref(key.strip_prefix(DISMISS_PREFIX)?)?;
         Some(Self::Dismiss {
+            name: reference.name,
+            source: reference.source,
+        })
+    }
+
+    fn parse_close_update(key: &str) -> Option<Self> {
+        let reference = package_ref(key.strip_prefix(CLOSE_UPDATE_PREFIX)?)?;
+        Some(Self::CloseAndUpdate {
             name: reference.name,
             source: reference.source,
         })
@@ -478,6 +490,10 @@ pub fn approve_id(target: &UpdateTarget) -> String {
 
 pub fn dismiss_id(target: &UpdateTarget) -> String {
     format!("{DISMISS_PREFIX}{}", target_key(target))
+}
+
+pub fn close_update_id(target: &UpdateTarget) -> String {
+    format!("{CLOSE_UPDATE_PREFIX}{}", target_key(target))
 }
 
 fn target_key(target: &UpdateTarget) -> String {

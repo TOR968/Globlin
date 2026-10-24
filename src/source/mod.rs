@@ -73,6 +73,14 @@ pub trait PackageSource {
         None
     }
 
+    fn running(&self, _name: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn close_running(&self, name: &str) -> Result<()> {
+        Err(format!("{name}: {} cannot close programs", self.kind().label()).into())
+    }
+
     fn approve_scripts(&self, _scripts: &[BlockedScript]) -> Result<()> {
         Err(format!("{} does not gate install scripts", self.kind().label()).into())
     }

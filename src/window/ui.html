@@ -493,7 +493,7 @@
         min-height: 46px;
         padding: 0 22px 0 46px;
         display: grid;
-        grid-template-columns: 18px minmax(0, 1fr) 210px 76px 64px 74px;
+        grid-template-columns: 18px minmax(0, 1fr) 210px 104px 64px 74px;
         align-items: center;
         gap: 12px;
         border-top: 1px solid var(--row-line);
@@ -558,6 +558,11 @@
 
       .update-row .act:hover:not(:disabled) {
         border-color: var(--control-hover);
+      }
+
+      .update-row .act.armed,
+      .tag.in-use {
+        color: var(--red-text);
       }
 
       .batch-row {
@@ -1447,6 +1452,11 @@
         const cell = make("span", "name-cell");
         cell.append(make("span", "name", row.name));
         if (row.elevation) cell.append(elevationTag(row.elevation));
+        if (row.in_use) {
+          const tag = make("span", "tag in-use", "in use: " + row.in_use.programs);
+          tag.title = "The last update failed while these programs were running from its folder.";
+          cell.append(tag);
+        }
         return cell;
       };
 
@@ -1471,6 +1481,22 @@
         return remove;
       };
 
+      const closeButton = (row) => {
+        const key = "close:" + row.key;
+        const armed = state.confirming === key;
+        const close = button(armed ? "act armed" : "act", armed ? "Confirm" : "Close & update", () => {
+          if (armed) {
+            state.confirming = null;
+            send(row.in_use.close_id);
+          } else {
+            state.confirming = key;
+            draw();
+          }
+        });
+        close.title = "Closes " + row.in_use.programs + " without saving anything, then updates.";
+        return close;
+      };
+
       const updateRow = (row) => {
         const line = make("div", "update-row");
         const busy = state.snapshot.busy;
@@ -1484,7 +1510,7 @@
           else state.selected.delete(row.key);
           applyBusy();
         };
-        const action = button("act", "Update", () => send(row.update_id));
+        const action = row.in_use ? closeButton(row) : button("act", "Update", () => send(row.update_id));
         action.disabled = busy;
         line.append(box, nameCell(row), versionCell(row), action, ignoreButton(row), removeButton(row));
         return line;

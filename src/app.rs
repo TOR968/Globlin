@@ -12,7 +12,7 @@ use crate::config::Config;
 use crate::icon::{self, IconState, BUSY_FRAMES};
 use crate::install;
 use crate::model::{
-    self, Activity, Batch, Blocked, Package, PackageRef, RemoveTarget, SourceKind, Status,
+    self, Activity, Batch, Blocked, InUse, Package, PackageRef, RemoveTarget, SourceKind, Status,
     UpdateTarget,
 };
 use crate::remove;
@@ -41,6 +41,7 @@ pub struct App {
     pending_restart: Option<Version>,
     activity: Option<Activity>,
     approvals: Vec<Blocked>,
+    in_use: Vec<InUse>,
     window: Option<Window>,
     failed: bool,
     skipped: Vec<String>,
@@ -65,6 +66,7 @@ impl App {
             pending_restart: None,
             activity: None,
             approvals: Vec::new(),
+            in_use: Vec::new(),
             window: None,
             failed: false,
             skipped: Vec::new(),
@@ -143,15 +145,20 @@ impl App {
             Action::ToggleSource { kind } => self.toggle_source(kind),
             Action::UpdateMany { refs } => {
                 let targets = self.targets_for(&refs);
-                self.start_update(targets, Vec::new());
+                self.start_update(targets, Vec::new(), false);
             }
             Action::UpdateAll => {
                 let targets = self.every_outdated_target();
-                self.start_update(targets, Vec::new());
+                self.start_update(targets, Vec::new(), false);
             }
             Action::Update { name, source } => {
                 if let Some(target) = self.find(&name, source).and_then(Package::update_target) {
-                    self.start_update(vec![target], Vec::new());
+                    self.start_update(vec![target], Vec::new(), false);
+                }
+            }
+            Action::CloseAndUpdate { name, source } => {
+                if let Some(target) = self.find(&name, source).and_then(Package::update_target) {
+                    self.start_update(vec![target], Vec::new(), true);
                 }
             }
             Action::ToggleIgnore { name } => self.toggle_ignore(&name),
@@ -272,7 +279,7 @@ impl App {
         });
     }
 
-    fn start_update(&mut self, targets: Vec<UpdateTarget>, approvals: Vec<Blocked>) {
+    fn start_update(&mut self, targets: Vec<UpdateTarget>, approvals: Vec<Blocked>, closing: bool) {
         if targets.is_empty() || self.activity.is_some() {
             return;
         }
@@ -287,7 +294,11 @@ impl App {
             let announce = |step| {
                 proxy.send_event(Message::Step(step)).ok();
             };
-            let outcome = update::run(&config, &targets, &approvals, announce);
+            let outcome = if closing {
+                update::close_and_run(&config, &targets[0], announce)
+            } else {
+                update::run(&config, &targets, &approvals, announce)
+            };
             proxy.send_event(Message::Updated(outcome)).ok();
         });
     }
@@ -308,7 +319,7 @@ impl App {
         }
         self.approvals.retain(|entry| !chosen.contains(entry));
         let targets = chosen.iter().map(|entry| entry.target.clone()).collect();
-        self.start_update(targets, chosen);
+        self.start_update(targets, chosen, false);
     }
 
     fn start_remove(&mut self, target: RemoveTarget) {
@@ -433,6 +444,7 @@ impl App {
             &self.packages,
             self.activity.as_ref(),
             &self.approvals,
+            &self.in_use,
             self.available_release.as_ref(),
             self.pending_restart.as_ref(),
             self.config.auto_update,
@@ -522,6 +534,7 @@ impl App {
     fn on_updated(&mut self, outcome: &Outcome, target: &EventLoopWindowTarget<Message>) {
         self.activity = None;
         update::settle(&mut self.approvals, outcome);
+        update::settle_in_use(&mut self.in_use, outcome);
         update::mark_updated(&mut self.packages, outcome);
         let approved = update::auto_approvals(outcome, self.config.auto_approve_scripts);
         if let Some((title, body)) = update::toast(outcome) {
@@ -592,6 +605,7 @@ impl App {
             &self.packages,
             self.activity.as_ref(),
             &self.approvals,
+            &self.in_use,
             self.available_release.as_ref(),
             self.pending_restart.as_ref(),
             self.config.auto_update,
@@ -614,6 +628,7 @@ impl App {
             &self.packages,
             self.activity.as_ref(),
             &self.approvals,
+            &self.in_use,
             self.available_release.as_ref(),
             self.pending_restart.as_ref(),
             self.config.auto_update,
@@ -686,6 +701,7 @@ fn view_of<'a>(
     packages: &'a [Package],
     activity: Option<&'a Activity>,
     approvals: &'a [Blocked],
+    in_use: &'a [InUse],
     release: Option<&'a Release>,
     pending_restart: Option<&'a Version>,
     auto_update: bool,
@@ -696,6 +712,7 @@ fn view_of<'a>(
         packages,
         activity,
         approvals,
+        in_use,
         self_update: install::managed_by().map_or_else(
             || SelfUpdate::Own {
                 release,

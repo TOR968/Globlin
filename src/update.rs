@@ -3,7 +3,8 @@ use std::time::Duration;
 use crate::config::Config;
 use crate::diagnostics;
 use crate::model::{
-    Blocked, BlockedScript, Installed, Package, Refusal, RowState, SourceKind, Status, UpdateTarget,
+    Blocked, BlockedScript, InUse, Installed, Package, Refusal, RowState, SourceKind, Status,
+    UpdateTarget,
 };
 use crate::source::{self, PackageSource};
 
@@ -15,6 +16,7 @@ pub struct Outcome {
     pub failed: Vec<String>,
     pub skipped: Vec<Skipped>,
     pub blocked: Vec<Blocked>,
+    pub in_use: Vec<InUse>,
     pub retried: bool,
 }
 
@@ -47,6 +49,7 @@ struct Failure {
     details: String,
     blocked: Option<Vec<BlockedScript>>,
     refusal: Option<Refusal>,
+    programs: Vec<String>,
 }
 
 impl From<String> for Failure {
@@ -55,6 +58,7 @@ impl From<String> for Failure {
             details,
             blocked: None,
             refusal: None,
+            programs: Vec::new(),
         }
     }
 }
@@ -84,10 +88,11 @@ pub fn run(
         return fail_all(targets, &details);
     }
 
+    let one_prompt = config.one_prompt_kinds();
     let outcome = drive(
         targets,
-        jobs(targets, &config.one_prompt_kinds()),
-        |job| execute(&sources, targets, job),
+        jobs(targets, &one_prompt),
+        |job| execute(&sources, targets, job, &one_prompt),
         &announce,
         BUSY_PAUSE,
     );
@@ -172,6 +177,12 @@ fn record(
                 name: target.name.clone(),
                 reason,
             });
+            if !failure.programs.is_empty() {
+                outcome.in_use.push(InUse {
+                    target: target.clone(),
+                    programs: failure.programs,
+                });
+            }
             RowState::Skipped
         }
         (None, _) => {
@@ -186,12 +197,64 @@ fn execute(
     sources: &[Box<dyn PackageSource>],
     targets: &[UpdateTarget],
     job: &[usize],
+    one_prompt: &[SourceKind],
 ) -> Vec<Result<(), Failure>> {
-    if let [index] = job {
-        return vec![apply(sources, &targets[*index])];
+    let results = match job {
+        [index] if !one_prompt.contains(&targets[*index].source) => {
+            vec![apply(sources, &targets[*index])]
+        }
+        _ => {
+            let group: Vec<UpdateTarget> =
+                job.iter().map(|index| targets[*index].clone()).collect();
+            apply_together(sources, &group)
+        }
+    };
+    job.iter()
+        .zip(results)
+        .map(|(index, result)| result.map_err(|failure| in_use(sources, &targets[*index], failure)))
+        .collect()
+}
+
+fn in_use(sources: &[Box<dyn PackageSource>], target: &UpdateTarget, failure: Failure) -> Failure {
+    if failure.blocked.is_some() || !matches!(failure.refusal, None | Some(Refusal::InUse)) {
+        return failure;
     }
-    let group: Vec<UpdateTarget> = job.iter().map(|index| targets[*index].clone()).collect();
-    apply_together(sources, &group)
+    let programs = source::source_for(sources, &target.name, target.source)
+        .map(|source| source.running(&target.name))
+        .unwrap_or_default();
+    if programs.is_empty() {
+        return failure;
+    }
+    Failure {
+        refusal: Some(Refusal::InUse),
+        programs,
+        ..failure
+    }
+}
+
+pub fn close_and_run(config: &Config, target: &UpdateTarget, announce: impl Fn(Step)) -> Outcome {
+    let closed = source::enabled(config)
+        .map_err(|error| error.to_string())
+        .and_then(|sources| {
+            source::source_for(&sources, &target.name, target.source)?
+                .close_running(&target.name)
+                .map_err(|error| error.to_string())
+        });
+    match closed {
+        Ok(()) => run(config, std::slice::from_ref(target), &[], announce),
+        Err(details) => fail_all(std::slice::from_ref(target), &format!("{details}\n")),
+    }
+}
+
+pub fn settle_in_use(in_use: &mut Vec<InUse>, outcome: &Outcome) {
+    in_use.retain(|entry| {
+        !outcome
+            .updated
+            .iter()
+            .chain(outcome.in_use.iter().map(|fresh| &fresh.target))
+            .any(|done| done.is(&entry.target.name, entry.target.source))
+    });
+    in_use.extend(outcome.in_use.iter().cloned());
 }
 
 pub fn toast(outcome: &Outcome) -> Option<(&'static str, String)> {
@@ -312,7 +375,7 @@ fn apply(sources: &[Box<dyn PackageSource>], target: &UpdateTarget) -> Result<()
     Err(Failure {
         blocked: source.blocked_scripts(&String::from_utf8_lossy(&output.stderr)),
         refusal: source.refusal(&output),
-        details: describe_failure(target, &output),
+        ..Failure::from(describe_failure(target, &output))
     })
 }
 

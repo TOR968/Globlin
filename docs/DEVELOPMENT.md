@@ -172,6 +172,9 @@ rest, and the elevation is left to Windows' own prompt:
   stopped — an unelevated parent cannot kill the elevated choco it started.
 - **`winget_one_prompt` does the same for winget**, through the same `update::jobs` fold
   (`Config::one_prompt_kinds` names every source whose switch is on, and each gets its own shared job).
+  A shared job of one package still goes through `update_together`: winget's own `update_command` runs
+  unelevated, so a lone update (one row's **Update**) would otherwise skip the prompt the switch promises,
+  and an MSIX with a packaged service — ChatGPT's — fails with `0x80073D28`.
   `Winget::update_together` cannot hand winget several ids, because `winget upgrade --id` takes one, so
   the elevated process is a second PowerShell: `Start-Process -FilePath <powershell> -ArgumentList
   '-NoProfile', '-NonInteractive', '-Command', '<inner>' -Verb RunAs`, where `<inner>` is `foreach ($id
@@ -227,9 +230,30 @@ directory.
   handed off to `msiexec` and exited, and the next three MSI packages in the queue were refused.
 - `0x8A150052` (`APPINSTALLER_CLI_ERROR_PORTABLE_INSTALL_FAILED`) — a portable package's program is
   running from its `WinGet\Packages\…` directory, so winget cannot remove the old `.exe`
-  (`remove: Access is denied.`, seen with `CodeZeno.ClaudeCodeUsageMonitor` left open in the tray). Globlin
-  never closes another program for the user; the row is skipped with *close it and update again*, and the
-  next check still offers the update.
+  (`remove: Access is denied.`, seen with `CodeZeno.ClaudeCodeUsageMonitor` left open in the tray). The
+  row is skipped with *close it and update again*, and the next check still offers the update.
+
+**In use, and Close & update.** Most installer failures carry no code that says "a program is running" —
+Git for Windows' installer sees its own `bash.exe` (VS Code terminals, Claude Code sessions), defaults
+its suppressed *Retry/Cancel* box to Cancel and exits 1, which winget reports as the generic
+`0x8A150006`. So after any winget failure that is not another refusal, `update::in_use` asks
+`PackageSource::running`: `Winget::location` reads `Installed Location:` from `winget list --id <id>
+--exact --details` (winget 1.29), and PowerShell lists every process whose `Path` starts with that
+folder. Any hit turns the failure into `Refusal::InUse` with the process names, which land in
+`Outcome.in_use`; `App.in_use` keeps them (`update::settle_in_use`) and the window's row shows *in use:
+bash ×9* with **Close & update** in place of **Update**. It is asked only after a failure, never before
+an update: Teams and Obsidian update fine while running, and a pre-check would cost a winget call per
+package. The trade-off is a real failure that happens while the program is open reads *in use*; its log
+is still written.
+
+The button is per row and two-click (like **Uninstall**); **Update all** and **Update N** never close
+anything. `close-update:` re-finds the processes at click time (not the PIDs from the failure), stops
+them with `Stop-Process -Force`, then runs the ordinary update. Nothing is restarted, because a terminal
+or a program started with arguments cannot be put back as it was. A process running as administrator
+cannot be stopped from an unelevated Globlin, so that update fails with PowerShell's reason in the log.
+`winget::narrow_location` refuses any folder that is, or contains, a shared one — the drive root,
+`Program Files`, `ProgramData`, the user profile, `AppData`, `%LOCALAPPDATA%\Programs`, winget's own
+`Packages` root — so a package reporting a broad install location can never close everything under it.
 
 A not-applicable, cancelled or in-use update lands in `Outcome.skipped` with its `Refusal`, finishes its row
 as `RowState::Skipped`, and never raises *update failed*; `update::toast` lists each one with
@@ -295,6 +319,10 @@ Claude Code updates its marketplace plugins itself.
 winget also reports some installed versions as the literal `Unknown` (Battle.net). `winget upgrade` hides
 those without `--include-unknown` and refuses to upgrade them, so `winget::to_installed` marks such a row
 `external`, which `check.rs` reads as `Unknown` — never `Outdated`, never offered by **Update all**.
+A row that is both `Unknown` and registry-only (an `ARP\…` id — Steam games, Riot, a `.sdb`
+compatibility database) is dropped instead: it has no catalog entry and no version, so nothing can ever
+check it, and twenty Steam games would otherwise keep the winget card at `?` forever. Their own launcher
+updates and uninstalls them.
 
 ### The window
 

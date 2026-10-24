@@ -249,6 +249,12 @@ pub struct Blocked {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InUse {
+    pub target: UpdateTarget,
+    pub programs: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageRef {
     pub name: String,
     pub source: SourceKind,

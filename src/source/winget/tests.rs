@@ -188,6 +188,69 @@ Git        Git.Git            2.44.0  2.47.1      winget
 }
 
 #[test]
+fn a_registry_only_entry_without_a_version_is_left_out_because_nothing_can_ever_check_it() {
+    let table = "Name        Id                                  Version Available   Source
+--------------------------------------------------------------------------------
+Dota 2      ARP\\Machine\\X64\\Steam App 570        Unknown
+Battle.net  Blizzard.BattleNet                  Unknown 1.19.3.3219 winget
+Tftpd64     ARP\\Machine\\X86\\Tftpd64              4.64
+";
+    let names: Vec<String> = parse_table(table)
+        .into_iter()
+        .map(|item| item.name)
+        .collect();
+
+    assert_eq!(
+        names,
+        vec!["Blizzard.BattleNet", r"ARP\Machine\X86\Tftpd64"]
+    );
+}
+
+#[test]
+fn the_install_folder_is_read_from_the_details_listing() {
+    let details = r"Found Git [Git.Git]
+Version: 2.56.0.2
+Installed Scope: Machine
+Installed Location: C:\Program Files\Git\
+";
+
+    assert_eq!(
+        installed_location(details).as_deref(),
+        Some(r"C:\Program Files\Git\")
+    );
+    assert_eq!(installed_location("Version: 1.0\n"), None);
+    assert_eq!(installed_location("Installed Location: \n"), None);
+}
+
+#[test]
+fn a_package_folder_is_matched_as_a_whole_folder_not_a_name_prefix() {
+    assert_eq!(
+        narrow_location(r"C:\Program Files\Git", &[]).as_deref(),
+        Some(r"c:\program files\git\")
+    );
+}
+
+#[test]
+fn a_shared_folder_or_any_folder_above_one_is_never_used_to_find_programs() {
+    let broad = [
+        "C:",
+        r"C:\Program Files",
+        r"C:\Users\me\AppData\Local\Programs",
+    ]
+    .map(String::from);
+
+    for location in [
+        r"C:\",
+        r"C:\Program Files\",
+        r"C:\Users\",
+        r"C:\Users\me\AppData\Local\Programs",
+    ] {
+        assert_eq!(narrow_location(location, &broad), None, "{location}");
+    }
+    assert!(narrow_location(r"C:\Users\me\AppData\Local\Programs\Obsidian\", &broad).is_some());
+}
+
+#[test]
 fn winget_exit_codes_that_are_not_a_broken_update_are_told_apart() {
     let code = |raw: u32| raw.cast_signed();
 
