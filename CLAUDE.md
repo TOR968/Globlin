@@ -87,7 +87,7 @@ arrives already in display order. `window/shell.rs` is the only file that touche
 `render`, so an 8 fps spinner does not rebuild a 200-row list.
 
 **The tray menu no longer lists packages.** It is the short entry point — status, Open Globlin, Update
-all, Check now, Run at startup, Open last log, the self-update block, Support Globlin on Patreon, Quit — plus the live batch rows
+all, Check now, Run at startup, Open last log, the self-update block, Support Globlin on Patreon, Globlin on GitHub, Quit — plus the live batch rows
 while an update runs, at most seven around the active one (`menu::shown_batch_rows`) and one
 "… N more" line, because a 100-package batch otherwise grows the menu past the screen. The package list
 lives in the window only, so there is one place a row can be wrong.

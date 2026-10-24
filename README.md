@@ -238,7 +238,8 @@ packages · 2 updates*, *No global packages*, *Off*. Switching one goes into `gl
 fresh check follows two seconds after the last switch, so flipping several costs one check.
 *Diagnostics* opens the last log; *About* shows the version and links to
 [Patreon](https://www.patreon.com/cw/TOR968/membership), as does *Support on Patreon* beside *Open last log* at the
-foot of the window.
+foot of the window. *Source code* under *About* and *GitHub* in the footer open the
+[repository](https://github.com/TOR968/Globlin).
 
 The tray menu stays short — the list lives in the window:
 
@@ -255,6 +256,7 @@ Globlin v0.4.0                        ▸  Update Globlin 0.4.0 → 0.4.1
                                          ☐ Auto-update Globlin
                                          Open Globlin-update log
 Support Globlin on Patreon
+Globlin on GitHub
 ─────────────────────────────────────
 Quit
 ```

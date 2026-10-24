@@ -1196,6 +1196,16 @@
                 <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5h5v5M19 5l-8 8M18 14v5H5V6h5"></path></svg>
               </button>
             </div>
+            <div class="setting">
+              <div class="setting-text">
+                <span class="setting-label" id="repo-label">Source code</span>
+                <span class="setting-note">GPL-3.0. Issues and releases live on GitHub.</span>
+              </div>
+              <button id="settings-repo" class="btn" type="button" aria-describedby="repo-label">
+                View on GitHub
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5h5v5M19 5l-8 8M18 14v5H5V6h5"></path></svg>
+              </button>
+            </div>
           </section>
         </div>
       </div>
@@ -1209,6 +1219,8 @@
         <svg class="heart" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path></svg>
         Support on Patreon
       </button>
+      <span class="dot" aria-hidden="true">·</span>
+      <button id="footer-repo" class="link blue" type="button">GitHub</button>
       <span class="dot" aria-hidden="true">·</span>
       <button id="open-log" class="link blue" type="button">Open last log</button>
     </footer>
@@ -1793,6 +1805,8 @@
       el("open-log").onclick = () => send("open-log");
       el("footer-patreon").onclick = () => send("open-patreon");
       el("settings-patreon").onclick = () => send("open-patreon");
+      el("footer-repo").onclick = () => send("open-repo");
+      el("settings-repo").onclick = () => send("open-repo");
       el("settings-log").onclick = () => send("open-log");
       el("autostart").onclick = () => send("autostart");
       el("auto-update").onclick = () => send("auto-update");
