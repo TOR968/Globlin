@@ -29,6 +29,7 @@ const ID_WINGET_ONE_PROMPT: &str = "winget-one-prompt";
 const ID_MONOCHROME_ICON: &str = "monochrome-icon";
 const ID_OPEN_LOG: &str = "open-log";
 const ID_OPEN_PATREON: &str = "open-patreon";
+const ID_OPEN_REPO: &str = "open-repo";
 const ID_OPEN_SELF_LOG: &str = "open-self-log";
 const ID_QUIT: &str = "quit";
 const UPDATE_PREFIX: &str = "update:";
@@ -65,6 +66,7 @@ pub enum Action {
     ToggleMonochromeIcon,
     OpenLog,
     OpenPatreon,
+    OpenRepo,
     OpenSelfLog,
     Quit,
 }
@@ -116,6 +118,7 @@ impl Action {
             ID_MONOCHROME_ICON => Some(Self::ToggleMonochromeIcon),
             ID_OPEN_LOG => Some(Self::OpenLog),
             ID_OPEN_PATREON => Some(Self::OpenPatreon),
+            ID_OPEN_REPO => Some(Self::OpenRepo),
             ID_OPEN_SELF_LOG => Some(Self::OpenSelfLog),
             ID_QUIT => Some(Self::Quit),
             other => Self::parse_update(other)
@@ -275,6 +278,12 @@ pub fn build(view: &View) -> Result<Built> {
     built.item(&MenuItem::with_id(
         ID_OPEN_PATREON,
         "Support Globlin on Patreon",
+        true,
+        None,
+    ))?;
+    built.item(&MenuItem::with_id(
+        ID_OPEN_REPO,
+        "Globlin on GitHub",
         true,
         None,
     ))?;

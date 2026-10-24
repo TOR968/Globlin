@@ -30,4 +30,4 @@ Globlin needs no runtime of its own — it drives whatever package managers are 
 
 Globlin is free and stays free; there is no paid tier and no telemetry.
 
-- [Patreon](https://www.patreon.com/c/TOR968): support the author's work
+- [Patreon](https://www.patreon.com/cw/TOR968/membership): support the author's work

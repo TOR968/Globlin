@@ -356,7 +356,8 @@ these a link or an `.html` file dragged onto the window became a page with `wind
 That guard is also why the page has no `<a href>` to anything outside itself. *Support on Patreon* — in
 the footer, under Settings › About and in the tray menu — posts the `open-patreon` id, and `App` hands
 the fixed `PATREON_URL` in `app.rs` to `platform::open_in_shell` (`explorer`, `open` or `xdg-open`,
-which pass a URL to the default browser). The page never names the URL, so no message it posts can make
+which pass a URL to the default browser). *GitHub* and *View on GitHub* do the same with `open-repo`
+and `REPO_URL`, which is `Cargo.toml`'s `repository`. The page never names the URL, so no message it posts can make
 Globlin open an address of its choosing.
 
 ### The icon

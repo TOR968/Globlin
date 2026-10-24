@@ -24,7 +24,8 @@ use crate::{diagnostics, notice, platform, progress, window, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
 const SETTLE_DELAY: Duration = Duration::from_secs(2);
-const PATREON_URL: &str = "https://www.patreon.com/c/TOR968";
+const PATREON_URL: &str = "https://www.patreon.com/cw/TOR968/membership";
+const REPO_URL: &str = env!("CARGO_PKG_REPOSITORY");
 
 pub enum Control {
     Continue,
@@ -176,7 +177,8 @@ impl App {
             Action::ToggleWingetOnePrompt => self.toggle_winget_one_prompt(),
             Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
             Action::OpenLog => open_log(),
-            Action::OpenPatreon => open_patreon(),
+            Action::OpenPatreon => open_url(PATREON_URL),
+            Action::OpenRepo => open_url(REPO_URL),
             Action::OpenSelfLog => open_self_log(),
         }
         Control::Continue
@@ -646,9 +648,9 @@ impl App {
     }
 }
 
-fn open_patreon() {
-    if let Err(error) = platform::open_in_shell(OsStr::new(PATREON_URL)) {
-        platform::notify("Globlin", &format!("Could not open {PATREON_URL}: {error}")).ok();
+fn open_url(url: &str) {
+    if let Err(error) = platform::open_in_shell(OsStr::new(url)) {
+        platform::notify("Globlin", &format!("Could not open {url}: {error}")).ok();
     }
 }
 
