@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::*;
 use crate::config::Sources;
-use crate::model::{Batch, Blocked, BlockedScript, UpdateTarget};
+use crate::model::{Batch, Blocked, BlockedScript, InUse, UpdateTarget};
 
 fn package(name: &str, source: SourceKind, status: Status) -> Package {
     Package {
@@ -28,6 +28,7 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>) -> View<'a>
         packages,
         activity,
         approvals: &[],
+        in_use: &[],
         autostart: true,
         self_update: SelfUpdate::Own {
             release: None,
@@ -307,6 +308,7 @@ fn a_winget_managed_install_tells_the_window_not_to_offer_self_updates() {
         packages: &[],
         activity: None,
         approvals: &[],
+        in_use: &[],
         autostart: false,
         self_update: SelfUpdate::Managed(crate::install::Manager::Winget),
         pending_restart: None,
@@ -413,6 +415,38 @@ fn a_blocked_update_reaches_the_window_with_its_scripts_and_ids() {
             scripts: "install: node ./cnoke.cjs".to_string(),
         }]
     );
+}
+
+#[test]
+fn an_in_use_package_carries_its_counted_programs_and_the_id_that_closes_them() {
+    let packages = vec![outdated("Git.Git", SourceKind::Winget, "2.56.0.3")];
+    let in_use = vec![InUse {
+        target: packages[0].update_target().unwrap(),
+        programs: ["bash", "tail", "bash"].map(String::from).to_vec(),
+    }];
+    let view = View {
+        in_use: &in_use,
+        ..view(&packages, None)
+    };
+
+    let snapshot = snapshot(&view, &config());
+
+    assert_eq!(
+        snapshot.packages[0].in_use,
+        Some(InUseTag {
+            programs: "bash ×2, tail".to_string(),
+            close_id: "close-update:winget:Git.Git".to_string(),
+        })
+    );
+}
+
+#[test]
+fn a_package_nothing_reported_in_use_offers_no_close() {
+    let packages = vec![outdated("Git.Git", SourceKind::Winget, "2.56.0.3")];
+
+    let snapshot = snapshot(&view(&packages, None), &config());
+
+    assert_eq!(snapshot.packages[0].in_use, None);
 }
 
 #[test]

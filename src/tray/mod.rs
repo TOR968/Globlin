@@ -8,8 +8,8 @@ use crate::Result;
 mod menu;
 
 pub use menu::{
-    approve_id, dismiss_id, headline, ignore_id, key_of, remove_id, source_id, update_id, Action,
-    SelfUpdate, View,
+    approve_id, close_update_id, dismiss_id, headline, ignore_id, key_of, remove_id, source_id,
+    update_id, Action, SelfUpdate, View,
 };
 
 pub struct Tray {
@@ -25,6 +25,7 @@ impl Tray {
             packages: &[],
             activity: None,
             approvals: &[],
+            in_use: &[],
             autostart: false,
             self_update: SelfUpdate::Own {
                 release: None,

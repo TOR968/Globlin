@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use serde::Serialize;
 
 use crate::config::Config;
-use crate::model::{Activity, Batch, Blocked, Package, RowState, SourceKind, Status, KINDS};
+use crate::model::{Activity, Batch, Blocked, InUse, Package, RowState, SourceKind, Status, KINDS};
 use crate::tray::{self, SelfUpdate, View};
 
 mod shell;
@@ -47,9 +47,16 @@ pub struct Row {
     pub latest: Option<String>,
     pub status: &'static str,
     pub elevation: Option<Elevation>,
+    pub in_use: Option<InUseTag>,
     pub update_id: String,
     pub ignore_id: String,
     pub remove_id: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct InUseTag {
+    pub programs: String,
+    pub close_id: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -128,14 +135,19 @@ fn snapshot_on(view: &View, config: &Config, os: &str) -> Snapshot {
         monochrome_icon: config.monochrome_icon,
         self_update,
         managed_by,
-        packages: package_rows(view.packages, &sources, config),
+        packages: package_rows(view.packages, &sources, config, view.in_use),
         sources,
         batch: batch_rows(view),
         approvals: view.approvals.iter().map(approval_row).collect(),
     }
 }
 
-fn package_rows(packages: &[Package], sources: &[SourceRow], config: &Config) -> Vec<Row> {
+fn package_rows(
+    packages: &[Package],
+    sources: &[SourceRow],
+    config: &Config,
+    in_use: &[InUse],
+) -> Vec<Row> {
     let mut ordered: Vec<&Package> = packages.iter().collect();
     ordered.sort_by_key(|package| {
         (
@@ -147,11 +159,11 @@ fn package_rows(packages: &[Package], sources: &[SourceRow], config: &Config) ->
     });
     ordered
         .into_iter()
-        .map(|package| row(package, config))
+        .map(|package| row(package, config, in_use))
         .collect()
 }
 
-fn row(package: &Package, config: &Config) -> Row {
+fn row(package: &Package, config: &Config, in_use: &[InUse]) -> Row {
     Row {
         key: tray::key_of(package),
         name: package.name.clone(),
@@ -160,9 +172,35 @@ fn row(package: &Package, config: &Config) -> Row {
         latest: package.latest().map(ToString::to_string),
         status: package.status.label(),
         elevation: elevation(package.source, config),
+        in_use: in_use
+            .iter()
+            .find(|entry| entry.target.is(&package.name, package.source))
+            .map(in_use_tag),
         update_id: tray::update_id(package),
         ignore_id: tray::ignore_id(package),
         remove_id: tray::remove_id(package),
+    }
+}
+
+fn in_use_tag(entry: &InUse) -> InUseTag {
+    let mut counted: Vec<(&str, usize)> = Vec::new();
+    for program in &entry.programs {
+        match counted.iter_mut().find(|(name, _)| name == program) {
+            Some((_, count)) => *count += 1,
+            None => counted.push((program, 1)),
+        }
+    }
+    let programs = counted
+        .into_iter()
+        .map(|(name, count)| match count {
+            1 => name.to_string(),
+            count => format!("{name} ×{count}"),
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    InUseTag {
+        programs,
+        close_id: tray::close_update_id(&entry.target),
     }
 }
 

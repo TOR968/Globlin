@@ -26,6 +26,7 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>, frame: u32)
         packages,
         activity,
         approvals: &[],
+        in_use: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: None,
@@ -43,6 +44,7 @@ fn updating_view(activity: &Activity, elapsed: Duration) -> View<'_> {
         packages: &[],
         activity: Some(activity),
         approvals: &[],
+        in_use: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: None,
@@ -539,6 +541,7 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
         packages: &[],
         activity: None,
         approvals: &[],
+        in_use: &[],
         autostart: false,
         self_update: SelfUpdate::Own {
             release: Some(&release),
@@ -588,6 +591,7 @@ fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
         packages: &[],
         activity: None,
         approvals: &[],
+        in_use: &[],
         autostart: false,
         self_update: SelfUpdate::Managed(crate::install::Manager::Winget),
         pending_restart: None,
@@ -685,6 +689,26 @@ fn approval_ids_round_trip_including_scoped_names() {
             source: SourceKind::Npm,
         })
     );
+}
+
+#[test]
+fn a_close_and_update_id_round_trips_to_the_package_it_names() {
+    let target = UpdateTarget {
+        name: "Git.Git".to_string(),
+        source: SourceKind::Winget,
+        from: "2.56.0.2".to_string(),
+        to: "2.56.0.3".to_string(),
+    };
+
+    assert_eq!(close_update_id(&target), "close-update:winget:Git.Git");
+    assert_eq!(
+        Action::from_key(&close_update_id(&target)),
+        Some(Action::CloseAndUpdate {
+            name: "Git.Git".to_string(),
+            source: SourceKind::Winget,
+        })
+    );
+    assert_eq!(Action::from_key("close-update:winget:"), None);
 }
 
 #[test]

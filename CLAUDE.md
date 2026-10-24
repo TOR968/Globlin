@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 645 tests (613 run, 32 ignored) on Windows, no network, no side effects
+cargo test                     # 655 tests (623 run, 32 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -117,7 +117,7 @@ the script. `choco_one_prompt` and `winget_one_prompt` fold a source's batch int
 (`Config::one_prompt_kinds`, `update::jobs`); results are then read back by version, never from the
 elevated process. A winget exit code that is not a broken update — not applicable, cancelled, a running portable
 program, another install in progress — comes back as a `model::Refusal` through `PackageSource::refusal`: the first three
-finish the row `Skipped`, the last is retried once at the end of the batch (`update::drive`). Never add a way to skip or pre-approve the prompt: that is a UAC bypass. Globlin's own row
+finish the row `Skipped`, the last is retried once at the end of the batch (`update::drive`). A failure while programs run from the package folder becomes `Refusal::InUse` via `PackageSource::running`, and only the window's per-row **Close & update** (`close-update:`) ever stops them — never a batch. Never add a way to skip or pre-approve the prompt: that is a UAC bypass. Globlin's own row
 (display name `Globlin`) is dropped from the winget listing so the app cannot uninstall itself.
 `PackageSource::uninstall_command` still returns `Option<Command>` because go has none; it removes itself
 through `PackageSource::remove_directly`, which deletes the binary from the Go bin directory. See

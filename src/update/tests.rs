@@ -695,7 +695,111 @@ fn refused(refusal: Refusal) -> Result<(), Failure> {
         details: format!("{refusal:?}\n"),
         blocked: None,
         refusal: Some(refusal),
+        programs: Vec::new(),
     })
+}
+
+struct RunningSource(Vec<String>);
+
+impl PackageSource for RunningSource {
+    fn kind(&self) -> SourceKind {
+        SourceKind::Winget
+    }
+
+    fn installed(&self) -> crate::Result<Vec<Installed>> {
+        Ok(Vec::new())
+    }
+
+    fn update_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn uninstall_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn running(&self, _name: &str) -> Vec<String> {
+        self.0.clone()
+    }
+}
+
+fn running(programs: &[&str]) -> Vec<Box<dyn PackageSource>> {
+    vec![Box::new(RunningSource(
+        programs.iter().map(ToString::to_string).collect(),
+    ))]
+}
+
+#[test]
+fn a_failed_update_whose_programs_are_running_becomes_in_use_with_their_names() {
+    let targets = vec![sourced("Git.Git", SourceKind::Winget)];
+
+    let results = execute(&running(&["bash", "bash"]), &targets, &[0], &[]);
+
+    let Err(failure) = &results[0] else {
+        panic!("the update had no command, so it cannot have succeeded");
+    };
+    assert_eq!(failure.refusal, Some(Refusal::InUse));
+    assert_eq!(failure.programs, vec!["bash", "bash"]);
+}
+
+#[test]
+fn a_failed_update_with_nothing_running_stays_an_ordinary_failure() {
+    let targets = vec![sourced("Git.Git", SourceKind::Winget)];
+
+    let results = execute(&running(&[]), &targets, &[0], &[]);
+
+    let Err(failure) = &results[0] else {
+        panic!("the update had no command, so it cannot have succeeded");
+    };
+    assert_eq!(failure.refusal, None);
+    assert!(failure.programs.is_empty());
+}
+
+#[test]
+fn an_in_use_target_is_skipped_and_handed_to_the_window_with_its_programs() {
+    let targets = vec![sourced("Git.Git", SourceKind::Winget)];
+    let in_use = Failure {
+        refusal: Some(Refusal::InUse),
+        programs: vec!["bash".to_string()],
+        ..Failure::from("in use\n".to_string())
+    };
+
+    let (outcome, steps, _) = driven(&targets, vec![Err(in_use)]);
+
+    assert!(outcome.failed.is_empty());
+    assert_eq!(
+        outcome.in_use,
+        vec![InUse {
+            target: targets[0].clone(),
+            programs: vec!["bash".to_string()],
+        }]
+    );
+    assert!(steps.contains(&Step::Finished {
+        index: 0,
+        state: RowState::Skipped
+    }));
+}
+
+#[test]
+fn an_in_use_entry_is_replaced_when_reported_again_and_dropped_once_updated() {
+    let git = sourced("Git.Git", SourceKind::Winget);
+    let monitor = sourced("Claude.Monitor", SourceKind::Winget);
+    let entry = |target: &UpdateTarget, program: &str| InUse {
+        target: target.clone(),
+        programs: vec![program.to_string()],
+    };
+    let mut in_use = vec![entry(&git, "bash"), entry(&monitor, "monitor")];
+
+    settle_in_use(
+        &mut in_use,
+        &Outcome {
+            updated: vec![monitor.clone()],
+            in_use: vec![entry(&git, "tail")],
+            ..Outcome::default()
+        },
+    );
+
+    assert_eq!(in_use, vec![entry(&git, "tail")]);
 }
 
 fn driven(

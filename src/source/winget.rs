@@ -14,6 +14,17 @@ const UNKNOWN_VERSION: &str = "Unknown";
 const REGISTRY_ONLY: &str = "ARP\\";
 
 const SHELLS: [&str; 2] = ["powershell", "pwsh"];
+const BROAD_DIRS: [&str; 9] = [
+    "SystemDrive",
+    "SystemRoot",
+    "ProgramFiles",
+    "ProgramFiles(x86)",
+    "ProgramW6432",
+    "ProgramData",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+];
 const UPGRADE_FLAGS: &str =
     "--exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements";
 const DIAGNOSTICS: &str =
@@ -72,6 +83,37 @@ impl Winget {
         Some(command)
     }
 
+    fn location(&self, id: &str) -> Option<String> {
+        let output = run_listing(hidden_command(&self.command).args([
+            "list",
+            "--id",
+            id,
+            "--exact",
+            "--details",
+            "--disable-interactivity",
+            "--accept-source-agreements",
+        ]))
+        .ok()?;
+        narrow_location(&installed_location(&stdout_text(&output))?, &broad_dirs())
+    }
+
+    fn processes_under(&self, id: &str, then: &str) -> Option<Output> {
+        let location = self.location(id)?;
+        let shell = self.shell.as_ref()?;
+        let script = format!(
+            "$ErrorActionPreference = 'Stop'; $root = {}; \
+             Get-Process | Where-Object {{ $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }} | {then}",
+            quoted(&location),
+        );
+        run_listing(hidden_command(shell).args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &script,
+        ]))
+        .ok()
+    }
+
     fn change(&self, verb: &str, id: &str) -> Command {
         let mut command = hidden_command(&self.command);
         command.args([
@@ -121,6 +163,62 @@ impl PackageSource for Winget {
     fn refusal(&self, output: &Output) -> Option<Refusal> {
         refusal_for(output.status.code()?)
     }
+
+    fn running(&self, name: &str) -> Vec<String> {
+        self.processes_under(name, "ForEach-Object { $_.ProcessName }")
+            .filter(|output| output.status.success())
+            .map(|output| {
+                stdout_text(&output)
+                    .lines()
+                    .map(str::trim)
+                    .filter(|line| !line.is_empty())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn close_running(&self, name: &str) -> Result<()> {
+        let output = self
+            .processes_under(name, "Stop-Process -Force")
+            .ok_or_else(|| format!("{name}: could not find where winget installed it"))?;
+        if output.status.success() {
+            return Ok(());
+        }
+        Err(format!(
+            "{name}: could not close its programs: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+        .into())
+    }
+}
+
+fn installed_location(details: &str) -> Option<String> {
+    details
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("Installed Location:"))
+        .map(str::trim)
+        .filter(|location| !location.is_empty())
+        .map(String::from)
+}
+
+fn narrow_location(location: &str, broad: &[String]) -> Option<String> {
+    let folder = |path: &str| format!("{}\\", path.trim_end_matches('\\')).to_lowercase();
+    let location = folder(location);
+    let covers_a_shared_folder = broad.iter().any(|dir| folder(dir).starts_with(&location));
+    (!covers_a_shared_folder).then_some(location)
+}
+
+fn broad_dirs() -> Vec<String> {
+    let mut dirs: Vec<String> = BROAD_DIRS
+        .iter()
+        .filter_map(|name| std::env::var(name).ok())
+        .collect();
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        dirs.push(format!("{local}\\Programs"));
+        dirs.push(format!("{local}\\Microsoft\\WinGet\\Packages"));
+    }
+    dirs
 }
 
 fn refusal_for(code: i32) -> Option<Refusal> {
