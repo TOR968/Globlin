@@ -172,6 +172,9 @@ rest, and the elevation is left to Windows' own prompt:
   stopped — an unelevated parent cannot kill the elevated choco it started.
 - **`winget_one_prompt` does the same for winget**, through the same `update::jobs` fold
   (`Config::one_prompt_kinds` names every source whose switch is on, and each gets its own shared job).
+  A shared job of one package still goes through `update_together`: winget's own `update_command` runs
+  unelevated, so a lone update (one row's **Update**) would otherwise skip the prompt the switch promises,
+  and an MSIX with a packaged service — ChatGPT's — fails with `0x80073D28`.
   `Winget::update_together` cannot hand winget several ids, because `winget upgrade --id` takes one, so
   the elevated process is a second PowerShell: `Start-Process -FilePath <powershell> -ArgumentList
   '-NoProfile', '-NonInteractive', '-Command', '<inner>' -Verb RunAs`, where `<inner>` is `foreach ($id

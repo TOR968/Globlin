@@ -84,10 +84,11 @@ pub fn run(
         return fail_all(targets, &details);
     }
 
+    let one_prompt = config.one_prompt_kinds();
     let outcome = drive(
         targets,
-        jobs(targets, &config.one_prompt_kinds()),
-        |job| execute(&sources, targets, job),
+        jobs(targets, &one_prompt),
+        |job| execute(&sources, targets, job, &one_prompt),
         &announce,
         BUSY_PAUSE,
     );
@@ -186,9 +187,12 @@ fn execute(
     sources: &[Box<dyn PackageSource>],
     targets: &[UpdateTarget],
     job: &[usize],
+    one_prompt: &[SourceKind],
 ) -> Vec<Result<(), Failure>> {
     if let [index] = job {
-        return vec![apply(sources, &targets[*index])];
+        if !one_prompt.contains(&targets[*index].source) {
+            return vec![apply(sources, &targets[*index])];
+        }
     }
     let group: Vec<UpdateTarget> = job.iter().map(|index| targets[*index].clone()).collect();
     apply_together(sources, &group)

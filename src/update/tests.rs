@@ -641,6 +641,55 @@ fn with_both_one_prompt_switches_winget_and_choco_each_get_their_own_shared_job(
     );
 }
 
+struct SharedRunSource(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl PackageSource for SharedRunSource {
+    fn kind(&self) -> SourceKind {
+        SourceKind::Winget
+    }
+
+    fn installed(&self) -> crate::Result<Vec<Installed>> {
+        Ok(Vec::new())
+    }
+
+    fn update_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+
+    fn update_together(&self, _names: &[&str]) -> Option<std::process::Command> {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+        None
+    }
+
+    fn uninstall_command(&self, _name: &str) -> Option<std::process::Command> {
+        None
+    }
+}
+
+#[test]
+fn a_lone_target_of_a_one_prompt_source_still_runs_under_the_prompt() {
+    let shared = std::sync::Arc::default();
+    let sources: Vec<Box<dyn PackageSource>> =
+        vec![Box::new(SharedRunSource(std::sync::Arc::clone(&shared)))];
+    let targets = vec![sourced("OpenAI.ChatGPT", SourceKind::Winget)];
+
+    execute(&sources, &targets, &[0], &[SourceKind::Winget]);
+
+    assert!(shared.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn a_lone_target_without_one_prompt_runs_its_own_command() {
+    let shared = std::sync::Arc::default();
+    let sources: Vec<Box<dyn PackageSource>> =
+        vec![Box::new(SharedRunSource(std::sync::Arc::clone(&shared)))];
+    let targets = vec![sourced("OpenAI.ChatGPT", SourceKind::Winget)];
+
+    execute(&sources, &targets, &[0], &[]);
+
+    assert!(!shared.load(std::sync::atomic::Ordering::SeqCst));
+}
+
 fn refused(refusal: Refusal) -> Result<(), Failure> {
     Err(Failure {
         details: format!("{refusal:?}\n"),
