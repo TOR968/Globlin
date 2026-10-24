@@ -1080,7 +1080,7 @@ dependencies = [
 
 [[package]]
 name = "globlin"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "mac-notification-sys",
  "minisign-verify",
