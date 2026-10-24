@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.17](https://github.com/TOR968/Globlin/compare/v0.4.16...v0.4.17) - 2026-10-24
+
+### Fixed
+
+- winget updates that skipped the admin prompt, Steam rows stuck at not checked, and Close & update for programs in use ([#120](https://github.com/TOR968/Globlin/pull/120))
+
 ## [0.4.16](https://github.com/TOR968/Globlin/compare/v0.4.15...v0.4.16) - 2026-10-24
 
 ### Added
