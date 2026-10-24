@@ -237,7 +237,7 @@ or the installer keeps Globlin up to date) and, when a release is waiting, **Upd
 packages · 2 updates*, *No global packages*, *Off*. Switching one goes into `globlin.json` at once; a
 fresh check follows two seconds after the last switch, so flipping several costs one check.
 *Diagnostics* opens the last log; *About* shows the version and links to
-[Patreon](https://www.patreon.com/c/TOR968), as does *Support on Patreon* beside *Open last log* at the
+[Patreon](https://www.patreon.com/cw/TOR968/membership), as does *Support on Patreon* beside *Open last log* at the
 foot of the window.
 
 The tray menu stays short — the list lives in the window:

@@ -24,7 +24,7 @@ use crate::{diagnostics, notice, platform, progress, window, Message, Result};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
 const SETTLE_DELAY: Duration = Duration::from_secs(2);
-const PATREON_URL: &str = "https://www.patreon.com/c/TOR968";
+const PATREON_URL: &str = "https://www.patreon.com/cw/TOR968/membership";
 
 pub enum Control {
     Continue,
