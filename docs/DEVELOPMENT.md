@@ -239,7 +239,10 @@ its suppressed *Retry/Cancel* box to Cancel and exits 1, which winget reports as
 `0x8A150006`. So after any winget failure that is not another refusal, `update::in_use` asks
 `PackageSource::running`: `Winget::location` reads `Installed Location:` from `winget list --id <id>
 --exact --details` (winget 1.29), and PowerShell lists every process whose `Path` starts with that
-folder. Any hit turns the failure into `Refusal::InUse` with the process names, which land in
+folder plus every running service whose `PathName` does (`<name> (service)`). Services matter for
+MSIX: ChatGPT's package installs `CodexSandboxService.OpenAI.Codex` (Auto), which keeps the old version
+in use, so registering the new one fails with `0x80073D02` — and winget still exits 0. A service runs
+as SYSTEM, so its process `Path` is unreadable unelevated; `Win32_Service.PathName` is not. Any hit turns the failure into `Refusal::InUse` with the process names, which land in
 `Outcome.in_use`; `App.in_use` keeps them (`update::settle_in_use`) and the window's row shows *in use:
 bash ×9* with **Close & update** in place of **Update**. It is asked only after a failure, never before
 an update: Teams and Obsidian update fine while running, and a pre-check would cost a winget call per
@@ -247,13 +250,18 @@ package. The trade-off is a real failure that happens while the program is open 
 is still written.
 
 The button is per row and two-click (like **Uninstall**); **Update all** and **Update N** never close
-anything. `close-update:` re-finds the processes at click time (not the PIDs from the failure), stops
-them with `Stop-Process -Force`, then runs the ordinary update. Nothing is restarted, because a terminal
-or a program started with arguments cannot be put back as it was. A process running as administrator
-cannot be stopped from an unelevated Globlin, so that update fails with PowerShell's reason in the log.
+anything. `close-update:` re-finds the processes and services at click time (not the PIDs from the
+failure), stops the services with `Stop-Service -Force` and then the processes with `Stop-Process -Force`,
+then runs the ordinary update. When a service is among them the close script runs through the same
+`Start-Process -Verb RunAs` wrapper as a one-prompt upgrade (`Winget::elevated`), so it carries no double
+quote (a test pins that); that is a second prompt when the update itself is elevated too. Nothing is
+restarted, because a terminal or a program started with arguments cannot be put back as it was; an Auto
+service comes back on its own with the new version. A process running as administrator that is not a
+service cannot be stopped from an unelevated Globlin, so that update fails with PowerShell's reason in
+the log. A shared run that exits 0 while a member's version did not move says so in the log.
 `winget::narrow_location` refuses any folder that is, or contains, a shared one — the drive root,
-`Program Files`, `ProgramData`, the user profile, `AppData`, `%LOCALAPPDATA%\Programs`, winget's own
-`Packages` root — so a package reporting a broad install location can never close everything under it.
+`Program Files`, `WindowsApps`, `ProgramData`, the user profile, `AppData`, `%LOCALAPPDATA%\Programs`,
+winget's own `Packages` root — so a package reporting a broad install location can never close everything under it.
 
 A not-applicable, cancelled or in-use update lands in `Outcome.skipped` with its `Refusal`, finishes its row
 as `RowState::Skipped`, and never raises *update failed*; `update::toast` lists each one with

@@ -402,9 +402,14 @@ fn apply_together(
     let refusal = source.refusal(&output);
     let details = diagnostics::command_report(
         &format!(
-            "{} via {} under one prompt",
+            "{} via {} under one prompt{}",
             names.join(", "),
-            first.source.label()
+            first.source.label(),
+            if output.status.success() {
+                " reported success, but the installed version did not change; it"
+            } else {
+                ""
+            }
         ),
         &output,
     );

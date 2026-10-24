@@ -25,6 +25,11 @@ const BROAD_DIRS: [&str; 9] = [
     "APPDATA",
     "LOCALAPPDATA",
 ];
+const PROCESSES: &str = "Get-Process | Where-Object { $_.Path -and \
+    $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }";
+const SERVICES: &str = "Get-CimInstance Win32_Service | Where-Object { $_.State -eq 'Running' -and \
+    $_.PathName -and $_.PathName.TrimStart([char]34).StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }";
+const SERVICE_SUFFIX: &str = " (service)";
 const UPGRADE_FLAGS: &str =
     "--exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements";
 const DIAGNOSTICS: &str =
@@ -61,7 +66,6 @@ impl Winget {
             .map(|id| plain_name(id).map(|id| format!("'{id}'")))
             .collect::<Option<Vec<String>>>()?
             .join(", ");
-        let shell = self.shell.as_ref()?;
         let inner = format!(
             "$codes = @(); foreach ($id in {ids}) {{ & {} upgrade --id $id {UPGRADE_FLAGS}; \
              if ($LASTEXITCODE) {{ $codes += $LASTEXITCODE }} }}; \
@@ -69,17 +73,28 @@ impl Winget {
              if ($shared.Count -eq 1) {{ exit $shared[0] }}; exit [int]($codes.Count -gt 0)",
             quoted(&self.command.to_string_lossy()),
         );
-        let script = format!(
+        self.elevated(
+            &inner,
+            &format!("'winget exited with ' + $run.ExitCode + '; its own logs are in ' + $env:LOCALAPPDATA + '{DIAGNOSTICS}'"),
+        )
+    }
+
+    fn elevated(&self, inner: &str, failure: &str) -> Option<Command> {
+        let shell = self.shell.as_ref()?;
+        self.in_shell(&format!(
             "$ErrorActionPreference = 'Stop'; \
              $run = Start-Process -FilePath {} -ArgumentList '-NoProfile', '-NonInteractive', '-Command', {} \
              -Verb RunAs -WindowStyle Hidden -Wait -PassThru; \
-             if ($run.ExitCode) {{ [Console]::Error.WriteLine('winget exited with ' + $run.ExitCode + '; its own logs are in ' + $env:LOCALAPPDATA + '{DIAGNOSTICS}') }}; \
+             if ($run.ExitCode) {{ [Console]::Error.WriteLine({failure}) }}; \
              exit $run.ExitCode",
             quoted(&shell.to_string_lossy()),
-            quoted(&inner),
-        );
-        let mut command = hidden_command(shell);
-        command.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+            quoted(inner),
+        ))
+    }
+
+    fn in_shell(&self, script: &str) -> Option<Command> {
+        let mut command = hidden_command(self.shell.as_ref()?);
+        command.args(["-NoProfile", "-NonInteractive", "-Command", script]);
         Some(command)
     }
 
@@ -95,23 +110,6 @@ impl Winget {
         ]))
         .ok()?;
         narrow_location(&installed_location(&stdout_text(&output))?, &broad_dirs())
-    }
-
-    fn processes_under(&self, id: &str, then: &str) -> Option<Output> {
-        let location = self.location(id)?;
-        let shell = self.shell.as_ref()?;
-        let script = format!(
-            "$ErrorActionPreference = 'Stop'; $root = {}; \
-             Get-Process | Where-Object {{ $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }} | {then}",
-            quoted(&location),
-        );
-        run_listing(hidden_command(shell).args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            &script,
-        ]))
-        .ok()
     }
 
     fn change(&self, verb: &str, id: &str) -> Command {
@@ -165,7 +163,9 @@ impl PackageSource for Winget {
     }
 
     fn running(&self, name: &str) -> Vec<String> {
-        self.processes_under(name, "ForEach-Object { $_.ProcessName }")
+        self.location(name)
+            .and_then(|location| self.in_shell(&running_script(&location)))
+            .and_then(|mut command| run_listing(&mut command).ok())
             .filter(|output| output.status.success())
             .map(|output| {
                 stdout_text(&output)
@@ -179,9 +179,23 @@ impl PackageSource for Winget {
     }
 
     fn close_running(&self, name: &str) -> Result<()> {
-        let output = self
-            .processes_under(name, "Stop-Process -Force")
+        let location = self
+            .location(name)
             .ok_or_else(|| format!("{name}: could not find where winget installed it"))?;
+        let script = close_script(&location);
+        let services = self
+            .running(name)
+            .iter()
+            .any(|program| program.ends_with(SERVICE_SUFFIX));
+        let command = if services {
+            self.elevated(
+                &script,
+                "'closing its programs failed with ' + $run.ExitCode",
+            )
+        } else {
+            self.in_shell(&script)
+        };
+        let output = super::run_change(command, name, SourceKind::Winget)?;
         if output.status.success() {
             return Ok(());
         }
@@ -191,6 +205,24 @@ impl PackageSource for Winget {
         )
         .into())
     }
+}
+
+fn running_script(location: &str) -> String {
+    format!(
+        "$ErrorActionPreference = 'Stop'; $root = {}; \
+         {PROCESSES} | ForEach-Object {{ $_.ProcessName }}; \
+         {SERVICES} | ForEach-Object {{ $_.Name + '{SERVICE_SUFFIX}' }}",
+        quoted(location),
+    )
+}
+
+fn close_script(location: &str) -> String {
+    format!(
+        "$ErrorActionPreference = 'Stop'; $root = {}; \
+         {SERVICES} | ForEach-Object {{ Stop-Service -Name $_.Name -Force }}; \
+         {PROCESSES} | Stop-Process -Force",
+        quoted(location),
+    )
 }
 
 fn installed_location(details: &str) -> Option<String> {
@@ -214,6 +246,9 @@ fn broad_dirs() -> Vec<String> {
         .iter()
         .filter_map(|name| std::env::var(name).ok())
         .collect();
+    if let Ok(programs) = std::env::var("ProgramFiles") {
+        dirs.push(format!("{programs}\\WindowsApps"));
+    }
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
         dirs.push(format!("{local}\\Programs"));
         dirs.push(format!("{local}\\Microsoft\\WinGet\\Packages"));
