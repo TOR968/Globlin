@@ -1136,6 +1136,13 @@
               </div>
               <button id="auto-approve" class="switch" type="button" aria-pressed="false" aria-labelledby="auto-approve-label"></button>
             </div>
+            <div class="setting">
+              <div class="setting-text">
+                <span class="setting-label" id="update-on-start-label">Update everything when Globlin starts</span>
+                <span class="setting-note">After the first check, runs Update all once. Ignored packages are left alone.</span>
+              </div>
+              <button id="update-on-start" class="switch" type="button" aria-pressed="false" aria-labelledby="update-on-start-label"></button>
+            </div>
             <div id="choco-one-prompt-row" class="setting" hidden>
               <div class="setting-text">
                 <span class="setting-label" id="choco-one-prompt-label">One administrator prompt for all choco updates</span>
@@ -1708,6 +1715,7 @@
         const snapshot = state.snapshot;
         setSwitch(el("autostart"), snapshot.autostart);
         setSwitch(el("auto-approve"), snapshot.auto_approve);
+        setSwitch(el("update-on-start"), snapshot.update_on_start);
         el("choco-one-prompt-row").hidden = snapshot.choco_one_prompt === null;
         setSwitch(el("choco-one-prompt"), Boolean(snapshot.choco_one_prompt));
         el("winget-one-prompt-row").hidden = snapshot.winget_one_prompt === null;
@@ -1837,6 +1845,7 @@
       el("autostart").onclick = () => send("autostart");
       el("auto-update").onclick = () => send("auto-update");
       el("auto-approve").onclick = () => send("auto-approve");
+      el("update-on-start").onclick = () => send("update-on-start");
       el("choco-one-prompt").onclick = () => send("choco-one-prompt");
       el("winget-one-prompt").onclick = () => send("winget-one-prompt");
       el("monochrome-icon").onclick = () => send("monochrome-icon");

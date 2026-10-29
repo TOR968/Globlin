@@ -183,11 +183,17 @@ rest, and the elevation is left to Windows' own prompt:
   they differ. `Start-Process` joins `-ArgumentList` with spaces and the inner PowerShell re-parses that
   as a command line, which strips double quotes, so the inner script uses single quotes only (a test
   pins that). Every id must pass `plain_name`, so an `ARP\…\{GUID}` id fails the group rather than being
-  pasted into a script. Results are read back by version, as for choco; a member whose version did not
-  move then takes the refusal (below) the run's exit code maps to, through `update::group_results`.
-  That is sound only because of the "all the same" rule: an exit code of `0x8A15002B` promises that
-  every package which failed was not applicable, so three inapplicable packages read *skipped*, while
-  one inapplicable package beside one broken one reads *failed* for both. The point of
+  pasted into a script. Results are read back by version, as for choco; a member counts as moved only
+  when no listed row with its id still carries the old version, because winget can list two installs
+  under one id (ClickUp's Store build beside its desktop build) and the untouched one would otherwise
+  read as an update. A member whose version did not move takes its own refusal (below), through
+  `PackageSource::refusal_of` and `update::group_results`: the elevated process's stdout never reaches
+  Globlin, so the inner script appends `<id> <exit code>` per package to `winget-codes.txt` in
+  `platform::data_dir()`, and the unelevated PowerShell prints that file after `-Wait` and deletes it.
+  An id missing from that output (a declined prompt, an inner script that died) falls back to the
+  refusal the whole run's exit code maps to. Without it, one inapplicable package (`0x8A15002B`) beside
+  one whose installer exited 0 without moving its version — Logitech G HUB's bootstrapper does this —
+  marked both *skipped, not applicable*. The point of
   the switch is less the prompt count than the hang: per-package, a machine-scope installer's UAC prompt
   that nobody answers holds the batch for the whole `CHANGE_LIMIT` (a `.NET Desktop Runtime` dependency
   pulled in by Vortex and Obsidian's `/allusers` installer each burned 30 minutes this way), while an
@@ -993,7 +999,7 @@ do nothing.
 
 `Config`, `Sources` and `Snapshot` carry `#[allow(clippy::struct_excessive_bools)]` for the opposite
 reason: every bool there is one independent user switch (`auto_update`, `auto_approve_scripts`,
-`choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
+`update_all_on_start`, `choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
 rename them. The allow goes on such a struct only when that is true of every field.
 
 ### When the installer owns the directory

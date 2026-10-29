@@ -744,6 +744,14 @@ fn the_auto_approve_id_parses_back_to_its_action() {
 }
 
 #[test]
+fn the_update_on_start_id_parses_back_to_its_action() {
+    assert_eq!(
+        Action::from_key(ID_UPDATE_ON_START),
+        Some(Action::ToggleUpdateOnStart)
+    );
+}
+
+#[test]
 fn a_long_batch_shows_only_a_few_rows_around_the_active_one() {
     assert_eq!(shown_batch_rows(0, 102), 0..7);
     assert_eq!(shown_batch_rows(50, 102), 48..55);

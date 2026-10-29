@@ -401,6 +401,7 @@ edits are never silently overwritten.
   "npm_cmd": null,
   "auto_update": false,
   "auto_approve_scripts": false,
+  "update_all_on_start": false,
   "choco_one_prompt": false,
   "winget_one_prompt": false,
   "monochrome_icon": false,
@@ -422,6 +423,9 @@ edits are never silently overwritten.
 - **`auto_update`** — see [Keeping itself updated](#keeping-itself-updated).
 - **`auto_approve_scripts`** — the **Approve npm install scripts automatically** switch in the window's
   Settings; see [Using it](#using-it).
+- **`update_all_on_start`** — the **Update everything when Globlin starts** switch in the window's
+  Settings: once the first check after launch finishes, it runs **Update all** a single time.
+  Ignored packages are skipped, as with the button.
 - **`choco_one_prompt`** — the **One administrator prompt for all choco updates** switch in the window's
   Settings (Windows only); see [Using it](#using-it).
 - **`winget_one_prompt`** — the **One administrator prompt for all winget updates** switch in the

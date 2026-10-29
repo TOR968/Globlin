@@ -399,7 +399,10 @@ fn apply_together(
     };
 
     let installed = source.installed().ok();
-    let refusal = source.refusal(&output);
+    let refusals = group
+        .iter()
+        .map(|target| source.refusal_of(&output, &target.name))
+        .collect();
     let details = diagnostics::command_report(
         &format!(
             "{} via {} under one prompt{}",
@@ -416,19 +419,20 @@ fn apply_together(
     group_results(
         changed_versions(group, installed.as_deref(), output.status.success()),
         details,
-        refusal,
+        refusals,
     )
 }
 
 fn group_results(
     changed: Vec<bool>,
     details: String,
-    refusal: Option<Refusal>,
+    refusals: Vec<Option<Refusal>>,
 ) -> Vec<Result<(), Failure>> {
     let mut details = Some(details);
     changed
         .into_iter()
-        .map(|changed| {
+        .zip(refusals)
+        .map(|(changed, refusal)| {
             if changed {
                 Ok(())
             } else {
@@ -457,9 +461,14 @@ fn changed_versions(
     group
         .iter()
         .map(|target| match installed {
-            Some(listing) => listing
-                .iter()
-                .any(|item| item.name == target.name && item.version != target.from),
+            Some(listing) => {
+                let versions: Vec<&str> = listing
+                    .iter()
+                    .filter(|item| item.name == target.name)
+                    .map(|item| item.version.as_str())
+                    .collect();
+                !versions.is_empty() && !versions.contains(&target.from.as_str())
+            }
             None => succeeded,
         })
         .collect()

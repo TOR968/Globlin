@@ -1007,6 +1007,17 @@ fn after_a_shared_run_a_package_counts_as_updated_only_if_its_version_moved() {
 }
 
 #[test]
+fn a_second_install_under_the_same_id_does_not_count_as_the_version_moving() {
+    let group = vec![sourced("XPFMMJNL4WBKMP", SourceKind::Winget)];
+    let listing = vec![
+        Installed::new("XPFMMJNL4WBKMP", "3.5.262.0", SourceKind::Winget),
+        Installed::new("XPFMMJNL4WBKMP", "1.0.0", SourceKind::Winget),
+    ];
+
+    assert_eq!(changed_versions(&group, Some(&listing), false), vec![false]);
+}
+
+#[test]
 fn when_the_listing_cannot_be_read_the_exit_code_decides_for_the_whole_group() {
     let group = vec![
         sourced("git", SourceKind::Choco),
@@ -1037,11 +1048,16 @@ fn a_group_that_could_not_run_logs_its_reason_once_and_fails_every_member() {
 }
 
 #[test]
-fn in_a_shared_run_every_unchanged_member_carries_the_refusal_the_whole_run_ended_with() {
+fn in_a_shared_run_every_unchanged_member_carries_its_own_refusal() {
     let results = group_results(
-        vec![false, true, false],
+        vec![false, true, false, false],
         "winget: not applicable\n".to_string(),
-        Some(Refusal::NotApplicable),
+        vec![
+            Some(Refusal::NotApplicable),
+            None,
+            Some(Refusal::NotApplicable),
+            None,
+        ],
     );
 
     let refusals: Vec<Option<Option<Refusal>>> = results
@@ -1053,7 +1069,8 @@ fn in_a_shared_run_every_unchanged_member_carries_the_refusal_the_whole_run_ende
         vec![
             Some(Some(Refusal::NotApplicable)),
             None,
-            Some(Some(Refusal::NotApplicable))
+            Some(Some(Refusal::NotApplicable)),
+            Some(None)
         ]
     );
     assert_eq!(
