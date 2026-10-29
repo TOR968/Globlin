@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.19](https://github.com/TOR968/Globlin/compare/v0.4.18...v0.4.19) - 2026-10-29
+
+### Added
+
+- update everything when Globlin starts, and per-package results for one-prompt winget runs ([#124](https://github.com/TOR968/Globlin/pull/124))
+
 ## [0.4.18](https://github.com/TOR968/Globlin/compare/v0.4.17...v0.4.18) - 2026-10-24
 
 ### Fixed
