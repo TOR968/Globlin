@@ -1,6 +1,5 @@
 use minisign_verify::{PublicKey, Signature};
 use semver::Version;
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,29 +28,18 @@ pub struct Release {
     pub sums_signature_url: String,
 }
 
-#[derive(Deserialize)]
-struct ApiRelease {
-    tag_name: String,
-    assets: Vec<ApiAsset>,
-}
-
-#[derive(Deserialize)]
-struct ApiAsset {
-    name: String,
-    browser_download_url: String,
-}
-
-fn offer(body: &str, current: &Version, asset: &str) -> Option<Release> {
-    let release: ApiRelease = serde_json::from_str(body).ok()?;
-    let version = Version::parse(release.tag_name.trim_start_matches('v')).ok()?;
+fn offer(location: &str, current: &Version, asset: &str) -> Option<Release> {
+    let (_, tag) = location.rsplit_once(TAG_PATH)?;
+    let version = Version::parse(tag.trim_start_matches('v')).ok()?;
     if version <= *current {
         return None;
     }
+    let url = |name: &str| format!("{DOWNLOAD_URL}/{tag}/{name}");
     Some(Release {
         version,
-        asset_url: asset_url(&release.assets, asset)?,
-        sums_url: asset_url(&release.assets, SUMS_ASSET)?,
-        sums_signature_url: asset_url(&release.assets, SUMS_SIGNATURE_ASSET)?,
+        asset_url: url(asset),
+        sums_url: url(SUMS_ASSET),
+        sums_signature_url: url(SUMS_SIGNATURE_ASSET),
     })
 }
 
@@ -61,13 +49,6 @@ pub fn should_auto_apply(release: &Version, auto_update: bool, blocked: Option<&
 
 pub fn supersedes(release: &Version, installed: Option<&Version>) -> bool {
     installed.is_none_or(|installed| release > installed)
-}
-
-fn asset_url(assets: &[ApiAsset], name: &str) -> Option<String> {
-    assets
-        .iter()
-        .find(|asset| asset.name == name)
-        .map(|asset| asset.browser_download_url.clone())
 }
 
 fn asset_for(os: &str, arch: &str, appimage: bool) -> Option<&'static str> {
@@ -177,7 +158,9 @@ fn remove_leftovers(current: &Path) {
     fs::remove_file(staged_path(current)).ok();
 }
 
-const LATEST_URL: &str = "https://api.github.com/repos/TOR968/globlin/releases/latest";
+const LATEST_URL: &str = "https://github.com/TOR968/globlin/releases/latest";
+const DOWNLOAD_URL: &str = "https://github.com/TOR968/globlin/releases/download";
+const TAG_PATH: &str = "/releases/tag/";
 const USER_AGENT: &str = "globlin";
 const TIMEOUT: Duration = Duration::from_secs(30);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_mins(2);
@@ -186,8 +169,19 @@ pub const RESTART_FLAG: &str = "--replaced";
 pub fn latest() -> Result<Option<Release>> {
     let asset = running_asset()?;
     let current = Version::parse(env!("CARGO_PKG_VERSION"))?;
-    let body = get(&agent(TIMEOUT), LATEST_URL)?.read_to_string()?;
-    Ok(offer(&body, &current, asset))
+    let response = agent(TIMEOUT)
+        .get(LATEST_URL)
+        .header("User-Agent", USER_AGENT)
+        .config()
+        .max_redirects(0)
+        .build()
+        .call()?;
+    let location = response
+        .headers()
+        .get("location")
+        .and_then(|value| value.to_str().ok())
+        .ok_or("the latest-release page did not redirect anywhere")?;
+    Ok(offer(location, &current, asset))
 }
 
 pub fn apply(release: &Release) -> Result<Version> {

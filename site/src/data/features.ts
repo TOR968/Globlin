@@ -6,7 +6,7 @@ export interface Feature {
 export const features: Feature[] = [
   {
     title: 'Fifteen package managers and your agent skills, one list',
-    body: 'npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem and Homebrew are checked out of the box, plus scoop on Windows; the PowerShell Gallery, winget and choco can be switched on. The same package installed under two of them stays distinguishable — each row names its source. Agent skills installed globally with skills.sh are checked too, against the GitHub repository each one came from, and update with the same click.',
+    body: 'npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem and Homebrew are checked out of the box, plus scoop on Windows; the PowerShell Gallery, winget and choco can be switched on. The same package installed under two of them stays distinguishable — each row names its source. Agent skills installed globally with skills.sh are kept current too: every check runs the update command of the skills.sh CLI.',
   },
   {
     title: 'Updates first, the rest folded away',

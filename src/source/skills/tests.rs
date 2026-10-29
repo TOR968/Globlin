@@ -1,12 +1,7 @@
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use super::*;
 use crate::source::NotInstalled;
-
-const INSTALLED: &str = "cf295b0c31a1d0a1f9f171c978ae1b9546953c1e";
-const UPSTREAM: &str = "9d1e4a2b7c3f5e6d8a9b0c1d2e3f4a5b6c7d8e9f";
-const ROOT: &str = "0a0b0c0d0e0f1a1b1c1d1e1f2a2b2c2d2e2f3a3b";
 
 const LOCK: &str = r#"{
   "version": 3,
@@ -45,33 +40,27 @@ const LOCK: &str = r#"{
   "lastSelectedAgents": ["codex"]
 }"#;
 
-fn tree(folder_sha: &str) -> String {
-    format!(
-        r#"{{"sha":"{ROOT}","tree":[
-            {{"path":"skills","type":"tree","sha":"5555555555555555555555555555555555555555"}},
-            {{"path":"skills/n8n-agents-official","type":"tree","sha":"{folder_sha}"}},
-            {{"path":"skills/n8n-agents-official/SKILL.md","type":"blob","sha":"6666666666666666666666666666666666666666"}}
-        ],"truncated":false}}"#
-    )
-}
+const UP_TO_DATE: &str = "\u{1b}[38;5;145mUpdating my-local, n8n-agents-official, n8n-loops-official, pinned…\u{1b}[0m\n\n\
+\r\u{1b}[38;5;102mChecking skills from source: n8n-io/skills\u{1b}[0m\u{1b}[K\n\
+\r\u{1b}[38;5;102mChecking skills from source: owner/repo\u{1b}[0m\u{1b}[K\n\
+\r\u{1b}[K\u{1b}[38;5;145m✓ All global skills are up to date\u{1b}[0m\n\n\
+\u{1b}[38;5;102m1 skill(s) cannot be checked automatically:\u{1b}[0m\n\
+  \u{1b}[38;5;145m•\u{1b}[0m my-local \u{1b}[38;5;102m(Local path)\u{1b}[0m\n";
 
 fn entries() -> Vec<Entry> {
     parse_lock(LOCK).unwrap()
 }
 
-fn entry(name: &str) -> Entry {
-    entries()
+fn asked() -> Vec<String> {
+    entries().into_iter().map(|entry| entry.name).collect()
+}
+
+fn resolved(output: &str, name: &str) -> Installed {
+    let run = Run::read(output, asked());
+    resolve(&entries(), Some(&run))
         .into_iter()
-        .find(|entry| entry.name == name)
+        .find(|skill| skill.name == name)
         .unwrap()
-}
-
-fn resolved(name: &str, trees: &HashMap<String, String>) -> Installed {
-    resolve(&[entry(name)], trees).remove(0)
-}
-
-fn agents_tree(folder_sha: &str) -> HashMap<String, String> {
-    HashMap::from([("n8n-io/skills".to_string(), tree(folder_sha))])
 }
 
 #[test]
@@ -100,9 +89,8 @@ fn the_lock_file_lives_in_the_agents_folder_of_home_otherwise() {
 
 #[test]
 fn every_lock_entry_becomes_one_skill_named_by_its_key() {
-    let names: Vec<String> = entries().into_iter().map(|entry| entry.name).collect();
     assert_eq!(
-        names,
+        asked(),
         [
             "my-local",
             "n8n-agents-official",
@@ -130,92 +118,87 @@ fn a_lock_that_is_not_json_is_an_error() {
 }
 
 #[test]
-fn skills_from_one_repository_share_one_tree_request() {
-    assert_eq!(
-        repo_key(&entry("n8n-agents-official")),
-        Some("n8n-io/skills".to_string())
-    );
-    assert_eq!(
-        repo_key(&entry("n8n-loops-official")),
-        repo_key(&entry("n8n-agents-official"))
-    );
-    assert_eq!(repo_key(&entry("my-local")), None);
-}
-
-#[test]
-fn a_pinned_ref_is_part_of_the_repository_key() {
-    assert_eq!(
-        repo_key(&entry("pinned")),
-        Some("owner/repo#v2".to_string())
-    );
-}
-
-#[test]
-fn a_folder_hash_is_the_tree_entry_for_the_skill_folder() {
-    assert_eq!(
-        folder_hash(&tree(UPSTREAM), "skills/n8n-agents-official/SKILL.md"),
-        Some(UPSTREAM.to_string())
-    );
-}
-
-#[test]
-fn a_root_level_skill_takes_the_hash_of_the_whole_tree() {
-    assert_eq!(
-        folder_hash(&tree(UPSTREAM), "SKILL.md"),
-        Some(ROOT.to_string())
-    );
-}
-
-#[test]
-fn a_windows_style_skill_path_still_finds_its_folder() {
-    assert_eq!(
-        folder_hash(&tree(UPSTREAM), r"skills\n8n-agents-official\SKILL.md"),
-        Some(UPSTREAM.to_string())
-    );
-}
-
-#[test]
-fn a_skill_whose_folder_changed_upstream_is_offered_the_new_hash() {
-    let skill = resolved("n8n-agents-official", &agents_tree(UPSTREAM));
+fn a_skill_whose_source_the_cli_checked_is_current() {
+    let skill = resolved(UP_TO_DATE, "n8n-agents-official");
     assert_eq!(skill.version, "cf295b0");
-    assert_eq!(skill.available.as_deref(), Some("9d1e4a2"));
+    assert_eq!(skill.available, None);
     assert!(!skill.external);
     assert_eq!(skill.source, SourceKind::Skills);
 }
 
 #[test]
-fn a_skill_whose_folder_is_unchanged_has_nothing_available() {
-    let skill = resolved("n8n-agents-official", &agents_tree(INSTALLED));
+fn a_skill_the_cli_could_not_check_is_unknown_not_current() {
+    assert!(resolved(UP_TO_DATE, "my-local").external);
+}
+
+#[test]
+fn a_skill_whose_tree_could_not_be_fetched_is_unknown_not_current() {
+    let output =
+        format!("{UP_TO_DATE}\n  \u{1b}[38;5;102m✗ Failed to fetch tree for owner/repo\u{1b}[0m\n");
+    assert!(resolved(&output, "pinned").external);
+    assert!(!resolved(&output, "n8n-agents-official").external);
+}
+
+#[test]
+fn a_source_whose_check_threw_is_unknown_not_current() {
+    let output =
+        "Checking skills from source: owner/repo\n  ✗ Failed to check skills from owner/repo\n";
+    assert!(resolved(output, "pinned").external);
+}
+
+#[test]
+fn a_skill_deleted_upstream_is_unknown_not_current() {
+    let output = format!(
+        "{UP_TO_DATE}\nWarning: The following skills from n8n-io/skills appear to have been deleted upstream:\n  • n8n-loops-official\nSkipping deletion in non-interactive mode.\n"
+    );
+    assert!(resolved(&output, "n8n-loops-official").external);
+    assert!(!resolved(&output, "n8n-agents-official").external);
+}
+
+#[test]
+fn a_skill_the_cli_updated_during_the_check_is_current() {
+    let output = "Updating pinned…\n\nChecking skills from source: owner/repo\nFound 1 global update(s)\n\nUpdating pinned…\n  ✓ Updated pinned\n\n✓ Updated 1 skill(s)\n";
+    let skill = resolved(output, "pinned");
     assert_eq!(skill.available, None);
     assert!(!skill.external);
 }
 
 #[test]
-fn a_skill_whose_repository_did_not_answer_is_unknown_not_current() {
-    let skill = resolved("n8n-agents-official", &HashMap::new());
-    assert!(skill.external);
+fn a_skill_whose_update_failed_stays_outdated() {
+    let output = "Checking skills from source: owner/repo\nFound 1 global update(s)\n\nUpdating pinned…\n  ✗ Failed to update pinned\n";
+    assert_eq!(
+        resolved(output, "pinned").available.as_deref(),
+        Some("newer")
+    );
 }
 
 #[test]
-fn a_skill_whose_folder_is_gone_upstream_is_unknown_not_outdated() {
-    let skill = resolved("n8n-loops-official", &agents_tree(UPSTREAM));
-    assert!(skill.external);
-    assert_eq!(skill.available, None);
+fn the_header_naming_one_skill_is_not_read_as_an_update() {
+    let output = "Updating pinned…\n\nChecking skills from source: owner/repo\n✓ All global skills are up to date\n";
+    assert_eq!(resolved(output, "pinned").available, None);
 }
 
 #[test]
-fn a_skill_installed_from_a_local_path_is_listed_but_never_checked() {
-    let skill = resolved("my-local", &agents_tree(UPSTREAM));
-    assert!(skill.external);
+fn a_skill_the_check_did_not_ask_about_is_unknown_even_when_its_source_was_checked() {
+    let run = Run::read(UP_TO_DATE, vec!["n8n-agents-official".to_string()]);
+    let skills = resolve(&entries(), Some(&run));
+    let loops = skills
+        .iter()
+        .find(|skill| skill.name == "n8n-loops-official")
+        .unwrap();
+    assert!(loops.external);
 }
 
 #[test]
-fn a_digits_only_hash_that_changed_is_still_offered() {
-    let mut skill = entry("n8n-agents-official");
-    skill.folder_hash = "1234567000000000000000000000000000000000".to_string();
-    let upstream = "0234567000000000000000000000000000000000";
-    let installed = resolve(&[skill], &agents_tree(upstream)).remove(0);
-    assert_eq!(installed.available.as_deref(), Some("0234567"));
+fn without_a_cli_run_every_skill_is_unknown() {
+    assert!(resolve(&entries(), None).iter().all(|skill| skill.external));
+}
+
+#[test]
+fn several_skills_on_one_bullet_line_are_all_unchecked() {
+    let output = "Checking skills from source: n8n-io/skills\n  • n8n-agents-official, n8n-loops-official (Private or deleted repo)\n";
+    assert!(resolved(output, "n8n-agents-official").external);
+    assert!(resolved(output, "n8n-loops-official").external);
 }
 
 fn arguments(command: &std::process::Command) -> Vec<String> {
@@ -238,6 +221,39 @@ fn a_machine_without_the_skills_lock_file_has_no_skills_source() {
     let missing = std::env::temp_dir().join("globlin-no-such-skill-lock.json");
     let error = Skills::at(missing, None).err().unwrap();
     assert!(error.is::<NotInstalled>(), "{error}");
+}
+
+#[test]
+fn the_check_updates_every_named_global_skill_through_npx() {
+    let command = with_npx()
+        .check_command(&["a".to_string(), "b".to_string()])
+        .unwrap();
+    assert_eq!(
+        arguments(&command),
+        ["--yes", "skills", "update", "a", "b", "-g", "-y"]
+    );
+}
+
+#[test]
+fn a_check_with_nothing_to_ask_about_runs_nothing() {
+    assert!(with_npx().check_command(&[]).is_none());
+}
+
+#[test]
+fn ignored_skills_and_names_that_could_inject_arguments_are_not_checked() {
+    let skills = Skills {
+        ignored: vec!["pinned".to_string()],
+        ..with_npx()
+    };
+    let mut entries = entries();
+    entries.push(Entry {
+        name: "--all".to_string(),
+        ..Entry::default()
+    });
+    assert_eq!(
+        skills.names_to_check(&entries),
+        ["my-local", "n8n-agents-official", "n8n-loops-official"]
+    );
 }
 
 #[test]
@@ -281,6 +297,7 @@ fn without_npx_a_skill_can_be_listed_but_offers_no_command() {
     };
     assert!(skills.update_command("n8n-agents-official").is_none());
     assert!(skills.uninstall_command("n8n-agents-official").is_none());
+    assert!(skills.check_command(&["a".to_string()]).is_none());
 }
 
 #[test]
@@ -310,32 +327,4 @@ fn the_real_skills_cli_updates_and_lists_without_a_prompt() {
         .unwrap()
         .iter()
         .any(|skill| skill.name == target));
-}
-
-#[test]
-fn a_repository_whose_skills_are_all_ignored_is_not_sent_to_github() {
-    let ignored = ["n8n-agents-official", "n8n-loops-official"];
-    assert_eq!(
-        repos_to_check(&entries(), |name| ignored.contains(&name)),
-        ["owner/repo#v2"]
-    );
-}
-
-#[test]
-fn a_repository_is_still_checked_while_one_of_its_skills_is_not_ignored() {
-    assert_eq!(
-        repos_to_check(&entries(), |name| name == "n8n-agents-official"),
-        ["n8n-io/skills", "owner/repo#v2"]
-    );
-}
-
-#[test]
-fn a_skill_path_ending_in_a_unicode_lookalike_of_skill_md_does_not_panic() {
-    assert_eq!(
-        folder_hash(
-            &tree(UPSTREAM),
-            "skills/n8n-agents-official/S\u{212A}ILL.md"
-        ),
-        None
-    );
 }
