@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -6,21 +6,28 @@ use std::process::Command;
 use serde::Deserialize;
 
 use super::{
-    executable_in, find_on_path, hidden_command, not_installed, plain_name, PackageSource,
+    executable_in, find_on_path, hidden_command, not_installed, plain_name, stdout_text,
+    PackageSource,
 };
 use crate::config::Config;
 use crate::model::{Installed, SourceKind};
-use crate::{platform, registry, Result};
+use crate::{platform, process, Result};
 
 const LOCK_FILE: &str = ".skill-lock.json";
 const AGENTS_DIR: &str = ".agents";
 const STATE_DIR: &str = "skills";
 const LOCK_VERSION: u32 = 3;
-const CHECKABLE_TYPE: &str = "github";
-const SKILL_FILE: &str = "skill.md";
 const SHORT_HASH: usize = 7;
 const NPX: &str = "npx";
 const CLI: &str = "skills";
+const NEWER: &str = "newer";
+const CHECKING: &str = "Checking skills from source: ";
+const FETCH_FAILED: &str = "✗ Failed to fetch tree for ";
+const CHECK_FAILED: &str = "✗ Failed to check skills from ";
+const FOUND: &str = "global update(s)";
+const UPDATING: &str = "Updating ";
+const UPDATED: &str = "✓ Updated ";
+const BULLET: &str = "•";
 
 pub struct Skills {
     lock: PathBuf,
@@ -57,10 +64,32 @@ impl Skills {
     }
 
     fn cli(&self, verb: &str, name: &str) -> Option<Command> {
-        let name = plain_name(name).filter(|name| !name.starts_with('-'))?;
+        let name = safe_name(name)?;
         let mut command = hidden_command(self.npx.as_ref()?);
         command.args(["--yes", CLI, verb, name, "-g", "-y"]);
         Some(command)
+    }
+
+    fn check_command(&self, names: &[String]) -> Option<Command> {
+        if names.is_empty() {
+            return None;
+        }
+        let mut command = hidden_command(self.npx.as_ref()?);
+        command
+            .args(["--yes", CLI, "update"])
+            .args(names)
+            .args(["-g", "-y"]);
+        Some(command)
+    }
+
+    fn names_to_check(&self, entries: &[Entry]) -> Vec<String> {
+        entries
+            .iter()
+            .map(|entry| entry.name.as_str())
+            .filter(|name| !self.ignored.iter().any(|ignored| ignored == name))
+            .filter_map(safe_name)
+            .map(str::to_string)
+            .collect()
     }
 }
 
@@ -70,11 +99,15 @@ impl PackageSource for Skills {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
+        let names = self.names_to_check(&parse_lock(&fs::read_to_string(&self.lock)?)?);
+        let run = self
+            .check_command(&names)
+            .and_then(|mut command| {
+                process::output_within(&mut command, process::CHANGE_LIMIT).ok()
+            })
+            .map(|output| Run::read(&stdout_text(&output), names));
         let entries = parse_lock(&fs::read_to_string(&self.lock)?)?;
-        let repos = repos_to_check(&entries, |name| {
-            self.ignored.iter().any(|ignored| ignored == name)
-        });
-        Ok(resolve(&entries, &registry::github_trees(&repos)))
+        Ok(resolve(&entries, run.as_ref()))
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
@@ -84,6 +117,10 @@ impl PackageSource for Skills {
     fn uninstall_command(&self, name: &str) -> Option<Command> {
         self.cli("remove", name)
     }
+}
+
+fn safe_name(name: &str) -> Option<&str> {
+    plain_name(name).filter(|name| !name.starts_with('-'))
 }
 
 fn npx_beside(npm_cmd: Option<&Path>) -> Option<PathBuf> {
@@ -100,12 +137,8 @@ struct Entry {
     #[serde(skip)]
     name: String,
     source: String,
-    source_type: String,
-    skill_path: String,
     #[serde(rename = "skillFolderHash")]
     folder_hash: String,
-    #[serde(rename = "ref")]
-    git_ref: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -116,18 +149,72 @@ struct Lock {
     skills: Option<BTreeMap<String, Entry>>,
 }
 
-#[derive(Deserialize)]
-struct Tree {
-    sha: String,
-    tree: Vec<TreeNode>,
+#[derive(Debug, Default)]
+struct Run {
+    asked: BTreeSet<String>,
+    checked: BTreeSet<String>,
+    unchecked: BTreeSet<String>,
+    outdated: BTreeSet<String>,
 }
 
-#[derive(Deserialize)]
-struct TreeNode {
-    path: String,
-    #[serde(rename = "type")]
-    kind: String,
-    sha: String,
+impl Run {
+    fn read(output: &str, asked: Vec<String>) -> Self {
+        let mut run = Self {
+            asked: asked.into_iter().collect(),
+            ..Self::default()
+        };
+        let mut updating = false;
+        for line in plain_lines(output) {
+            if let Some(source) = line.strip_prefix(CHECKING) {
+                run.checked.insert(source.to_string());
+            } else if let Some(source) = line
+                .strip_prefix(FETCH_FAILED)
+                .or_else(|| line.strip_prefix(CHECK_FAILED))
+            {
+                run.checked.remove(source);
+            } else if let Some(names) = line.strip_prefix(BULLET) {
+                run.unchecked.extend(bullet_names(names));
+            } else if line.ends_with(FOUND) {
+                updating = true;
+            } else if let Some(name) = line.strip_prefix(UPDATING).filter(|_| updating) {
+                run.outdated.insert(name.trim_end_matches('…').to_string());
+            } else if let Some(name) = line.strip_prefix(UPDATED) {
+                run.outdated.remove(name);
+            }
+        }
+        run
+    }
+
+    fn confirms(&self, entry: &Entry) -> bool {
+        self.asked.contains(&entry.name)
+            && self.checked.contains(&entry.source)
+            && !self.unchecked.contains(&entry.name)
+    }
+}
+
+fn plain_lines(output: &str) -> Vec<String> {
+    let mut text = String::with_capacity(output.len());
+    let mut chars = output.chars();
+    while let Some(character) = chars.next() {
+        if character == '\u{1b}' {
+            chars.find(char::is_ascii_alphabetic);
+        } else {
+            text.push(character);
+        }
+    }
+    text.split(['\r', '\n'])
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn bullet_names(line: &str) -> impl Iterator<Item = String> + '_ {
+    line.split(" (")
+        .next()
+        .unwrap_or_default()
+        .split(", ")
+        .map(|name| name.trim().to_string())
 }
 
 fn lock_path(xdg_state_home: Option<PathBuf>, home: Option<PathBuf>) -> Option<PathBuf> {
@@ -150,68 +237,18 @@ fn parse_lock(raw: &str) -> Result<Vec<Entry>> {
         .collect())
 }
 
-fn repos_to_check(entries: &[Entry], ignored: impl Fn(&str) -> bool) -> Vec<String> {
-    entries
-        .iter()
-        .filter(|entry| !ignored(&entry.name))
-        .filter_map(repo_key)
-        .collect::<BTreeSet<String>>()
-        .into_iter()
-        .collect()
-}
-
-fn repo_key(entry: &Entry) -> Option<String> {
-    let checkable = entry.source_type == CHECKABLE_TYPE
-        && !entry.source.is_empty()
-        && !entry.folder_hash.is_empty()
-        && !entry.skill_path.is_empty();
-    if !checkable {
-        return None;
-    }
-    Some(match &entry.git_ref {
-        Some(git_ref) => format!("{}#{git_ref}", entry.source),
-        None => entry.source.clone(),
-    })
-}
-
-fn folder_hash(tree_json: &str, skill_path: &str) -> Option<String> {
-    let tree: Tree = serde_json::from_str(tree_json).ok()?;
-    let folder = skill_folder(skill_path);
-    if folder.is_empty() {
-        return Some(tree.sha);
-    }
-    tree.tree
-        .into_iter()
-        .find(|node| node.kind == "tree" && node.path == folder)
-        .map(|node| node.sha)
-}
-
-fn skill_folder(skill_path: &str) -> String {
-    let path = skill_path.replace('\\', "/");
-    let folder = path
-        .len()
-        .checked_sub(SKILL_FILE.len())
-        .filter(|start| {
-            path.get(*start..)
-                .is_some_and(|tail| tail.eq_ignore_ascii_case(SKILL_FILE))
-        })
-        .map_or(path.as_str(), |start| &path[..start]);
-    folder.trim_end_matches('/').to_string()
-}
-
-fn resolve(entries: &[Entry], trees: &HashMap<String, String>) -> Vec<Installed> {
+fn resolve(entries: &[Entry], run: Option<&Run>) -> Vec<Installed> {
     entries
         .iter()
         .map(|entry| {
             let installed =
                 Installed::new(&entry.name, short(&entry.folder_hash), SourceKind::Skills);
-            let upstream = repo_key(entry)
-                .and_then(|key| trees.get(&key))
-                .and_then(|tree| folder_hash(tree, &entry.skill_path));
-            match upstream {
-                None => installed.with_external(true),
-                Some(hash) if hash == entry.folder_hash => installed,
-                Some(hash) => installed.with_available(Some(short(&hash))),
+            match run {
+                Some(run) if run.outdated.contains(&entry.name) => {
+                    installed.with_available(Some(NEWER.to_string()))
+                }
+                Some(run) if run.confirms(entry) => installed,
+                _ => installed.with_external(true),
             }
         })
         .collect()

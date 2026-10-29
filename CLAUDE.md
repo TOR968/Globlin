@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 663 tests (631 run, 32 ignored) on Windows, no network, no side effects
+cargo test                     # 657 tests (626 run, 31 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -25,10 +25,10 @@ Run one test: `cargo test -- --exact check::tests::versions_compare_numerically_
 a test that records a failure cannot show up in an installed Globlin's *Open last log*. Every module reaches
 the directory through that one function — keep it that way.
 
-Thirty-two tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
+Thirty-one tests are `#[ignore]`d because they touch the real system (registry Run key, real toast,
 real `npm install -g` x2, one that runs the real `npm config get/set` against a temporary userconfig,
-an icon dump, a README-image dump, a site-image dump, a macOS iconset dump, a Linux hicolor icon dump, a window-screenshot page dump, two that hit the real GitHub releases API, five
-that hit a real remote catalog — PyPI, crates.io, NuGet, the PowerShell Gallery, a GitHub tree — one that builds a real
+an icon dump, a README-image dump, a site-image dump, a macOS iconset dump, a Linux hicolor icon dump, a window-screenshot page dump, two that hit the real GitHub releases page, four
+that hit a real remote catalog — PyPI, crates.io, NuGet, the PowerShell Gallery — one that builds a real
 WebView2 window, and thirteen that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`, `cargo`,
 `go`, `dotnet`, PowerShell, `gem`, `brew` and `npx skills` to confirm their output still has the shape the parsers expect).
 They never run in CI. Each carries its exact invocation in its `#[ignore = "…"]` message —

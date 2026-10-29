@@ -291,29 +291,36 @@ Claude Code updates its marketplace plugins itself.
   hand, with no lock entry, are not shown: nothing records where they came from.
 - **There are no versions, only folder hashes.** Each entry carries `skillFolderHash`, the git tree SHA of
   the skill's folder at install time. The row shows its first seven characters.
-- **The check mirrors the CLI's own.** skills.sh has no read-only "what is outdated" command (`skills
-  update` checks and installs in one go), so the source asks GitHub itself: one
-  `GET /repos/<source>/git/trees/<ref, or HEAD, main, master>?recursive=1` per distinct source + ref
-  (`registry::github_trees`), then finds the `tree` entry whose path is the skill's folder (the whole
-  tree's `sha` for a root-level `SKILL.md`; `\` in a Windows-written `skillPath` is read as `/`).
-  Requests go out anonymously; a 401, 403 or 404 is retried once with `GITHUB_TOKEN`, else `GH_TOKEN`,
-  as the CLI does (it also falls back to `gh` authentication, which Globlin does not). A repository whose
-  skills are all in the ignore list is not requested (`repos_to_check`), so the README's "ignored
-  packages are never looked up" holds here too.
-- **`SelfReported`, not `SelfResolved`.** `available` is set only when the upstream hash differs, which is
-  exactly `SelfReported`'s "present means upgrade". Hashes are compared for equality only: `SelfResolved`
-  would run them through `registry::is_newer`, which reads a digits-only hash as a number and could call a
-  changed hash `Current`.
-- **Anything the source could not check is `external`, which reads `Unknown`.** That covers non-GitHub
-  entries (`git`, `local`, `well-known`), an empty hash, a repository that did not answer or hit the
-  60-requests-per-hour anonymous limit, and a folder missing from the upstream tree (moved, deleted, or
-  cut off by a `"truncated": true` reply). None of these goes into `Report.skipped`: a private repository
-  without a token, or a limit spent by other tools on the same IP, would otherwise keep the icon red on
-  every check.
+- **The check is the CLI's own update.** skills.sh has no read-only "what is outdated" command —
+  `skills check` is an alias of `update` (`cli.mjs`, 1.7.4), and there is no `--dry-run` or `--json` for
+  it — so `installed()` runs `npx --yes skills update <every non-ignored name> -g -y` and then re-reads the
+  lock. A skill that has fallen behind is therefore installed by the check itself, on every check, and
+  shows up already `Current`; the window's **Update** button for a skill only matters after a failed run.
+  This replaced Globlin's own `GET /repos/<source>/git/trees/…` lookups (`registry::github_trees`, gone):
+  the CLI makes the same anonymous requests, but on a spent 60-per-hour limit it falls back to
+  `GITHUB_TOKEN`, `GH_TOKEN` and then `gh auth token`, and it also checks `git` sources by cloning them.
+  Names are passed explicitly, never left to the CLI's "update everything", so an ignored skill is never
+  checked or touched (`names_to_check`) and a name starting with `-` is never passed (`safe_name`). The
+  run has `process::CHANGE_LIMIT`, not the listing limit, because it installs.
+- **Status comes from what the CLI printed, positively.** The output is stripped of ANSI escapes and split
+  on `\r` and `\n` (`plain_lines`), then read by `Run::read`: `Checking skills from source: <source>`
+  marks a source as checked, `✗ Failed to fetch tree for` / `✗ Failed to check skills from` takes it back,
+  any `•` line (skills it cannot check automatically, or that appear deleted upstream) names skills that
+  were not checked, and after `Found N global update(s)` each `Updating <name>…` that is not followed by
+  `✓ Updated <name>` leaves that skill outdated, with `available` set to the literal `newer` (there is no
+  upstream hash to show). The `Updating a, b…` header before `Found` is not an update. A skill is
+  `Current` only when it was asked about, its source was checked, and no bullet named it.
+- **`SelfReported`, not `SelfResolved`.** `available` is set only for a skill whose update failed, which is
+  exactly `SelfReported`'s "present means upgrade".
+- **Anything the CLI did not confirm is `external`, which reads `Unknown`.** That covers ignored skills,
+  `local` and `well-known` entries, an empty hash, a repository that did not answer or hit the rate limit
+  with no token to fall back on, a folder missing upstream, a missing `npx`, and a run that timed out or
+  could not start. None of these goes into `Report.skipped`: a private repository without a token, or a
+  limit spent by other tools on the same IP, would otherwise keep the icon red on every check.
 - **The CLI does every write.** Update is `npx --yes skills update <name> -g -y`, uninstall is
   `npx --yes skills remove <name> -g -y`; Globlin never edits the lock file or a skill folder. `npx` is
   looked for beside a configured `npm_cmd` first, then on `PATH`. Without it the skills are still listed
-  and checked, and an update or removal fails with "skills has no command for this" — hiding the button
+  but read `Unknown`, and an update or removal fails with "skills has no command for this" — hiding the button
   would need window changes for a machine that has skills.sh but no Node. Names must pass `plain_name`
   and must not start with `-`, because `plain_name` alone accepts `--all`.
 - **The CLI is not pinned.** `npx --yes skills` runs the newest release, as a user typing the command
@@ -888,15 +895,24 @@ first sign-in after updating opens the window.
 The full mechanics behind the brief version in the [README](../README.md#keeping-itself-updated).
 
 On the same schedule as the package check, the app makes one extra request per cycle to
-`https://api.github.com/repos/TOR968/globlin/releases/latest`. The two are deliberately independent:
+`https://github.com/TOR968/globlin/releases/latest`, without following the redirect: the tag is read from
+the 302's `Location` (`…/releases/tag/v0.4.19`), and no body is downloaded. It is deliberately the web
+page, not `api.github.com/repos/…/releases/latest`: the REST API allows 60 unauthenticated requests an
+hour per IP, and the skills.sh CLI spends that same quota on `git/trees` lookups, so a machine with a
+dozen skills repositories that restarted Globlin a few times saw the release lookup fail with 403 and
+silently offered no update. The two are deliberately independent:
 `check::run` looks the release up first and returns a `Report` carrying `packages: Result<Vec<Package>>`,
 so a missing npm, a `PATH` without bun, or an unreachable registry cannot stop the app from finding — and
-installing — its own update. That endpoint always resolves to the newest *published* release; GitHub
+installing — its own update. That page always resolves to the newest *published* release; GitHub
 excludes pre-releases and drafts from it, so neither can reach a user by accident. A release is offered
-only when its tag parses as semver strictly newer than the running build, and both the binary for the
-running platform (`globlin.exe` on x64, `globlin-arm64.exe` on ARM64, `globlin-macos-apple-silicon.zip`
-on a Mac, `globlin-<arch>.AppImage` in an AppImage — `selfupdate::asset_for`), `SHA256SUMS` and `SHA256SUMS.minisig` are all attached — a release
-missing any of them is skipped rather than half-offered.
+only when its tag parses as semver strictly newer than the running build. The download URLs are built
+from the tag — `releases/download/<tag>/<asset>` for the binary of the running platform (`globlin.exe` on
+x64, `globlin-arm64.exe` on ARM64, `globlin-macos-apple-silicon.zip` on a Mac, `globlin-<arch>.AppImage`
+in an AppImage — `selfupdate::asset_for`), `SHA256SUMS` and `SHA256SUMS.minisig`. The lookup no longer
+sees the asset list, and does not need to: `gh release create` with files creates a draft, uploads every
+asset and only then publishes, so a release never reaches `latest` half-attached. Were one ever missing,
+the download fails in `apply`, the failure lands in the self-update log, and that version is not
+auto-applied again.
 
 Applying an update downloads all three, verifies the signature on `SHA256SUMS` (see
 [The release signature](#the-release-signature)), hashes the download with SHA-256 and compares it with
@@ -1054,15 +1070,15 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-641 tests on Windows: 609 run by default (no network, no side effects), 32 `#[ignore]`d because they
+657 tests on Windows: 626 run by default (no network, no side effects), 31 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
 window screenshot pages (`dump_window_screenshots`), two that hit
 `TOR968/globlin`'s real GitHub releases, one that builds a real WebView2 window
 (`the_window_shell_starts_against_a_real_webview`, the only check that the `wry` shell actually starts on
-this machine), five that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index, the
-Gallery redirect and a GitHub tree), and thirteen that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
+this machine), four that hit a real remote catalog (the PyPI feed, crates.io, the NuGet index and the
+Gallery redirect), and thirteen that run the real `winget`, `choco`, `pnpm`, `pipx`, `uv`, `scoop`,
 `cargo`, `go`, `dotnet`, PowerShell, `gem`, `brew` and `npx skills`. Those last thirteen exist because
 the parsers below are pinned against captured output, and captured output cannot notice the day a tool
 changes its format — run them after a winget or Chocolatey upgrade. Each carries its own exact invocation

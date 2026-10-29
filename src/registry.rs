@@ -18,12 +18,6 @@ const PYPI_HOST: &str = "pypi.org";
 const CRATES_HOST: &str = "crates.io";
 const NUGET_HOST: &str = "api.nuget.org";
 const GALLERY_HOST: &str = "www.powershellgallery.com";
-const GITHUB_REPOS: &str = "https://api.github.com/repos";
-const GITHUB_HOST: &str = "api.github.com";
-const GITHUB_MEDIA_TYPE: &str = "application/vnd.github+json";
-const GITHUB_DEFAULT_REFS: [&str; 3] = ["HEAD", "main", "master"];
-const GITHUB_TOKEN_VARIABLES: [&str; 2] = ["GITHUB_TOKEN", "GH_TOKEN"];
-const RETRY_WITH_TOKEN: [u16; 3] = [401, 403, 404];
 const BATCH: usize = 100;
 const USER_AGENT: &str = concat!(
     "globlin/",
@@ -60,16 +54,6 @@ pub fn nuget_latest(names: &[String]) -> Result<HashMap<String, String>> {
 
 pub fn psgallery_latest(names: &[String]) -> Result<HashMap<String, String>> {
     fetch_all(names, GALLERY_HOST, gallery_newest_release)
-}
-
-pub fn github_trees(repos: &[String]) -> HashMap<String, String> {
-    let token = github_token();
-    fetch_all(repos, GITHUB_HOST, |client, key| {
-        tree_urls(key)
-            .iter()
-            .find_map(|url| tree_body(client, url, token.as_deref()))
-    })
-    .unwrap_or_default()
 }
 
 pub fn numeric_is_newer(latest: &str, current: &str) -> Option<bool> {
@@ -234,43 +218,6 @@ fn body(client: &Client, url: &str) -> Option<String> {
         .body_mut()
         .read_to_string()
         .ok()
-}
-
-fn tree_body(client: &Client, url: &str, token: Option<&str>) -> Option<String> {
-    let request = || client.agent.get(url).header("Accept", GITHUB_MEDIA_TYPE);
-    let reply = match (request().call(), token) {
-        (Err(ureq::Error::StatusCode(status)), Some(token))
-            if RETRY_WITH_TOKEN.contains(&status) =>
-        {
-            request()
-                .header("Authorization", format!("Bearer {token}"))
-                .call()
-        }
-        (reply, _) => reply,
-    };
-    client.answered(reply)?.body_mut().read_to_string().ok()
-}
-
-fn github_token() -> Option<String> {
-    GITHUB_TOKEN_VARIABLES
-        .iter()
-        .filter_map(|variable| std::env::var(variable).ok())
-        .find(|token| !token.trim().is_empty())
-}
-
-fn tree_urls(key: &str) -> Vec<String> {
-    let (repo, refs) = match key.split_once('#') {
-        Some((repo, pinned)) => (repo, vec![pinned]),
-        None => (key, GITHUB_DEFAULT_REFS.to_vec()),
-    };
-    refs.into_iter()
-        .map(|git_ref| {
-            format!(
-                "{GITHUB_REPOS}/{repo}/git/trees/{}?recursive=1",
-                encoded(git_ref)
-            )
-        })
-        .collect()
 }
 
 fn dist_tags_url(name: &str) -> String {

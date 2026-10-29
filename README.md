@@ -288,7 +288,7 @@ updated and one `… N more` line; the full queue is in the window.
 | **brew** | `brew info --json=v2 --installed` (formulae and casks) | the same reply — brew's `outdated` flag | `brew upgrade <name>` |
 | **winget** | `winget list` | winget's own `Available` column | `winget upgrade --id <id> --exact --silent` |
 | **choco** | `choco list -r` + `choco outdated -r` | choco's own report | `choco upgrade <name> -y`, elevated |
-| **skills** | the skills.sh lock file (`~/.agents/.skill-lock.json`) | GitHub's tree for the skill's folder | `npx --yes skills update <name> -g -y` |
+| **skills** | the skills.sh lock file (`~/.agents/.skill-lock.json`) | the skills.sh CLI's own update, run on every check | `npx --yes skills update <name> -g -y` |
 
 Everything except psgallery, winget and choco is on by default. A source whose CLI isn't installed simply
 reports nothing — it is not an error, not even when none of them is installed, and one broken source never
@@ -520,13 +520,13 @@ goes on the network only to do what it is for, and every request it makes names 
   `api.nuget.org` (dotnet) and `www.powershellgallery.com` (PowerShell Gallery). Switching a source off in
   Settings stops its lookups, and ignored packages are never looked up. An npm, bun, pnpm or yarn package
   installed from git, a local path, a link or a private registry is never sent to the public registry.
-- **Skill lookups:** for skills installed with skills.sh, the `owner/repo` names from its lock file are
-  sent to `api.github.com` to read each repository's file tree. Requests are anonymous; only when GitHub
-  answers 401, 403 or 404 does Globlin repeat that one request with the `GITHUB_TOKEN` or `GH_TOKEN`
-  already set in its environment, which is what the skills.sh CLI itself does. A repository whose skills
-  are all ignored is not asked about. Switching the skills source off stops these lookups.
-- **Its own updates:** `api.github.com` is asked for the latest Globlin release, and an update is
-  downloaded from GitHub's release storage. Builds owned by winget or a system package manager skip this.
+- **Skill lookups:** for skills installed with skills.sh, every check runs `npx skills update <names> -g -y`,
+  which installs whatever has fallen behind. The skills.sh CLI does the network part: it reads each
+  repository's file tree from `api.github.com`, falls back to `GITHUB_TOKEN`, `GH_TOKEN` or `gh auth token`
+  when the anonymous limit is spent, and reports usage to skills.sh's own telemetry. Ignored skills are
+  never named to it. Switching the skills source off stops these runs.
+- **Its own updates:** `github.com/TOR968/globlin/releases/latest` is asked which release is the latest
+  (only the redirect is read), and an update is downloaded from GitHub's release storage. Builds owned by winget or a system package manager skip this.
 - **The package managers themselves** contact their own servers when Globlin runs their list, outdated,
   update and uninstall commands; what they send is governed by their own privacy policies.
 
