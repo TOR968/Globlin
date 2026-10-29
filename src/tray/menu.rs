@@ -24,6 +24,7 @@ const ID_AUTOSTART: &str = "autostart";
 const ID_UPDATE_SELF: &str = "update-self";
 const ID_AUTO_UPDATE: &str = "auto-update";
 const ID_AUTO_APPROVE: &str = "auto-approve";
+const ID_UPDATE_ON_START: &str = "update-on-start";
 const ID_CHOCO_ONE_PROMPT: &str = "choco-one-prompt";
 const ID_WINGET_ONE_PROMPT: &str = "winget-one-prompt";
 const ID_MONOCHROME_ICON: &str = "monochrome-icon";
@@ -63,6 +64,7 @@ pub enum Action {
     UpdateSelf,
     ToggleAutoUpdate,
     ToggleAutoApprove,
+    ToggleUpdateOnStart,
     ToggleChocoOnePrompt,
     ToggleWingetOnePrompt,
     ToggleMonochromeIcon,
@@ -116,6 +118,7 @@ impl Action {
             ID_UPDATE_SELF => Some(Self::UpdateSelf),
             ID_AUTO_UPDATE => Some(Self::ToggleAutoUpdate),
             ID_AUTO_APPROVE => Some(Self::ToggleAutoApprove),
+            ID_UPDATE_ON_START => Some(Self::ToggleUpdateOnStart),
             ID_CHOCO_ONE_PROMPT => Some(Self::ToggleChocoOnePrompt),
             ID_WINGET_ONE_PROMPT => Some(Self::ToggleWingetOnePrompt),
             ID_MONOCHROME_ICON => Some(Self::ToggleMonochromeIcon),

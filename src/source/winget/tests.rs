@@ -313,6 +313,38 @@ fn one_prompt_upgrades_every_id_in_a_single_elevated_shell() {
 }
 
 #[test]
+fn a_shared_run_hands_each_ids_exit_code_back_through_a_file_the_unelevated_shell_prints() {
+    let winget = elevating_winget();
+    let script = script(
+        &winget
+            .elevated_upgrade(&["Git.Git"], r"C:\data\winget-codes.txt")
+            .unwrap(),
+    );
+
+    assert!(
+        script.contains(
+            r"Add-Content -LiteralPath ''C:\data\winget-codes.txt'' -Value ($id + '' '' + $LASTEXITCODE)"
+        ),
+        "{script}"
+    );
+    assert!(
+        script.contains(
+            r"if (Test-Path -LiteralPath 'C:\data\winget-codes.txt') { Get-Content -LiteralPath 'C:\data\winget-codes.txt'; Remove-Item -LiteralPath 'C:\data\winget-codes.txt' }; exit $run.ExitCode"
+        ),
+        "{script}"
+    );
+}
+
+#[test]
+fn each_id_in_a_shared_run_reads_its_own_exit_code_not_a_longer_id_sharing_its_prefix() {
+    let stdout = "Git.GitLFS -1978335189\r\nGit.Git 0\r\nClickUp -1978335189\r\n";
+
+    assert_eq!(reported_code(stdout, "Git.Git"), Some(0));
+    assert_eq!(reported_code(stdout, "ClickUp"), Some(-1_978_335_189));
+    assert_eq!(reported_code(stdout, "Logitech.GHUB"), None);
+}
+
+#[test]
 fn a_shared_run_ends_with_a_refusal_code_only_when_every_failure_gave_that_same_code() {
     let script = script(&elevating_winget().update_together(&["Git.Git"]).unwrap());
 

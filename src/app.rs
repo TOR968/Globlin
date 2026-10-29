@@ -46,6 +46,7 @@ pub struct App {
     failed: bool,
     skipped: Vec<String>,
     recheck_after_retry: bool,
+    update_on_start: bool,
     frame: u32,
     next_check: Instant,
     step_started: Instant,
@@ -57,6 +58,7 @@ impl App {
         let (config, warning) = Config::load();
         let next_check = Instant::now() + config.interval();
         let tray = Tray::new(config.monochrome_icon)?;
+        let update_on_start = config.update_all_on_start;
         let app = Self {
             config,
             tray,
@@ -71,6 +73,7 @@ impl App {
             failed: false,
             skipped: Vec::new(),
             recheck_after_retry: false,
+            update_on_start,
             frame: 0,
             next_check,
             step_started: Instant::now(),
@@ -180,6 +183,7 @@ impl App {
             }
             Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::ToggleAutoApprove => self.toggle_auto_approve(),
+            Action::ToggleUpdateOnStart => self.toggle_update_on_start(),
             Action::ToggleChocoOnePrompt => self.toggle_choco_one_prompt(),
             Action::ToggleWingetOnePrompt => self.toggle_winget_one_prompt(),
             Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
@@ -365,6 +369,11 @@ impl App {
         self.save_setting();
     }
 
+    fn toggle_update_on_start(&mut self) {
+        self.config.update_all_on_start = !self.config.update_all_on_start;
+        self.save_setting();
+    }
+
     fn toggle_choco_one_prompt(&mut self) {
         self.config.choco_one_prompt = !self.config.choco_one_prompt;
         self.save_setting();
@@ -488,6 +497,11 @@ impl App {
         }
         if self.wants_auto_update() {
             self.start_self_update();
+        }
+        if self.update_on_start && self.activity.is_none() {
+            self.update_on_start = false;
+            let targets = self.every_outdated_target();
+            self.start_update(targets, Vec::new(), false);
         }
         self.render();
     }

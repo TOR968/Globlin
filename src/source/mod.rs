@@ -73,6 +73,10 @@ pub trait PackageSource {
         None
     }
 
+    fn refusal_of(&self, output: &Output, _name: &str) -> Option<Refusal> {
+        self.refusal(output)
+    }
+
     fn running(&self, _name: &str) -> Vec<String> {
         Vec::new()
     }

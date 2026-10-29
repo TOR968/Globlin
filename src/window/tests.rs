@@ -477,6 +477,16 @@ fn the_auto_approve_setting_reaches_the_window_from_the_config() {
 }
 
 #[test]
+fn the_update_on_start_setting_reaches_the_window_from_the_config() {
+    let mut config = config();
+    assert!(!snapshot(&view(&[], None), &config).update_on_start);
+
+    config.update_all_on_start = true;
+
+    assert!(snapshot(&view(&[], None), &config).update_on_start);
+}
+
+#[test]
 fn only_the_page_globlin_loaded_itself_counts_as_its_own() {
     assert!(is_own_page("about:blank"));
     assert!(is_own_page("data:text/html;charset=utf-8;base64,PGh0bWw+"));

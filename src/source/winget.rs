@@ -35,6 +35,8 @@ const UPGRADE_FLAGS: &str =
 const DIAGNOSTICS: &str =
     "\\Packages\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\LocalState\\DiagOutputDir";
 
+const CODES_FILE: &str = "winget-codes.txt";
+
 const UPDATE_NOT_APPLICABLE: u32 = 0x8A15_002B;
 const PORTABLE_INSTALL_FAILED: u32 = 0x8A15_0052;
 const INSTALL_IN_PROGRESS: u32 = 0x8A15_0102;
@@ -60,14 +62,17 @@ impl Winget {
         Ok(Self { command, shell })
     }
 
-    fn elevated_upgrade(&self, ids: &[&str]) -> Option<Command> {
+    fn elevated_upgrade(&self, ids: &[&str], codes: &str) -> Option<Command> {
         let ids = ids
             .iter()
             .map(|id| plain_name(id).map(|id| format!("'{id}'")))
             .collect::<Option<Vec<String>>>()?
             .join(", ");
+        let codes = quoted(codes);
         let inner = format!(
-            "$codes = @(); foreach ($id in {ids}) {{ & {} upgrade --id $id {UPGRADE_FLAGS}; \
+            "$codes = @(); $null = New-Item -Force -ItemType File -Path {codes}; \
+             foreach ($id in {ids}) {{ & {} upgrade --id $id {UPGRADE_FLAGS}; \
+             Add-Content -LiteralPath {codes} -Value ($id + ' ' + $LASTEXITCODE); \
              if ($LASTEXITCODE) {{ $codes += $LASTEXITCODE }} }}; \
              $shared = @($codes | Select-Object -Unique); \
              if ($shared.Count -eq 1) {{ exit $shared[0] }}; exit [int]($codes.Count -gt 0)",
@@ -76,17 +81,21 @@ impl Winget {
         self.elevated(
             &inner,
             &format!("'winget exited with ' + $run.ExitCode + '; its own logs are in ' + $env:LOCALAPPDATA + '{DIAGNOSTICS}'"),
+            &format!(
+                "if (Test-Path -LiteralPath {codes}) {{ Get-Content -LiteralPath {codes}; \
+                 Remove-Item -LiteralPath {codes} }}; "
+            ),
         )
     }
 
-    fn elevated(&self, inner: &str, failure: &str) -> Option<Command> {
+    fn elevated(&self, inner: &str, failure: &str, after: &str) -> Option<Command> {
         let shell = self.shell.as_ref()?;
         self.in_shell(&format!(
             "$ErrorActionPreference = 'Stop'; \
              $run = Start-Process -FilePath {} -ArgumentList '-NoProfile', '-NonInteractive', '-Command', {} \
              -Verb RunAs -WindowStyle Hidden -Wait -PassThru; \
              if ($run.ExitCode) {{ [Console]::Error.WriteLine({failure}) }}; \
-             exit $run.ExitCode",
+             {after}exit $run.ExitCode",
             quoted(&shell.to_string_lossy()),
             quoted(inner),
         ))
@@ -151,7 +160,12 @@ impl PackageSource for Winget {
         if names.is_empty() {
             return None;
         }
-        self.elevated_upgrade(names)
+        self.elevated_upgrade(
+            names,
+            &crate::platform::data_dir()
+                .join(CODES_FILE)
+                .to_string_lossy(),
+        )
     }
 
     fn uninstall_command(&self, name: &str) -> Option<Command> {
@@ -160,6 +174,13 @@ impl PackageSource for Winget {
 
     fn refusal(&self, output: &Output) -> Option<Refusal> {
         refusal_for(output.status.code()?)
+    }
+
+    fn refusal_of(&self, output: &Output, name: &str) -> Option<Refusal> {
+        match reported_code(&stdout_text(output), name) {
+            Some(code) => refusal_for(code),
+            None => self.refusal(output),
+        }
     }
 
     fn running(&self, name: &str) -> Vec<String> {
@@ -191,6 +212,7 @@ impl PackageSource for Winget {
             self.elevated(
                 &script,
                 "'closing its programs failed with ' + $run.ExitCode",
+                "",
             )
         } else {
             self.in_shell(&script)
@@ -254,6 +276,16 @@ fn broad_dirs() -> Vec<String> {
         dirs.push(format!("{local}\\Microsoft\\WinGet\\Packages"));
     }
     dirs
+}
+
+fn reported_code(stdout: &str, id: &str) -> Option<i32> {
+    stdout.lines().find_map(|line| {
+        line.trim()
+            .strip_prefix(id)?
+            .strip_prefix(' ')?
+            .parse()
+            .ok()
+    })
 }
 
 fn refusal_for(code: i32) -> Option<Refusal> {
