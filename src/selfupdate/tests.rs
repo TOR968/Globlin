@@ -4,7 +4,7 @@ use super::*;
 fn the_release_endpoint_points_at_this_repository() {
     assert_eq!(
         LATEST_URL,
-        "https://api.github.com/repos/TOR968/globlin/releases/latest"
+        "https://github.com/TOR968/globlin/releases/latest"
     );
 }
 
@@ -60,14 +60,8 @@ fn a_release_newer_than_the_installed_one_is_still_offered() {
     assert!(supersedes(&release, Some(&installed)));
 }
 
-fn body(tag: &str, assets: &[&str]) -> String {
-    let assets: Vec<String> = assets
-        .iter()
-        .map(|name| {
-            format!(r#"{{"name":"{name}","browser_download_url":"https://example.test/{name}"}}"#)
-        })
-        .collect();
-    format!(r#"{{"tag_name":"{tag}","assets":[{}]}}"#, assets.join(","))
+fn location(tag: &str) -> String {
+    format!("https://github.com/TOR968/globlin/releases/tag/{tag}")
 }
 
 fn current() -> Version {
@@ -75,88 +69,49 @@ fn current() -> Version {
 }
 
 #[test]
-fn a_newer_tag_with_both_assets_is_offered() {
-    let release = offer(
-        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        X64_ASSET,
-    )
-    .unwrap();
+fn a_newer_tag_is_offered_with_its_download_urls() {
+    let release = offer(&location("v0.2.0"), &current(), X64_ASSET).unwrap();
     assert_eq!(release.version, Version::parse("0.2.0").unwrap());
     assert_eq!(
         release.asset_url,
-        format!("https://example.test/{X64_ASSET}")
+        "https://github.com/TOR968/globlin/releases/download/v0.2.0/globlin.exe"
     );
     assert_eq!(
         release.sums_url,
-        format!("https://example.test/{SUMS_ASSET}")
+        "https://github.com/TOR968/globlin/releases/download/v0.2.0/SHA256SUMS"
     );
 }
 
 #[test]
 fn a_tag_without_the_v_prefix_is_still_read() {
-    let release = offer(
-        &body("0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        X64_ASSET,
-    )
-    .unwrap();
+    let release = offer(&location("0.2.0"), &current(), X64_ASSET).unwrap();
     assert_eq!(release.version, Version::parse("0.2.0").unwrap());
+    assert!(release.asset_url.ends_with("/download/0.2.0/globlin.exe"));
 }
 
 #[test]
 fn the_running_version_is_not_offered_to_itself() {
-    assert!(offer(
-        &body("v0.1.1", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        X64_ASSET
-    )
-    .is_none());
+    assert!(offer(&location("v0.1.1"), &current(), X64_ASSET).is_none());
 }
 
 #[test]
 fn an_older_release_is_not_offered() {
-    assert!(offer(
-        &body("v0.1.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        X64_ASSET
-    )
-    .is_none());
-}
-
-#[test]
-fn a_release_without_an_exe_asset_is_not_offered() {
-    assert!(offer(
-        &body("v0.2.0", &[SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        X64_ASSET
-    )
-    .is_none());
-}
-
-#[test]
-fn a_release_without_a_checksum_asset_is_not_offered() {
-    assert!(offer(
-        &body("v0.2.0", &[X64_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        X64_ASSET
-    )
-    .is_none());
+    assert!(offer(&location("v0.1.0"), &current(), X64_ASSET).is_none());
 }
 
 #[test]
 fn an_unparsable_tag_is_not_offered() {
+    assert!(offer(&location("nightly"), &current(), X64_ASSET).is_none());
+}
+
+#[test]
+fn a_redirect_to_the_release_list_is_not_offered() {
     assert!(offer(
-        &body("nightly", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
+        "https://github.com/TOR968/globlin/releases",
         &current(),
         X64_ASSET
     )
     .is_none());
-}
-
-#[test]
-fn a_body_that_is_not_a_release_is_not_offered() {
-    assert!(offer(r#"{"message":"Not Found"}"#, &current(), X64_ASSET).is_none());
 }
 
 #[test]
@@ -370,37 +325,12 @@ fn a_linux_binary_outside_an_appimage_is_never_replaced_by_one() {
 }
 
 #[test]
-fn an_arm64_release_is_offered_only_when_its_own_assets_are_published() {
-    assert!(offer(
-        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        ARM64_ASSET
-    )
-    .is_none());
-
-    let release = offer(
-        &body(
-            "v0.2.0",
-            &[
-                X64_ASSET,
-                SUMS_ASSET,
-                ARM64_ASSET,
-                SUMS_ASSET,
-                SUMS_SIGNATURE_ASSET,
-            ],
-        ),
-        &current(),
-        ARM64_ASSET,
-    )
-    .unwrap();
+fn an_arm64_build_is_offered_its_own_asset() {
+    let release = offer(&location("v0.2.0"), &current(), ARM64_ASSET).unwrap();
 
     assert_eq!(
         release.asset_url,
-        format!("https://example.test/{ARM64_ASSET}")
-    );
-    assert_eq!(
-        release.sums_url,
-        format!("https://example.test/{SUMS_ASSET}")
+        "https://github.com/TOR968/globlin/releases/download/v0.2.0/globlin-arm64.exe"
     );
 }
 
@@ -437,27 +367,12 @@ aP6o1JiJTh21SJbDwfjHHkVkwp6LQ54WlQVNvNQPiJopPRdrxeCHdEMSswrikEsLxuMvw/b6CI2slt12
 ";
 
 #[test]
-fn a_release_without_a_signature_asset_is_not_offered() {
-    assert!(offer(
-        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET]),
-        &current(),
-        X64_ASSET
-    )
-    .is_none());
-}
-
-#[test]
 fn the_signature_asset_is_offered_beside_the_binary() {
-    let release = offer(
-        &body("v0.2.0", &[X64_ASSET, SUMS_ASSET, SUMS_SIGNATURE_ASSET]),
-        &current(),
-        X64_ASSET,
-    )
-    .unwrap();
+    let release = offer(&location("v0.2.0"), &current(), X64_ASSET).unwrap();
 
     assert_eq!(
         release.sums_signature_url,
-        format!("https://example.test/{SUMS_SIGNATURE_ASSET}")
+        "https://github.com/TOR968/globlin/releases/download/v0.2.0/SHA256SUMS.minisig"
     );
 }
 
