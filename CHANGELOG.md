@@ -7,6 +7,16 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.21](https://github.com/TOR968/Globlin/compare/v0.4.20...v0.4.21) - 2026-11-03
+
+### Added
+
+- start the programs Close & update closed again once the update finishes ([#129](https://github.com/TOR968/Globlin/pull/129))
+
+### Other
+
+- bump the actions group with 2 updates ([#128](https://github.com/TOR968/Globlin/pull/128))
+
 ## [0.4.20](https://github.com/TOR968/Globlin/compare/v0.4.19...v0.4.20) - 2026-10-29
 
 ### Added
