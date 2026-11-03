@@ -81,7 +81,7 @@ pub trait PackageSource {
         Vec::new()
     }
 
-    fn close_running(&self, name: &str) -> Result<()> {
+    fn close_running(&self, name: &str) -> Result<Option<Command>> {
         Err(format!("{name}: {} cannot close programs", self.kind().label()).into())
     }
 
