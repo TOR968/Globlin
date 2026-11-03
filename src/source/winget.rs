@@ -30,6 +30,25 @@ const PROCESSES: &str = "Get-Process | Where-Object { $_.Path -and \
 const SERVICES: &str = "Get-CimInstance Win32_Service | Where-Object { $_.State -eq 'Running' -and \
     $_.PathName -and $_.PathName.TrimStart([char]34).StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }";
 const SERVICE_SUFFIX: &str = " (service)";
+const STARTED_BY_USER: &str = "$all = @(Get-CimInstance Win32_Process); \
+    $inside = @($all | Where-Object { $_.ExecutablePath -and \
+    $_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }); \
+    $shell = @($all | Where-Object { $_.Name -eq 'explorer.exe' } | ForEach-Object { $_.ProcessId }); \
+    $roots = @($inside | Where-Object { $inside.ProcessId -notcontains $_.ParentProcessId }); \
+    $shown = @($roots | Where-Object { ($shell -contains $_.ParentProcessId) -or \
+    ([long](Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).MainWindowHandle -ne 0) } | \
+    ForEach-Object { $_.ExecutablePath })";
+const PACKAGED_APPS: &str = "$package = $null; $apps = @(); \
+    if ($roots -and $root -like '*\\windowsapps\\*') { try { \
+    $package = Get-AppxPackage | Where-Object { $_.InstallLocation -and \
+    ($_.InstallLocation.TrimEnd('\\') + '\\') -eq $root } | Select-Object -First 1; \
+    if ($package) { $apps = @((Get-AppxPackageManifest $package).Package.Applications.Application) } \
+    } catch { $package = $null } }; \
+    @($roots | ForEach-Object { $path = $_.ExecutablePath; \
+    $arguments = [string]$_.CommandLine -replace '^\\s*(\\x22[^\\x22]*\\x22|\\S+)\\s*', ''; \
+    $app = $apps | Where-Object { $_.Executable -eq $path.Substring($root.Length) } | Select-Object -First 1; \
+    if ($app) { 'shell:AppsFolder\\' + $package.PackageFamilyName + '!' + $app.Id } \
+    elseif ($shown -contains $path) { $path + [char]9 + $arguments } }) | Select-Object -Unique";
 const UPGRADE_FLAGS: &str =
     "--exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements";
 const DIAGNOSTICS: &str =
@@ -121,6 +140,21 @@ impl Winget {
         narrow_location(&installed_location(&stdout_text(&output))?, &broad_dirs())
     }
 
+    fn started_by_user(&self, location: &str) -> Vec<String> {
+        self.in_shell(&started_by_user_script(location))
+            .and_then(|mut command| run_listing(&mut command).ok())
+            .filter(|output| output.status.success())
+            .map(|output| lines(&stdout_text(&output)))
+            .unwrap_or_default()
+    }
+
+    fn start_again(&self, location: &str, programs: &[String]) -> Option<Command> {
+        if programs.is_empty() {
+            return None;
+        }
+        self.in_shell(&start_script(location, programs))
+    }
+
     fn change(&self, verb: &str, id: &str) -> Command {
         let mut command = hidden_command(&self.command);
         command.args([
@@ -188,21 +222,15 @@ impl PackageSource for Winget {
             .and_then(|location| self.in_shell(&running_script(&location)))
             .and_then(|mut command| run_listing(&mut command).ok())
             .filter(|output| output.status.success())
-            .map(|output| {
-                stdout_text(&output)
-                    .lines()
-                    .map(str::trim)
-                    .filter(|line| !line.is_empty())
-                    .map(String::from)
-                    .collect()
-            })
+            .map(|output| lines(&stdout_text(&output)))
             .unwrap_or_default()
     }
 
-    fn close_running(&self, name: &str) -> Result<()> {
+    fn close_running(&self, name: &str) -> Result<Option<Command>> {
         let location = self
             .location(name)
             .ok_or_else(|| format!("{name}: could not find where winget installed it"))?;
+        let started_by_user = self.started_by_user(&location);
         let script = close_script(&location);
         let services = self
             .running(name)
@@ -219,7 +247,7 @@ impl PackageSource for Winget {
         };
         let output = super::run_change(command, name, SourceKind::Winget)?;
         if output.status.success() {
-            return Ok(());
+            return Ok(self.start_again(&location, &started_by_user));
         }
         Err(format!(
             "{name}: could not close its programs: {}",
@@ -236,6 +264,42 @@ fn running_script(location: &str) -> String {
          {SERVICES} | ForEach-Object {{ $_.Name + '{SERVICE_SUFFIX}' }}",
         quoted(location),
     )
+}
+
+fn started_by_user_script(location: &str) -> String {
+    format!(
+        "$ErrorActionPreference = 'Stop'; $root = {}; {STARTED_BY_USER}; {PACKAGED_APPS}",
+        quoted(location),
+    )
+}
+
+fn start_script(location: &str, programs: &[String]) -> String {
+    let programs = programs
+        .iter()
+        .map(|program| quoted(program))
+        .collect::<Vec<String>>()
+        .join(", ");
+    format!(
+        "$root = {}; $failed = 0; foreach ($entry in @({programs})) {{ \
+         $program, $arguments = $entry -split [char]9, 2; try {{ \
+         $start = @{{ FilePath = $program; ErrorAction = 'Stop' }}; \
+         if ($program -notlike 'shell:*') {{ if (-not (Test-Path -LiteralPath $program)) {{ \
+         $moved = Get-ChildItem -LiteralPath $root -Filter (Split-Path -Leaf $program) -File -Recurse -Depth 2 \
+         -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; \
+         if ($moved) {{ $start.FilePath = $moved.FullName }} }}; \
+         $start.WorkingDirectory = Split-Path -LiteralPath $start.FilePath }}; \
+         if ($arguments) {{ $start.ArgumentList = $arguments }}; Start-Process @start \
+         }} catch {{ [Console]::Error.WriteLine($program + ': ' + $_); $failed = 1 }} }}; exit $failed",
+        quoted(location),
+    )
+}
+
+fn lines(text: &str) -> Vec<String> {
+    text.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 fn close_script(location: &str) -> String {

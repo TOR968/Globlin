@@ -1,3 +1,4 @@
+use std::process::Command;
 use std::time::Duration;
 
 use crate::config::Config;
@@ -241,9 +242,28 @@ pub fn close_and_run(config: &Config, target: &UpdateTarget, announce: impl Fn(S
                 .map_err(|error| error.to_string())
         });
     match closed {
-        Ok(()) => run(config, std::slice::from_ref(target), &[], announce),
+        Ok(start_again) => {
+            let outcome = run(config, std::slice::from_ref(target), &[], announce);
+            start(start_again, target);
+            outcome
+        }
         Err(details) => fail_all(std::slice::from_ref(target), &format!("{details}\n")),
     }
+}
+
+fn start(command: Option<Command>, target: &UpdateTarget) {
+    if command.is_none() {
+        return;
+    }
+    let report = match source::run_change(command, &target.name, target.source) {
+        Ok(output) if output.status.success() => return,
+        Ok(output) => diagnostics::command_report(
+            &format!("{}: starting its programs again", target.name),
+            &output,
+        ),
+        Err(details) => details,
+    };
+    diagnostics::record_note(&report);
 }
 
 pub fn settle_in_use(in_use: &mut Vec<InUse>, outcome: &Outcome) {

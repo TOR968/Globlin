@@ -275,6 +275,106 @@ fn the_close_script_survives_being_elevated_because_it_carries_no_double_quote()
 }
 
 #[test]
+fn only_programs_the_user_started_are_remembered_not_their_helpers_or_a_hosted_terminal() {
+    let script = started_by_user_script(r"c:\program files\git\");
+
+    assert!(
+        script.contains("$inside.ProcessId -notcontains $_.ParentProcessId"),
+        "{script}"
+    );
+    assert!(
+        script.contains("$shell -contains $_.ParentProcessId"),
+        "{script}"
+    );
+    assert!(script.contains("MainWindowHandle -ne 0"), "{script}");
+    assert!(
+        script.contains(r"$root = 'c:\program files\git\'"),
+        "{script}"
+    );
+}
+
+#[test]
+fn a_program_is_remembered_with_the_arguments_it_was_started_with_but_not_its_own_path() {
+    let script = started_by_user_script(r"c:\program files\obsidian\");
+
+    assert!(
+        script.contains(r"[string]$_.CommandLine -replace '^\s*(\x22[^\x22]*\x22|\S+)\s*', ''"),
+        "{script}"
+    );
+    assert!(script.contains("$path + [char]9 + $arguments"), "{script}");
+}
+
+#[test]
+fn a_packaged_app_is_started_again_through_its_app_id_because_its_folder_moves_with_the_version() {
+    let script = started_by_user_script(r"c:\program files\windowsapps\openai.chatgpt_1_x64__x\");
+
+    assert!(script.contains("Get-AppxPackageManifest"), "{script}");
+    assert!(
+        script.contains(r"'shell:AppsFolder\' + $package.PackageFamilyName + '!' + $app.Id"),
+        "{script}"
+    );
+}
+
+#[test]
+fn every_program_is_started_again_even_when_one_of_them_fails() {
+    let script = start_script(
+        r"c:\program files\obsidian\",
+        &[
+            "C:\\Program Files\\Obsidian\\Obsidian.exe\t--hidden".to_string(),
+            r"shell:AppsFolder\OpenAI.ChatGPT_x!App".to_string(),
+            r"C:\it's\odd.exe".to_string(),
+        ],
+    );
+
+    assert!(
+        script.contains(
+            "foreach ($entry in @('C:\\Program Files\\Obsidian\\Obsidian.exe\t--hidden', 'shell:AppsFolder\\OpenAI.ChatGPT_x!App', 'C:\\it''s\\odd.exe'))"
+        ),
+        "{script}"
+    );
+    assert!(
+        script.contains("$program, $arguments = $entry -split [char]9, 2;"),
+        "{script}"
+    );
+    assert!(script.contains("catch {"), "{script}");
+    assert!(script.ends_with("exit $failed"), "{script}");
+}
+
+#[test]
+fn a_program_whose_folder_moved_with_the_version_is_looked_up_by_name_under_the_package_folder() {
+    let script = start_script(
+        r"c:\users\me\appdata\local\discord\",
+        &[r"C:\Users\me\AppData\Local\Discord\app-1.0.9\Discord.exe".to_string()],
+    );
+
+    assert!(
+        script.contains(r"$root = 'c:\users\me\appdata\local\discord\';"),
+        "{script}"
+    );
+    assert!(
+        script.contains("Get-ChildItem -LiteralPath $root -Filter (Split-Path -Leaf $program)"),
+        "{script}"
+    );
+    assert!(
+        script.contains("if ($program -notlike 'shell:*')"),
+        "{script}"
+    );
+}
+
+#[test]
+fn nothing_to_start_again_builds_no_command() {
+    let location = r"c:\program files\obsidian\";
+
+    assert!(elevating_winget().start_again(location, &[]).is_none());
+    assert!(elevating_winget()
+        .start_again(
+            location,
+            &[r"C:\Program Files\Obsidian\Obsidian.exe".to_string()]
+        )
+        .is_some());
+}
+
+#[test]
 fn winget_exit_codes_that_are_not_a_broken_update_are_told_apart() {
     let code = |raw: u32| raw.cast_signed();
 

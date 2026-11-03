@@ -260,9 +260,23 @@ anything. `close-update:` re-finds the processes and services at click time (not
 failure), stops the services with `Stop-Service -Force` and then the processes with `Stop-Process -Force`,
 then runs the ordinary update. When a service is among them the close script runs through the same
 `Start-Process -Verb RunAs` wrapper as a one-prompt upgrade (`Winget::elevated`), so it carries no double
-quote (a test pins that); that is a second prompt when the update itself is elevated too. Nothing is
-restarted, because a terminal or a program started with arguments cannot be put back as it was; an Auto
-service comes back on its own with the new version. A process running as administrator that is not a
+quote (a test pins that); that is a second prompt when the update itself is elevated too.
+
+Before closing, an unelevated script (`winget::started_by_user_script`) remembers what the user started:
+the root processes in the folder (whose parent is not itself in the folder) that have a window or whose
+parent is `explorer.exe` — the Start menu, the taskbar, a desktop shortcut or the Run key. A helper
+process, a crash handler or a `bash.exe` hosted in a VS Code terminal is none of those and is not
+remembered. For an MSIX package the folder carries the version (`…_1.2.3.0_x64__…`) and is gone after
+the update, so a root process whose executable is an `Application` in the package manifest is
+remembered as `shell:AppsFolder\<PackageFamilyName>!<Id>` instead, window or not, because a packaged
+app is activated by `svchost`/`sihost`, never by Explorer, and often sits in the tray. After the update
+— whether it succeeded or not — `update::close_and_run` runs `Start-Process` for each, unelevated, with
+the arguments from its `Win32_Process.CommandLine` (the first token, quoted or not, is the program
+itself and is dropped), so a tray app the Run key started with `--hidden` comes back hidden. A path
+gone after the update — Squirrel's `app-1.0.9\Discord.exe` becoming `app-1.0.10\` — is looked up by
+file name up to two levels under the package folder, newest first. One that still cannot start is
+noted in the log without failing the update. A terminal comes back as a fresh one, not as it was. Services are not
+started again: an Auto service comes back on its own with the new version. A process running as administrator that is not a
 service cannot be stopped from an unelevated Globlin, so that update fails with PowerShell's reason in
 the log. A shared run that exits 0 while a member's version did not move says so in the log.
 `winget::narrow_location` refuses any folder that is, or contains, a shared one — the drive root,
@@ -1070,7 +1084,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-657 tests on Windows: 626 run by default (no network, no side effects), 31 `#[ignore]`d because they
+663 tests on Windows: 632 run by default (no network, no side effects), 31 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
