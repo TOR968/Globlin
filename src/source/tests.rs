@@ -358,3 +358,22 @@ fn a_missing_program_is_told_apart_from_a_broken_one() {
     assert_eq!(not_on_path("go").to_string(), "go was not found on PATH");
     assert!(!crate::Error::from("go crashed").is::<NotInstalled>());
 }
+
+#[test]
+fn every_powershell_single_quote_is_doubled_not_only_the_ascii_one() {
+    assert_eq!(quoted("it's"), "'it''s'");
+    assert_eq!(
+        quoted("a\u{2019};calc;\u{2018}b\u{201A}c\u{201B}"),
+        "'a\u{2019}\u{2019};calc;\u{2018}\u{2018}b\u{201A}\u{201A}c\u{201B}\u{201B}'"
+    );
+}
+
+#[test]
+fn a_package_manager_never_runs_in_the_directory_globlin_was_started_from() {
+    let command = hidden_command(Path::new("npm"));
+
+    assert_eq!(
+        command.get_current_dir(),
+        Some(crate::platform::data_dir().as_path())
+    );
+}

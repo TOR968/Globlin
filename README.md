@@ -379,7 +379,8 @@ restart work.
 
 <br>
 
-The portable Windows build reads it from next to the exe first, otherwise from
+The portable Windows build reads it from next to the exe first (unless that file still carries Windows'
+*from the internet* mark, which makes Globlin ignore it), otherwise from
 `%LOCALAPPDATA%\globlin\`, and writes it back to whichever of those accepts a write. An installed build
 (the installer or winget) and every macOS and Linux build keep it in the data directory only —
 `%LOCALAPPDATA%\globlin\`, `~/Library/Application Support/globlin/` or `~/.local/share/globlin/`. Missing keys take their defaults, so a partial file is fine. If the file isn't
@@ -431,9 +432,9 @@ edits are never silently overwritten.
 - **`last_notified`** — bookkeeping for the "only notify on change" rule. Clear it to force the next
   check to notify again.
 - **`npm_cmd`** — an override, only needed if `npm.cmd` is somewhere unusual. Left `null`, `PATH` is
-  searched, then `%APPDATA%\npm\npm.cmd`. The file must be called `npm` (`npm.cmd`, `npm.exe`) and
-  must not be a downloaded file still carrying Windows' *from the internet* mark; otherwise npm is
-  skipped rather than run.
+  searched, then `%APPDATA%\npm\npm.cmd`. The file must be called `npm` (`npm.cmd`, `npm.exe`), must
+  sit on a local drive (`C:\…`, not a `\\server\share` path) and must not be a downloaded file still
+  carrying Windows' *from the internet* mark; otherwise npm is skipped rather than run.
 - **`auto_update`** — see [Keeping itself updated](#keeping-itself-updated).
 - **`auto_approve_scripts`** — the **Approve npm install scripts automatically** switch in the window's
   Settings; see [Using it](#using-it).

@@ -62,13 +62,31 @@ fn asset_for(os: &str, arch: &str, appimage: bool) -> Option<&'static str> {
     }
 }
 
-fn verify_signature(bytes: &[u8], signature: &str, public_key: &str) -> Result<()> {
+fn verify_signature(
+    bytes: &[u8],
+    signature: &str,
+    public_key: &str,
+    version: &Version,
+) -> Result<()> {
     let key = PublicKey::from_base64(public_key)
         .map_err(|error| format!("the embedded release key is unusable: {error}"))?;
     let signature = Signature::decode(signature)
         .map_err(|error| format!("the release signature is unreadable: {error}"))?;
     key.verify(bytes, &signature, false)
-        .map_err(|error| format!("the release signature does not match: {error}").into())
+        .map_err(|error| format!("the release signature does not match: {error}"))?;
+    match signed_version(signature.trusted_comment()) {
+        Some(signed) if signed == version.to_string() => Ok(()),
+        Some(signed) => {
+            Err(format!("the release signature is for {signed}, not the offered {version}").into())
+        }
+        None => Err("the release signature does not name the version it was made for".into()),
+    }
+}
+
+fn signed_version(trusted_comment: &str) -> Option<&str> {
+    trusted_comment
+        .split('\t')
+        .find_map(|field| field.strip_prefix("version:"))
 }
 
 fn running_asset() -> Result<&'static str> {
@@ -190,7 +208,12 @@ pub fn apply(release: &Release) -> Result<Version> {
     let download = get(&agent(DOWNLOAD_TIMEOUT), &release.asset_url)?.read_to_vec()?;
     let sums = get(&agent(TIMEOUT), &release.sums_url)?.read_to_string()?;
     let signature = get(&agent(TIMEOUT), &release.sums_signature_url)?.read_to_string()?;
-    verify_signature(sums.as_bytes(), &signature, RELEASE_PUBLIC_KEY)?;
+    verify_signature(
+        sums.as_bytes(),
+        &signature,
+        RELEASE_PUBLIC_KEY,
+        &release.version,
+    )?;
     verify(&download, &sums, asset)?;
     if is_bundle_archive(asset) {
         install_bundle(&download)?;

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use tray_icon::menu::MenuItem;
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
@@ -46,6 +48,7 @@ impl Tray {
             .with_icon_as_template(monochrome)
             .with_menu(Box::new(built.menu))
             .with_menu_on_left_click(false)
+            .with_temp_dir_path(icon_frame_dir())
             .build()?;
         Ok(Self {
             icon,
@@ -93,4 +96,11 @@ impl Tray {
 
 fn look_for(monochrome: bool) -> Look {
     icon::look(monochrome, monochrome && platform::tray_is_light())
+}
+
+fn icon_frame_dir() -> PathBuf {
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .filter(|dir| !dir.is_empty())
+        .map_or_else(platform::data_dir, PathBuf::from)
+        .join("tray-icon")
 }

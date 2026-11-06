@@ -212,8 +212,11 @@ fn write_paths() -> Vec<PathBuf> {
 
 fn candidate_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
-    if let Some(dir) = exe_dir() {
-        paths.push(dir.join(FILE_NAME));
+    if let Some(path) = exe_dir()
+        .map(|dir| dir.join(FILE_NAME))
+        .filter(|path| !platform::downloaded(path))
+    {
+        paths.push(path);
     }
     paths.push(platform::data_dir().join(FILE_NAME));
     paths

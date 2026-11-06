@@ -89,7 +89,7 @@ fn without_powershell_there_is_no_way_to_elevate_and_no_command() {
 
 #[test]
 fn the_local_listing_becomes_the_installed_set() {
-    let installed = merge(LISTING, "");
+    let installed = merge(LISTING, Some(""));
     let names: Vec<&str> = installed.iter().map(|item| item.name.as_str()).collect();
 
     assert_eq!(names, vec!["git", "nodejs", "7zip.install"]);
@@ -98,18 +98,36 @@ fn the_local_listing_becomes_the_installed_set() {
 
 #[test]
 fn the_outdated_report_supplies_the_upgrade() {
-    let installed = merge(LISTING, OUTDATED);
+    let installed = merge(LISTING, Some(OUTDATED));
 
     assert_eq!(installed[0].version, "2.44.0");
     assert_eq!(installed[0].available.as_deref(), Some("2.47.1"));
 }
 
 #[test]
-fn a_package_absent_from_the_outdated_report_is_not_behind() {
-    let installed = merge(LISTING, OUTDATED);
-    let seven_zip = installed.iter().find(|item| item.name == "7zip.install");
+fn a_package_absent_from_the_outdated_report_is_resolved_to_its_own_version() {
+    let installed = merge(LISTING, Some(OUTDATED));
+    let seven_zip = installed
+        .iter()
+        .find(|item| item.name == "7zip.install")
+        .unwrap();
 
-    assert_eq!(seven_zip.unwrap().available, None);
+    assert_eq!(
+        seven_zip.available.as_deref(),
+        Some(seven_zip.version.as_str())
+    );
+}
+
+#[test]
+fn a_failed_outdated_report_leaves_every_package_unresolved_not_current() {
+    let installed = merge(LISTING, None);
+
+    assert!(!installed.is_empty());
+    assert!(installed.iter().all(|item| item.available.is_none()));
+    assert_eq!(
+        SourceKind::Choco.catalog(),
+        crate::model::Catalog::SelfResolved
+    );
 }
 
 #[test]
@@ -137,7 +155,7 @@ fn chocolatey_one_needs_the_local_only_flag() {
 
 #[test]
 fn empty_output_is_no_packages_rather_than_a_panic() {
-    assert!(merge("", "").is_empty());
+    assert!(merge("", Some("")).is_empty());
 }
 
 #[test]

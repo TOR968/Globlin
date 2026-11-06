@@ -9,10 +9,16 @@ use super::{
     PackageSource,
 };
 use crate::model::{BlockedScript, Installed, SourceKind};
-use crate::Result;
+use crate::{platform, Result};
 
 const EXECUTABLE: &str = "npm";
-const PUBLIC_REGISTRY: &str = "https://registry.npmjs.org/";
+const PUBLIC_REGISTRIES: [&str; 3] = [
+    "https://registry.npmjs.org",
+    "https://registry.npmmirror.com",
+    "https://registry.yarnpkg.com",
+];
+const DEFAULT_REGISTRY_KEY: &str = "registry";
+const SCOPED_REGISTRY_SUFFIX: &str = ":registry";
 const LOCKFILE: &str = ".package-lock.json";
 const TRUSTED_STEMS: [&str; 1] = ["npm"];
 
@@ -116,13 +122,16 @@ impl PackageSource for Npm {
 impl Npm {
     fn origins(&self) -> Origins {
         let root = self.answer(&["root", "-g"]).map(PathBuf::from);
-        let registry = self.answer(&["config", "get", "registry"]);
+        let registries = self.answer(&["config", "ls", "--json"]);
         let lock = root
             .as_deref()
             .and_then(|root| std::fs::read_to_string(root.join(LOCKFILE)).ok());
         Origins {
             root,
-            registry,
+            registries: registries
+                .as_deref()
+                .map(parse_registries)
+                .unwrap_or_default(),
             lock: lock.as_deref().and_then(parse_lock).unwrap_or_default(),
         }
     }
@@ -168,18 +177,21 @@ fn install_arguments(name: &str, version: &str, configured_allow_scripts: &str) 
 #[derive(Default)]
 struct Origins {
     root: Option<PathBuf>,
-    registry: Option<String>,
+    registries: BTreeMap<String, String>,
     lock: BTreeMap<String, LockEntry>,
 }
 
 impl Origins {
     fn is_external(&self, name: &str) -> bool {
+        if !self.registry_for(name).is_none_or(is_public) || self.renamed(name) {
+            return true;
+        }
         match self.lock.get(&format!("node_modules/{name}")) {
             Some(entry) if entry.link => true,
             Some(LockEntry {
                 resolved: Some(resolved),
                 ..
-            }) => !self.resolves_through_registry(resolved),
+            }) => !resolves_publicly(resolved),
             Some(_) => false,
             None => self
                 .root
@@ -188,19 +200,59 @@ impl Origins {
         }
     }
 
-    fn resolves_through_registry(&self, resolved: &str) -> bool {
-        resolved.starts_with(PUBLIC_REGISTRY)
-            || self.registry.as_deref().is_some_and(|registry| {
-                let registry = registry.trim_end_matches('/');
-                resolved
-                    .strip_prefix(registry)
-                    .is_some_and(|rest| rest.starts_with('/'))
+    fn registry_for(&self, name: &str) -> Option<&str> {
+        name.split_once('/')
+            .and_then(|(scope, _)| {
+                self.registries
+                    .get(&format!("{scope}{SCOPED_REGISTRY_SUFFIX}"))
             })
+            .or_else(|| self.registries.get(DEFAULT_REGISTRY_KEY))
+            .map(String::as_str)
     }
+
+    fn renamed(&self, name: &str) -> bool {
+        self.root
+            .as_deref()
+            .and_then(|root| std::fs::read_to_string(root.join(name).join("package.json")).ok())
+            .and_then(|raw| serde_json::from_str::<Manifest>(&raw).ok())
+            .and_then(|manifest| manifest.name)
+            .is_some_and(|actual| actual != name)
+    }
+}
+
+fn is_public(registry: &str) -> bool {
+    PUBLIC_REGISTRIES.contains(&registry.trim_end_matches('/'))
+}
+
+fn resolves_publicly(resolved: &str) -> bool {
+    PUBLIC_REGISTRIES.iter().any(|registry| {
+        resolved
+            .strip_prefix(registry)
+            .is_some_and(|rest| rest.starts_with('/'))
+    })
+}
+
+fn parse_registries(raw: &str) -> BTreeMap<String, String> {
+    let Ok(config) = serde_json::from_str::<BTreeMap<String, serde_json::Value>>(raw) else {
+        return BTreeMap::new();
+    };
+    config
+        .into_iter()
+        .filter(|(key, _)| {
+            key == DEFAULT_REGISTRY_KEY
+                || (key.starts_with('@') && key.ends_with(SCOPED_REGISTRY_SUFFIX))
+        })
+        .filter_map(|(key, value)| Some((key, value.as_str()?.to_owned())))
+        .collect()
 }
 
 fn is_link(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
+}
+
+#[derive(Deserialize)]
+struct Manifest {
+    name: Option<String>,
 }
 
 fn parse_lock(raw: &str) -> Option<BTreeMap<String, LockEntry>> {
@@ -280,7 +332,23 @@ fn blocked_line(line: &str) -> Option<BlockedScript> {
 }
 
 fn trusted_override(path: &Path) -> bool {
-    names_npm(path) && !downloaded(path)
+    names_npm(path) && on_local_drive(path) && !platform::downloaded(path)
+}
+
+#[cfg(windows)]
+fn on_local_drive(path: &Path) -> bool {
+    use std::path::{Component, Prefix};
+
+    matches!(
+        path.components().next(),
+        Some(Component::Prefix(prefix))
+            if matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_))
+    )
+}
+
+#[cfg(not(windows))]
+fn on_local_drive(_path: &Path) -> bool {
+    true
 }
 
 fn names_npm(path: &Path) -> bool {
@@ -291,18 +359,6 @@ fn names_npm(path: &Path) -> bool {
                 .iter()
                 .any(|trusted| stem.eq_ignore_ascii_case(trusted))
         })
-}
-
-#[cfg(windows)]
-fn downloaded(path: &Path) -> bool {
-    let mut stream = path.as_os_str().to_owned();
-    stream.push(":Zone.Identifier");
-    Path::new(&stream).exists()
-}
-
-#[cfg(not(windows))]
-fn downloaded(_path: &Path) -> bool {
-    false
 }
 
 #[cfg(windows)]

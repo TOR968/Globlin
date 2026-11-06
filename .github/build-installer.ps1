@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
 if (-not (Test-Path $iscc)) {
-    choco install innosetup -y --no-progress | Out-Host
+    throw "Inno Setup 6 is not installed at $iscc; install it from https://jrsoftware.org/isdl.php and run again"
 }
 
 $version = (Select-String -Path Cargo.toml -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
