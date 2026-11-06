@@ -11,6 +11,7 @@ use crate::model::{
     self, Activity, Batch, Blocked, InUse, Package, PackageRef, RowState, SourceKind, UpdateTarget,
 };
 use crate::progress;
+use crate::queue::Queue;
 use crate::selfupdate::Release;
 use crate::Result;
 
@@ -94,6 +95,7 @@ pub enum SelfUpdate<'a> {
 pub struct View<'a> {
     pub packages: &'a [Package],
     pub activity: Option<&'a Activity>,
+    pub queue: &'a Queue,
     pub approvals: &'a [Blocked],
     pub in_use: &'a [InUse],
     pub autostart: bool,
@@ -242,7 +244,6 @@ impl Sections {
 
 pub fn build(view: &View) -> Result<Built> {
     let header = MenuItem::new(headline(view), false, None);
-    let busy = view.activity.is_some();
     let updatable = model::updatable(view.packages).len();
 
     let mut built = Sections::new();
@@ -274,11 +275,11 @@ pub fn build(view: &View) -> Result<Built> {
         built.item(&MenuItem::with_id(
             ID_UPDATE_ALL,
             format!("Update all ({updatable})"),
-            !busy,
+            true,
             None,
         ))?;
     }
-    built.item(&MenuItem::with_id(ID_CHECK_NOW, "Check now", !busy, None))?;
+    built.item(&MenuItem::with_id(ID_CHECK_NOW, "Check now", true, None))?;
     built.item(&CheckMenuItem::with_id(
         ID_AUTOSTART,
         "Run at startup",
@@ -289,7 +290,7 @@ pub fn build(view: &View) -> Result<Built> {
     built.item(&MenuItem::with_id(ID_OPEN_LOG, "Open last log", true, None))?;
     built.split()?;
 
-    built.item(&self_block(view, busy)?)?;
+    built.item(&self_block(view)?)?;
     built.item(&MenuItem::with_id(
         ID_OPEN_PATREON,
         "Support Globlin on Patreon",
@@ -358,7 +359,7 @@ fn target_label(target: &UpdateTarget, marker: char) -> String {
     )
 }
 
-fn self_block(view: &View, busy: bool) -> Result<Submenu> {
+fn self_block(view: &View) -> Result<Submenu> {
     let entry = Submenu::new(format!("Globlin v{}", env!("CARGO_PKG_VERSION")), true);
     let (release, auto_update, log) = match view.self_update {
         SelfUpdate::Managed(manager) => {
@@ -375,7 +376,7 @@ fn self_block(view: &View, busy: bool) -> Result<Submenu> {
         entry.append(&MenuItem::with_id(
             ID_UPDATE_SELF,
             self_update_text(release),
-            !busy,
+            true,
             None,
         ))?;
     }
@@ -415,7 +416,7 @@ fn self_update_text(release: &Release) -> String {
 
 pub fn headline(view: &View) -> String {
     match view.activity {
-        Some(Activity::Checking) => format!("Checking for updates{}", dots(view.frame)),
+        Some(Activity::Checking { source }) => format!("{}{}", checking(*source), dots(view.frame)),
         Some(Activity::Updating { batch }) => match batch.current() {
             Some(target) => {
                 let progress = if batch.total() > 1 {
@@ -463,6 +464,14 @@ fn summary(packages: &[Package]) -> String {
     }
 }
 
+fn checking(source: Option<SourceKind>) -> String {
+    match source {
+        Some(SourceKind::Skills) => "Updating skills via npx".to_string(),
+        Some(kind) => format!("Checking {}", kind.label()),
+        None => "Checking for updates".to_string(),
+    }
+}
+
 fn dots(frame: u32) -> String {
     ".".repeat((frame / FRAMES_PER_DOT % DOT_CYCLE) as usize)
 }
@@ -499,7 +508,7 @@ pub fn close_update_id(target: &UpdateTarget) -> String {
     format!("{CLOSE_UPDATE_PREFIX}{}", target_key(target))
 }
 
-fn target_key(target: &UpdateTarget) -> String {
+pub fn target_key(target: &UpdateTarget) -> String {
     format!("{}:{}", target.source.label(), target.name)
 }
 

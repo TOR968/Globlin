@@ -11,6 +11,7 @@ mod notice;
 mod platform;
 mod process;
 mod progress;
+mod queue;
 mod registry;
 mod remove;
 mod selfupdate;
@@ -28,7 +29,7 @@ use tray_icon::TrayIconEvent;
 
 use app::{App, Control};
 use check::Report;
-use model::RemoveTarget;
+use model::{RemoveTarget, SourceKind};
 use update::{Outcome, Step};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -39,6 +40,7 @@ pub enum Message {
     Tray(TrayIconEvent),
     ShowWindow,
     Ipc(String),
+    Checking(Option<SourceKind>),
     Checked(Report),
     Step(Step),
     Updated(Outcome),

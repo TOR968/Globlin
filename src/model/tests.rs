@@ -165,7 +165,7 @@ fn a_skipped_target_counts_as_finished_but_reads_skipped_not_failed() {
 
 #[test]
 fn a_self_update_is_an_activity_like_any_other() {
-    assert_ne!(Activity::SelfUpdate, Activity::Checking);
+    assert_ne!(Activity::SelfUpdate, Activity::Checking { source: None });
 }
 
 #[test]

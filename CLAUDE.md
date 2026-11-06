@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 663 tests (632 run, 31 ignored) on Windows, no network, no side effects
+cargo test                     # 678 tests (647 run, 31 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -58,10 +58,13 @@ state and lives inside the closure. Work that can block — a check, an update r
 `Message` variant (`main.rs:36`). Menu clicks arrive the same way: `tray_icon`'s global handler is
 forwarded into the same queue.
 
-**`Activity` is the concurrency guard.** `App.activity: Option<Activity>` doubles as (a) the "a job is in
-flight" lock — `start_check`/`start_update` return early when it is `Some` — and (b) what the menu and
-icon render as busy. It is set on the main thread before the worker spawns and cleared only by the
-worker's terminal message.
+**`Activity` is the concurrency guard; `Queue` is what waits behind it.** `App.activity: Option<Activity>`
+doubles as (a) the "a job is in flight" lock and (b) what the menu and icon render as busy. It is set on
+the main thread before the worker spawns and cleared only by the worker's terminal message. A
+`start_update`/`start_remove`/`start_self_update`/`start_check` while it is `Some` is never refused: it
+goes onto `App.queue` (`src/queue.rs`), and every terminal handler ends in `run_next`, which drains the
+jobs in order, then a waiting self-update, then one re-check. No button in the window or the tray is
+disabled for being busy — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#the-window).
 
 **`next_wake` drives everything time-based.** Busy: `now + 120 ms` so the spinner advances. Idle: the next
 scheduled check. There is no timer thread and idle costs nothing.

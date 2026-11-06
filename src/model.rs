@@ -135,6 +135,7 @@ pub struct Installed {
     pub source: SourceKind,
     pub available: Option<String>,
     pub external: bool,
+    pub previous: Option<String>,
 }
 
 impl Installed {
@@ -145,12 +146,19 @@ impl Installed {
             source,
             available: None,
             external: false,
+            previous: None,
         }
     }
 
     #[must_use]
     pub fn with_available(mut self, available: Option<String>) -> Self {
         self.available = available;
+        self
+    }
+
+    #[must_use]
+    pub fn with_previous(mut self, previous: Option<String>) -> Self {
+        self.previous = previous;
         self
     }
 
@@ -347,7 +355,7 @@ impl Batch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Activity {
-    Checking,
+    Checking { source: Option<SourceKind> },
     Updating { batch: Batch },
     Removing { target: RemoveTarget },
     SelfUpdate,

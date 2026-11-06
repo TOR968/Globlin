@@ -191,7 +191,9 @@ The window puts updates first:
   opens on its own.
 - Per row: **Update** runs `npm install -g <name>@latest` (or the pnpm/yarn/bun equivalent) with no
   console window, then re-checks. **Ignore** removes it from checks and from `Update all` without
-  touching the network — **Unignore** and it's re-checked immediately. **Uninstall** arms into a
+  touching the network — **Unignore** and it's re-checked immediately. A winget package that winget
+  itself lists with version `Unknown` can never be updated through it, so Globlin ignores it the first time
+  it sees it; **Unignore** it and it stays unignored (and shows `?` again). **Uninstall** arms into a
   **Confirm** button and then removes the package with `npm uninstall -g <name>` (or the equivalent). The
   two clicks are the confirmation; there is no dialog.
 
@@ -200,6 +202,15 @@ The window puts updates first:
 - **While a queue runs** the hero card turns into its progress: *Updating 7 of 12*, a bar split into
   done, failed and running, and the queue grouped by source. The group that is running opens by itself,
   so does one with a failure, and the rest fold to one line saying *done* or *queued*.
+- **While a check runs** the headline names the package manager being read — *Checking winget…*,
+  *Checking npm…* — and *Updating skills via npx…* while the skills.sh CLI updates your skills. Skills
+  that changed during the check are listed in one notification, old and new folder hash side by side.
+- **Nothing waits for the running job to finish before you can click it.** Update, Update all, Update
+  selected, Uninstall, Ignore, Check now and the source switches stay live while a check, an update or an
+  uninstall runs. A click that needs the package managers joins a queue instead: an update lands at the
+  end of the running batch as *queued*, any other row gets an *update queued* or *uninstall queued* tag,
+  and each job starts as soon as the one before it finishes. A package already waiting is never queued
+  twice, and the re-check after a change runs once, after the queue is empty.
 - If npm 12 refuses an update because a dependency wants to run install scripts you have not approved,
   Globlin opens its window with the list of packages and the exact scripts. **Allow and update** adds
   those exact versions to `allow-scripts` in your user `.npmrc` and runs the update again; **Not now**
@@ -397,6 +408,7 @@ edits are never silently overwritten.
     "skills": true
   },
   "ignore": ["npm", "@anthropic-ai/claude-code"],
+  "auto_ignored": [],
   "last_notified": [],
   "npm_cmd": null,
   "auto_update": false,
@@ -414,6 +426,8 @@ edits are never silently overwritten.
 - **`ignore`** — listed packages still appear in the window with their version, but are never checked,
   flagged or notified about. `npm` is ignored by default because updating it on Windows means it rewrites
   its own shim mid-run; `@anthropic-ai/claude-code` because it self-updates. An explicit `[]` is respected.
+- **`auto_ignored`** — winget packages with an `Unknown` version that Globlin has already added to
+  `ignore` on its own. A name listed here is never added again, so un-ignoring one sticks.
 - **`last_notified`** — bookkeeping for the "only notify on change" rule. Clear it to force the next
   check to notify again.
 - **`npm_cmd`** — an override, only needed if `npm.cmd` is somewhere unusual. Left `null`, `PATH` is

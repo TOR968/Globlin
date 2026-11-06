@@ -15,6 +15,7 @@ use crate::model::{
     self, Activity, Batch, Blocked, InUse, Package, PackageRef, RemoveTarget, SourceKind, Status,
     UpdateTarget,
 };
+use crate::queue::{Job, Next, Queue};
 use crate::remove;
 use crate::selfupdate::{self, Release};
 use crate::tray::{Action, SelfUpdate, Tray, View};
@@ -40,12 +41,12 @@ pub struct App {
     blocked_self: Option<Version>,
     pending_restart: Option<Version>,
     activity: Option<Activity>,
+    queue: Queue,
     approvals: Vec<Blocked>,
     in_use: Vec<InUse>,
     window: Option<Window>,
     failed: bool,
     skipped: Vec<String>,
-    recheck_after_retry: bool,
     update_on_start: bool,
     frame: u32,
     next_check: Instant,
@@ -67,12 +68,12 @@ impl App {
             blocked_self: None,
             pending_restart: None,
             activity: None,
+            queue: Queue::new(),
             approvals: Vec::new(),
             in_use: Vec::new(),
             window: None,
             failed: false,
             skipped: Vec::new(),
-            recheck_after_retry: false,
             update_on_start,
             frame: 0,
             next_check,
@@ -105,6 +106,11 @@ impl App {
             Message::Ipc(body) => return self.on_action(Action::from_key(&body), target),
             Message::Tray(event) => self.on_tray(&event, target),
             Message::ShowWindow => self.open_window(target),
+            Message::Checking(source) => {
+                if let Some(Activity::Checking { source: current }) = self.activity.as_mut() {
+                    *current = source;
+                }
+            }
             Message::Checked(report) => self.on_checked(report),
             Message::Step(step) => self.on_step(&step),
             Message::Updated(outcome) => self.on_updated(&outcome, target),
@@ -269,22 +275,56 @@ impl App {
         self.next_check = Instant::now() + SETTLE_DELAY;
     }
 
+    fn run_next(&mut self) {
+        while self.activity.is_none() {
+            match self.queue.next() {
+                Some(Next::Job(Job::Update {
+                    targets,
+                    approvals,
+                    closing,
+                })) => self.start_update(targets, approvals, closing),
+                Some(Next::Job(Job::Remove(target))) => self.start_remove(target),
+                Some(Next::SelfUpdate) => self.start_self_update(),
+                Some(Next::Check) => self.start_check(),
+                None => break,
+            }
+        }
+        if self.activity.is_none() {
+            self.render();
+        }
+    }
+
     fn start_check(&mut self) {
-        if self.activity.is_some() {
-            return;
+        match self.activity {
+            Some(Activity::Checking { .. }) => return,
+            Some(_) => {
+                self.queue.push_check();
+                return;
+            }
+            None => {}
         }
         self.next_check = Instant::now() + self.config.interval();
-        self.begin(Activity::Checking);
+        self.begin(Activity::Checking { source: None });
 
         let config = self.config.clone();
         let proxy = self.proxy.clone();
         std::thread::spawn(move || {
-            proxy.send_event(Message::Checked(check::run(&config))).ok();
+            let announce = |source| {
+                proxy.send_event(Message::Checking(source)).ok();
+            };
+            let report = check::run(&config, announce);
+            proxy.send_event(Message::Checked(report)).ok();
         });
     }
 
     fn start_update(&mut self, targets: Vec<UpdateTarget>, approvals: Vec<Blocked>, closing: bool) {
-        if targets.is_empty() || self.activity.is_some() {
+        if targets.is_empty() {
+            return;
+        }
+        if self.activity.is_some() {
+            self.queue
+                .push_update(targets, approvals, closing, self.activity.as_ref());
+            self.render();
             return;
         }
         let targets = model::in_update_order(targets);
@@ -318,7 +358,7 @@ impl App {
     }
 
     fn start_approvals(&mut self, chosen: Vec<Blocked>) {
-        if chosen.is_empty() || self.activity.is_some() {
+        if chosen.is_empty() {
             return;
         }
         self.approvals.retain(|entry| !chosen.contains(entry));
@@ -328,6 +368,8 @@ impl App {
 
     fn start_remove(&mut self, target: RemoveTarget) {
         if self.activity.is_some() {
+            self.queue.push_remove(target, self.activity.as_ref());
+            self.render();
             return;
         }
         self.begin(Activity::Removing {
@@ -343,12 +385,16 @@ impl App {
     }
 
     fn start_self_update(&mut self) {
-        if self.activity.is_some() || self.pending_restart.is_some() {
+        if self.pending_restart.is_some() {
             return;
         }
         let Some(release) = self.available_release.clone() else {
             return;
         };
+        if self.activity.is_some() {
+            self.queue.push_self_update();
+            return;
+        }
         self.begin(Activity::SelfUpdate);
 
         let proxy = self.proxy.clone();
@@ -413,7 +459,7 @@ impl App {
             }
             Err(error) => self.report_self_failure(&error.to_string()),
         }
-        self.render();
+        self.run_next();
         Control::Continue
     }
 
@@ -452,6 +498,7 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            &self.queue,
             &self.approvals,
             &self.in_use,
             self.available_release.as_ref(),
@@ -482,9 +529,22 @@ impl App {
         self.available_release = report.release.filter(|release| {
             selfupdate::supersedes(&release.version, self.pending_restart.as_ref())
         });
+        if !report.refreshed.is_empty() {
+            platform::notify(
+                "Globlin — skills updated",
+                &report.refreshed.join(
+                    "
+",
+                ),
+            )
+            .ok();
+        }
         match report.packages {
             Ok(mut packages) => {
                 packages.retain(|package| self.config.source_enabled(package.source));
+                if check::ignore_unversioned(&mut packages, &mut self.config) {
+                    self.config.save().ok();
+                }
                 self.packages = packages;
                 self.failed = !report.skipped.is_empty();
                 self.announce_new_updates();
@@ -503,7 +563,7 @@ impl App {
             let targets = self.every_outdated_target();
             self.start_update(targets, Vec::new(), false);
         }
-        self.render();
+        self.run_next();
     }
 
     fn announce_skipped(&mut self, skipped: Vec<String>) {
@@ -550,12 +610,14 @@ impl App {
         update::settle(&mut self.approvals, outcome);
         update::settle_in_use(&mut self.in_use, outcome);
         update::mark_updated(&mut self.packages, outcome);
+        if outcome.changed_packages() {
+            self.queue.push_check();
+        }
         let approved = update::auto_approvals(outcome, self.config.auto_approve_scripts);
         if let Some((title, body)) = update::toast(outcome) {
             platform::notify(title, &body).ok();
         }
         if !approved.is_empty() {
-            self.recheck_after_retry |= outcome.changed_packages();
             self.start_approvals(approved);
             return;
         }
@@ -577,12 +639,7 @@ impl App {
                 .ok();
             }
         }
-        let carried = std::mem::take(&mut self.recheck_after_retry);
-        if outcome.changed_packages() || carried {
-            self.start_check();
-        } else {
-            self.render();
-        }
+        self.run_next();
     }
 
     fn on_removed(&mut self, target: &RemoveTarget, ok: bool) {
@@ -597,7 +654,8 @@ impl App {
             )
             .ok();
         }
-        self.start_check();
+        self.queue.push_check();
+        self.run_next();
     }
 
     fn toggle_autostart(&mut self) {
@@ -618,6 +676,7 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            &self.queue,
             &self.approvals,
             &self.in_use,
             self.available_release.as_ref(),
@@ -641,6 +700,7 @@ impl App {
         let view = view_of(
             &self.packages,
             self.activity.as_ref(),
+            &self.queue,
             &self.approvals,
             &self.in_use,
             self.available_release.as_ref(),
@@ -665,7 +725,7 @@ impl App {
             Some(Activity::Updating { batch }) => {
                 progress::level(batch.done(), batch.total(), self.elapsed())
             }
-            Some(Activity::Checking | Activity::SelfUpdate | Activity::Removing { .. }) => {
+            Some(Activity::Checking { .. } | Activity::SelfUpdate | Activity::Removing { .. }) => {
                 progress::creep(self.elapsed())
             }
             None => 0.0,
@@ -714,6 +774,7 @@ fn open_diagnostic(path: &Path, empty: &str) {
 fn view_of<'a>(
     packages: &'a [Package],
     activity: Option<&'a Activity>,
+    queue: &'a Queue,
     approvals: &'a [Blocked],
     in_use: &'a [InUse],
     release: Option<&'a Release>,
@@ -725,6 +786,7 @@ fn view_of<'a>(
     View {
         packages,
         activity,
+        queue,
         approvals,
         in_use,
         self_update: install::managed_by().map_or_else(

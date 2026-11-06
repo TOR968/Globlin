@@ -1,5 +1,6 @@
 use super::*;
 use crate::model::{Status, UpdateTarget};
+use crate::queue;
 use semver::Version;
 
 fn package(name: &str, source: SourceKind, status: Status) -> Package {
@@ -25,6 +26,7 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>, frame: u32)
     View {
         packages,
         activity,
+        queue: &queue::IDLE,
         approvals: &[],
         in_use: &[],
         autostart: false,
@@ -43,6 +45,7 @@ fn updating_view(activity: &Activity, elapsed: Duration) -> View<'_> {
     View {
         packages: &[],
         activity: Some(activity),
+        queue: &queue::IDLE,
         approvals: &[],
         in_use: &[],
         autostart: false,
@@ -325,7 +328,7 @@ fn a_batch_update_headline_shows_a_one_based_counter() {
 
 #[test]
 fn the_dots_grow_then_reset_so_the_header_animates() {
-    let activity = Activity::Checking;
+    let activity = Activity::Checking { source: None };
     let rendered: Vec<String> = (0..8)
         .map(|frame| headline(&view(&[], Some(&activity), frame)))
         .collect();
@@ -507,7 +510,9 @@ fn a_package_batch_and_a_self_update_never_share_a_headline() {
     let self_update_headline = headline(&view(&[], Some(&self_update), 0));
 
     assert_ne!(batch_headline, self_update_headline);
-    assert!(!headline(&view(&[], Some(&Activity::Checking), 0)).contains("Globlin"));
+    assert!(
+        !headline(&view(&[], Some(&Activity::Checking { source: None }), 0)).contains("Globlin")
+    );
 }
 
 #[test]
@@ -540,6 +545,7 @@ fn the_self_update_controls_live_inside_a_submenu_named_after_the_running_versio
     let self_view = View {
         packages: &[],
         activity: None,
+        queue: &queue::IDLE,
         approvals: &[],
         in_use: &[],
         autostart: false,
@@ -590,6 +596,7 @@ fn a_winget_managed_install_offers_no_self_update_and_no_auto_update() {
     let winget_view = View {
         packages: &[],
         activity: None,
+        queue: &queue::IDLE,
         approvals: &[],
         in_use: &[],
         autostart: false,
@@ -660,7 +667,7 @@ fn removing_and_checking_never_share_a_headline() {
 
     assert_ne!(
         headline(&view(&[], Some(&activity), 0)),
-        headline(&view(&[], Some(&Activity::Checking), 0))
+        headline(&view(&[], Some(&Activity::Checking { source: None }), 0))
     );
 }
 
@@ -786,5 +793,20 @@ fn the_winget_one_prompt_id_parses_back_to_its_action() {
     assert_eq!(
         Action::from_key(ID_WINGET_ONE_PROMPT),
         Some(Action::ToggleWingetOnePrompt)
+    );
+}
+
+#[test]
+fn the_check_headline_names_the_package_manager_it_is_reading() {
+    let headline_for = |source| {
+        let activity = Activity::Checking { source };
+        headline(&view(&[], Some(&activity), 0))
+    };
+
+    assert_eq!(headline_for(None), "Checking for updates");
+    assert_eq!(headline_for(Some(SourceKind::Winget)), "Checking winget");
+    assert_eq!(
+        headline_for(Some(SourceKind::Skills)),
+        "Updating skills via npx"
     );
 }

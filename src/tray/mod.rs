@@ -3,13 +3,14 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 use crate::icon::{self, IconState, Look};
 use crate::platform;
+use crate::queue;
 use crate::Result;
 
 mod menu;
 
 pub use menu::{
     approve_id, close_update_id, dismiss_id, headline, ignore_id, key_of, remove_id, source_id,
-    update_id, Action, SelfUpdate, View,
+    target_key, update_id, Action, SelfUpdate, View,
 };
 
 pub struct Tray {
@@ -24,6 +25,7 @@ impl Tray {
         let view = View {
             packages: &[],
             activity: None,
+            queue: &queue::IDLE,
             approvals: &[],
             in_use: &[],
             autostart: false,

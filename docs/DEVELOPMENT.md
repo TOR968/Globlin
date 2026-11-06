@@ -63,7 +63,7 @@ kills it — on Windows with `taskkill /T`, so the `node` behind a `.cmd` shim g
 `LISTING_LIMIT` (two minutes, for listings and `npm config`) or `CHANGE_LIMIT` (thirty minutes, for
 updates and uninstalls, because `cargo install` compiles) runs out. `Activity` is the global busy lock and
 only a worker's terminal message clears it, so one hung child used to disable Check, Update and Uninstall
-until Globlin was restarted. The go source also sets `GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never`,
+until Globlin was restarted — and would now leave every queued job waiting behind it. The go source also sets `GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never`,
 so `go list -m <private module>@latest` fails at once instead of waiting on a credential prompt.
 
 **A failed listing is an error, not an empty source.** `source::listed` turns a listing whose command
@@ -310,6 +310,11 @@ Claude Code updates its marketplace plugins itself.
   it — so `installed()` runs `npx --yes skills update <every non-ignored name> -g -y` and then re-reads the
   lock. A skill that has fallen behind is therefore installed by the check itself, on every check, and
   shows up already `Current`; the window's **Update** button for a skill only matters after a failed run.
+  So the user still sees it happen, the headline reads *Updating skills via npx…* while that run is in
+  flight (see the phase below), and `installed()` compares each entry's hash in the lock before and after
+  the run (`with_previous`): a changed one carries `Installed.previous`, `check::refreshed` turns it into
+  `<name> <old> → <new>`, and `on_checked` raises one *Globlin — skills updated* toast with those lines.
+  A skill new to the lock, or one with an empty hash, has no old hash and is not reported.
   This replaced Globlin's own `GET /repos/<source>/git/trees/…` lookups (`registry::github_trees`, gone):
   the CLI makes the same anonymous requests, but on a spent 60-per-hour limit it falls back to
   `GITHUB_TOKEN`, `GH_TOKEN` and then `gh auth token`, and it also checks `git` sources by cloning them.
@@ -397,8 +402,8 @@ interval.
 Switching a source on or off, and un-ignoring a package, does not start a check. It applies locally at
 once (a switched-off source's rows are dropped) and moves `next_check` to `now + SETTLE_DELAY` (2 s), so
 every further click pushes it out again and a run of toggles costs one check, not one per click. The same
-move covers a toggle made while a job is already running: the old code called `start_check`, which returned
-early on a busy `activity` and left the new source unchecked until the next scheduled interval. Because
+move covers a toggle made while a job is already running: `next_check` is already in the past when the job
+ends, so the check runs right after it. Because
 such an in-flight check was started with the old `Config`, `on_checked` drops rows from sources the
 current config has switched off.
 
@@ -406,6 +411,39 @@ When an update finishes, `update::mark_updated` sets every package in `Outcome.u
 target version before the follow-up check starts. Without it the window spent that check showing the
 same `old → new` rows under *Checking for updates*, which read as if nothing had been updated. The check
 still runs and corrects any package whose manager installed something other than the target.
+
+**A check names the source it is reading.** `check::run` takes an `announce` callback; `collect` calls it
+with each source's kind before `installed()`, and with `None` once listing is done and the registry
+lookups start. The worker forwards it as `Message::Checking`, which only rewrites
+`Activity::Checking { source }` — no render, because the next animation frame re-texts the header and
+the window's `tick` carries the headline. `tray::headline` reads *Checking winget…*, *Updating skills via
+npx…* for skills (its listing is the CLI's update), and *Checking for updates…* otherwise. Sources are
+listed one after another, so the name is always the one actually running.
+
+**A click while something runs is queued, never refused.** `App.queue` (`queue.rs`) holds the jobs asked
+for while `activity` is `Some`: `start_update`, `start_remove` and `start_self_update` push onto it instead
+of returning early, and `start_check` sets a flag (one asked for during a check is dropped, since that
+check is the answer). Every terminal message — `on_checked`, `on_updated`, `on_removed`, `on_replaced` —
+ends in `run_next`, which starts queued jobs in the order they were asked for, then a waiting self-update,
+then the re-check. So the follow-up check after an update or an uninstall runs once, after the last
+queued job, not between each. `push_update` drops a target still waiting or running in the batch (a row
+the batch already finished, failed for instance, can be queued again) or already queued, and
+`push_remove` does the same for uninstalls; the page also disables a row's own button once it is
+pending. The window sees the queue through `View.queue`: `Row.pending` (`update`/`uninstall`) tags the
+row, and while a batch runs `batch_rows` appends the queued targets as `queued` rows, so the hero's
+*Updating N of M* counts them. The page keeps the update groups under the batch, minus the rows the
+batch holds (`BatchRow.key`), so more updates can be queued while one runs. A self-update relaunches the
+process, which drops whatever is still queued; that is why it runs after every queued job. Jobs are not
+re-resolved against a newer check before they run — the targets keep the versions they were queued
+with, and the package manager installs its latest anyway.
+
+**winget packages with an `Unknown` version are ignored on their own.** winget reports `Unknown` for a
+program it found in the registry but cannot version (`source::winget` drops the `ARP\` ones outright and
+marks the rest `external`, which reads `Unknown`). winget can never upgrade them, so after each check
+`check::ignore_unversioned` adds every winget package still `Unknown` to `Config.ignore` and records the
+name in `Config.auto_ignored`. A name already in `auto_ignored` is skipped, so un-ignoring one sticks: it
+stays `Unknown` and shows `?`. Only winget is touched — an `Unknown` from any other source can mean a
+registry that did not answer, and hiding that would break the rule that a failure never reads as fine.
 
 **The page is the only document the view will ever show.** `window::is_own_page` accepts `about:blank`
 and `data:text/html…` — what WebView2 reports for `with_html` (navigation is the `data:` URL, IPC
@@ -642,8 +680,8 @@ to beat.
 `activity = Some(..)` on the main thread before spawning a worker, and clears it only when the worker's
 terminal `Message` arrives (`app.rs:170`, cleared at `app.rs:312`). Under `abort` a panic in a worker
 takes the process down — loud, and obvious to the user. Under unwind it kills only that thread: the
-message is never sent, `activity` stays `Some` forever, `start_check` and `start_update` return early
-from then on, and `next_wake` stays pinned at `now + 120 ms`, so the app spins at 8 fps doing nothing
+message is never sent, `activity` stays `Some` forever, every `start_*` only adds to `App.queue` from
+then on, and `next_wake` stays pinned at `now + 120 ms`, so the app spins at 8 fps doing nothing
 until it is killed. A silent permanent hang is worse than a crash. The exposure is small — the only
 `unwrap` outside tests and `icon/` writes to a `String` and cannot fail — but if `panic = "abort"` is ever
 restored, or a fallible `unwrap` is added to a worker path, that interaction is what to think about.
@@ -1084,7 +1122,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-663 tests on Windows: 632 run by default (no network, no side effects), 31 `#[ignore]`d because they
+678 tests on Windows: 647 run by default (no network, no side effects), 31 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
