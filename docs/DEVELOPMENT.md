@@ -1060,8 +1060,10 @@ it. The trusted comment carries `version:<semver>`, and `verify_signature` refus
 version is not the one `offer` read from the release tag, so the signed files of an older release
 cannot be replayed under a newer tag (prefixed or not). Releases up to v0.4.22 carry no version; a
 build that checks for it does not accept them, which is the point. The publish job runs in the `release`
-environment and first refuses a tag whose commit is not on `origin/master`; keep `MINISIGN_SECRET_KEY`
-as a secret of that environment (required reviewer, `v*` tags only), not of the repository.
+environment, which deploys only from `v*` tags and needs no manual approval, and first refuses a tag
+whose commit is not on `origin/master`. The `Release tags` ruleset lets only admins create, move or
+delete a tag, so release-plz's token (acting as the maintainer) still tags. `MINISIGN_SECRET_KEY` is a
+repository secret today; moving it onto the `release` environment hides it from every other workflow.
 The publish job fails rather than publish unsigned files when the secret is missing. The private key
 exists only in that secret and in the maintainer's offline backup; **losing it means shipping a build with
 a new public key, which every installed copy will refuse until the user downloads it by hand**, so the
