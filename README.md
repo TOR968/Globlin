@@ -237,8 +237,8 @@ The window puts updates first:
   of the batch. When a winget update fails while programs from its folder are running (Git's installer
   and an open terminal, or ChatGPT's background service), the row reads *in use: bash ×9* and offers
   **Close & update**: it closes those programs without saving anything — stopping a service asks for an
-  administrator — and updates. It never runs on its own, not even from **Update
-  all**, and nothing is restarted afterwards. A winget package whose installed version winget itself reports as `Unknown` reads *not
+  administrator — updates, and starts again the programs you had open. It never runs on its own, not
+  even from **Update all**. A winget package whose installed version winget itself reports as `Unknown` reads *not
   checked*, since winget refuses to upgrade it anyway. An entry winget only found in *Installed apps*
   with no version at all (Steam games, for one) is left out of the list: its own launcher keeps it current.
 - A desktop notification only fires when the set of outdated packages *changes*, so it won't nag about
