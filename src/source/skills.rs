@@ -99,7 +99,8 @@ impl PackageSource for Skills {
     }
 
     fn installed(&self) -> Result<Vec<Installed>> {
-        let names = self.names_to_check(&parse_lock(&fs::read_to_string(&self.lock)?)?);
+        let before = parse_lock(&fs::read_to_string(&self.lock)?)?;
+        let names = self.names_to_check(&before);
         let run = self
             .check_command(&names)
             .and_then(|mut command| {
@@ -107,7 +108,7 @@ impl PackageSource for Skills {
             })
             .map(|output| Run::read(&stdout_text(&output), names));
         let entries = parse_lock(&fs::read_to_string(&self.lock)?)?;
-        Ok(resolve(&entries, run.as_ref()))
+        Ok(with_previous(&before, resolve(&entries, run.as_ref())))
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
@@ -250,6 +251,20 @@ fn resolve(entries: &[Entry], run: Option<&Run>) -> Vec<Installed> {
                 Some(run) if run.confirms(entry) => installed,
                 _ => installed.with_external(true),
             }
+        })
+        .collect()
+}
+
+fn with_previous(before: &[Entry], installed: Vec<Installed>) -> Vec<Installed> {
+    installed
+        .into_iter()
+        .map(|item| {
+            let previous = before
+                .iter()
+                .find(|entry| entry.name == item.name)
+                .map(|entry| short(&entry.folder_hash))
+                .filter(|hash| !hash.is_empty() && *hash != item.version);
+            item.with_previous(previous)
         })
         .collect()
 }

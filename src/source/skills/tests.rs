@@ -328,3 +328,36 @@ fn the_real_skills_cli_updates_and_lists_without_a_prompt() {
         .iter()
         .any(|skill| skill.name == target));
 }
+
+#[test]
+fn a_skill_whose_folder_hash_changed_during_the_check_carries_its_old_hash() {
+    let before = entries();
+    let mut after = entries();
+    let moved = after
+        .iter_mut()
+        .find(|entry| entry.name == "n8n-loops-official")
+        .unwrap();
+    moved.folder_hash = "abcdef0123456789".to_string();
+
+    let listed = with_previous(&before, resolve(&after, None));
+
+    let previous = |name: &str| {
+        listed
+            .iter()
+            .find(|skill| skill.name == name)
+            .unwrap()
+            .previous
+            .clone()
+    };
+    assert_eq!(previous("n8n-loops-official").as_deref(), Some("1111111"));
+    assert_eq!(previous("n8n-agents-official"), None);
+    assert_eq!(previous("my-local"), None);
+}
+
+#[test]
+fn a_skill_installed_during_the_check_has_no_old_hash() {
+    let after = entries();
+    let listed = with_previous(&[], resolve(&after, None));
+
+    assert!(listed.iter().all(|skill| skill.previous.is_none()));
+}

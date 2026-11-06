@@ -560,6 +560,10 @@
         border-color: var(--control-hover);
       }
 
+      .tag.pending {
+        color: var(--sky-text);
+      }
+
       .update-row .act.armed,
       .tag.in-use {
         color: var(--red-text);
@@ -1309,7 +1313,9 @@
         return state.status === "all" || row.status === state.status;
       };
 
-      const selectable = (row) => row.status === "outdated";
+      const inBatch = (row) => state.snapshot.batch.some((entry) => entry.key === row.key);
+
+      const selectable = (row) => row.status === "outdated" && !row.pending && !inBatch(row);
 
       const groupBy = (rows, keyOf) => {
         const groups = new Map();
@@ -1387,19 +1393,16 @@
 
       const applyBusy = () => {
         const snapshot = state.snapshot;
-        const busy = snapshot.busy;
-        el("check").disabled = busy;
         const updatable = snapshot.packages.filter(selectable).length;
         const all = el("update-all");
         all.textContent = updatable ? "Update all (" + updatable + ")" : "Update all";
-        all.disabled = busy || !updatable;
-        all.hidden = snapshot.batch.length > 0 || !updatable;
+        all.disabled = !updatable;
+        all.hidden = !updatable;
         const chosen = chosenRows();
         const some = el("update-selected");
-        some.hidden = updatable < 2 || snapshot.batch.length > 0;
+        some.hidden = updatable < 2;
         some.textContent = chosen.length ? "Update " + chosen.length + " selected" : "Update selected";
-        some.disabled = busy || !chosen.length;
-        for (const node of document.querySelectorAll("#approvals .btn.primary")) node.disabled = busy;
+        some.disabled = !chosen.length;
       };
 
       const chosenRows = () =>
@@ -1464,13 +1467,16 @@
           tag.title = "The last update failed while these programs were running from its folder.";
           cell.append(tag);
         }
+        if (row.pending) {
+          const tag = make("span", "tag pending", row.pending + " queued");
+          tag.title = "Starts as soon as the work in progress is done.";
+          cell.append(tag);
+        }
         return cell;
       };
 
       const ignoreButton = (row) => {
-        const ignore = button("link", row.status === "ignored" ? "Unignore" : "Ignore", () => send(row.ignore_id));
-        ignore.disabled = state.snapshot.busy;
-        return ignore;
+        return button("link", row.status === "ignored" ? "Unignore" : "Ignore", () => send(row.ignore_id));
       };
 
       const removeButton = (row) => {
@@ -1484,7 +1490,7 @@
             draw();
           }
         });
-        remove.disabled = state.snapshot.busy;
+        remove.disabled = row.pending === "uninstall";
         return remove;
       };
 
@@ -1506,11 +1512,10 @@
 
       const updateRow = (row) => {
         const line = make("div", "update-row");
-        const busy = state.snapshot.busy;
         const box = make("input");
         box.type = "checkbox";
         box.setAttribute("aria-label", "Select " + row.name);
-        box.disabled = busy || !selectable(row);
+        box.disabled = !selectable(row);
         box.checked = selectable(row) && state.selected.has(row.key);
         box.onchange = () => {
           if (box.checked) state.selected.add(row.key);
@@ -1518,31 +1523,29 @@
           applyBusy();
         };
         const action = row.in_use ? closeButton(row) : button("act", "Update", () => send(row.update_id));
-        action.disabled = busy;
+        action.disabled = Boolean(row.pending);
         line.append(box, nameCell(row), versionCell(row), action, ignoreButton(row), removeButton(row));
         return line;
       };
 
       const renderUpdateGroups = (host) => {
         const packages = state.snapshot.packages;
-        const rows = packages.filter((row) => row.status === "outdated" && matches(row));
+        const rows = packages.filter((row) => row.status === "outdated" && matches(row) && !inBatch(row));
         const anyOutdated = packages.some((row) => row.status === "outdated");
         if (!rows.length) {
-          if (anyOutdated && state.status !== "current" && state.status !== "unknown" && state.status !== "ignored") {
+          if (!state.snapshot.batch.length && anyOutdated && state.status !== "current" && state.status !== "unknown" && state.status !== "ignored") {
             host.append(make("div", "empty", "No updates match the search."));
           }
           return;
         }
         for (const [source, members] of groupBy(rows, (row) => row.source)) {
           const key = "updates:" + source;
-          const keys = members.map((row) => row.key);
+          const keys = members.filter(selectable).map((row) => row.key);
           const elevation = members[0].elevation;
           const note = plural(members.length, "update", "updates") + (elevation ? " · " + elevation.label : "");
           const { head, open } = groupHead(key, true, source, note);
           if (elevation) head.title = elevation.detail;
-          const go = button("btn small", "Update " + keys.length, () => send("update-many:" + keys.join("|")));
-          go.disabled = state.snapshot.busy;
-          head.append(go);
+          if (keys.length) head.append(button("btn small", "Update " + keys.length, () => send("update-many:" + keys.join("|"))));
           host.append(head);
           if (!open) continue;
           const shown = state.more.has(key) ? members : members.slice(0, LIMIT);
@@ -1600,8 +1603,8 @@
         applyBusy();
         const host = el("groups");
         host.replaceChildren();
-        if (state.snapshot.batch.length) renderBatchGroups(host);
-        else renderUpdateGroups(host);
+        renderBatchGroups(host);
+        renderUpdateGroups(host);
         state.batchShape = shapeOf(state.snapshot.batch);
       };
 
@@ -1728,7 +1731,6 @@
           : "Installs new Globlin releases in the background, verified against their signature.";
         el("self-row").hidden = !snapshot.self_update;
         if (snapshot.self_update) el("self-label").textContent = "Globlin " + snapshot.self_update + " is available";
-        el("self-update").disabled = snapshot.busy;
         el("settings-version").textContent = "Globlin v" + snapshot.version;
 
         const host = el("source-list");
@@ -1742,7 +1744,6 @@
           const toggle = button("switch", "", () => send(source.id));
           toggle.setAttribute("aria-labelledby", label.id);
           setSwitch(toggle, source.enabled);
-          toggle.disabled = snapshot.busy;
           line.append(toggle);
           host.append(line);
         }
@@ -1753,7 +1754,6 @@
         el("version").textContent = "Globlin v" + snapshot.version + (snapshot.managed_by ? " · installed with " + snapshot.managed_by : "");
         const self = el("footer-self");
         self.hidden = !snapshot.self_update;
-        self.disabled = snapshot.busy;
         if (snapshot.self_update) self.textContent = "Update Globlin → " + snapshot.self_update;
       };
 
@@ -1786,7 +1786,6 @@
           const buttons = make("div", "buttons");
           const later = button("btn", "Not now", () => send(entry.dismiss_id));
           const allow = button("btn primary", "Allow and update", () => send(entry.approve_id));
-          allow.disabled = state.snapshot.busy;
           buttons.append(later, allow);
           card.append(title, note, list, buttons);
           dialog.append(card);

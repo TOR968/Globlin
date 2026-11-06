@@ -5,7 +5,7 @@ use semver::Version;
 use crate::config::Config;
 use crate::diagnostics;
 use crate::install;
-use crate::model::{Catalog, Installed, Package, Status};
+use crate::model::{Catalog, Installed, Package, SourceKind, Status};
 use crate::registry;
 use crate::selfupdate::{self, Release};
 use crate::source::{self, PackageSource};
@@ -15,6 +15,7 @@ use crate::Result;
 pub struct Report {
     pub packages: Result<Vec<Package>>,
     pub skipped: Vec<String>,
+    pub refreshed: Vec<String>,
     pub release: Option<Release>,
 }
 
@@ -33,29 +34,35 @@ struct Latest {
     crates: HashMap<String, Version>,
 }
 
-pub fn run(config: &Config) -> Report {
+pub fn run(config: &Config, announce: impl Fn(Option<SourceKind>)) -> Report {
     let release = if install::managed_by().is_some() {
         None
     } else {
         look_up_release(selfupdate::latest())
     };
-    let (packages, skipped) = match collect_packages(config) {
-        Ok((packages, skipped)) => (Ok(packages), skipped),
-        Err(error) => (Err(error), Vec::new()),
+    let (packages, skipped, refreshed) = match collect_packages(config, &announce) {
+        Ok((packages, skipped, refreshed)) => (Ok(packages), skipped, refreshed),
+        Err(error) => (Err(error), Vec::new(), Vec::new()),
     };
     Report {
         packages,
         skipped,
+        refreshed,
         release,
     }
 }
 
-fn collect_packages(config: &Config) -> Result<(Vec<Package>, Vec<String>)> {
+fn collect_packages(
+    config: &Config,
+    announce: &impl Fn(Option<SourceKind>),
+) -> Result<(Vec<Package>, Vec<String>, Vec<String>)> {
     let sources = source::enabled(config)?;
     let Listing {
         installed,
         mut skipped,
-    } = collect(&sources)?;
+    } = collect(&sources, announce)?;
+    announce(None);
+    let refreshed = refreshed(&installed);
     let names = |catalog| lookup_names(&installed, config, catalog);
     let latest = Latest {
         npm: reachable(registry::npm_latest(&names(Catalog::Npm)), &mut skipped),
@@ -75,7 +82,17 @@ fn collect_packages(config: &Config) -> Result<(Vec<Package>, Vec<String>)> {
         .map(|item| classify(item, config, &latest))
         .collect();
     diagnostics::record_snapshot(&packages);
-    Ok((packages, skipped))
+    Ok((packages, skipped, refreshed))
+}
+
+fn refreshed(installed: &[Installed]) -> Vec<String> {
+    installed
+        .iter()
+        .filter_map(|item| {
+            let previous = item.previous.as_ref()?;
+            Some(format!("{} {previous} → {}", item.name, item.version))
+        })
+        .collect()
 }
 
 fn reachable<T>(
@@ -100,9 +117,13 @@ fn look_up_release(outcome: Result<Option<Release>>) -> Option<Release> {
     }
 }
 
-fn collect(sources: &[Box<dyn PackageSource>]) -> Result<Listing> {
+fn collect(
+    sources: &[Box<dyn PackageSource>],
+    announce: &impl Fn(Option<SourceKind>),
+) -> Result<Listing> {
     let mut listing = Listing::default();
     for source in sources {
+        announce(Some(source.kind()));
         match source.installed() {
             Ok(found) => listing.installed.extend(found),
             Err(error) => listing
@@ -117,6 +138,23 @@ fn collect(sources: &[Box<dyn PackageSource>]) -> Result<Listing> {
         .installed
         .sort_by(|left, right| (&left.name, left.source).cmp(&(&right.name, right.source)));
     Ok(listing)
+}
+
+pub fn ignore_unversioned(packages: &mut [Package], config: &mut Config) -> bool {
+    let mut changed = false;
+    for package in packages
+        .iter_mut()
+        .filter(|package| package.source == SourceKind::Winget && package.status == Status::Unknown)
+    {
+        if config.auto_ignored.contains(&package.name) {
+            continue;
+        }
+        config.auto_ignored.push(package.name.clone());
+        config.set_ignored(&package.name, true);
+        package.status = Status::Ignored;
+        changed = true;
+    }
+    changed
 }
 
 fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> Vec<String> {

@@ -1,5 +1,4 @@
 use super::*;
-use crate::model::SourceKind;
 
 fn installed(name: &str, version: &str) -> Installed {
     Installed::new(name, version, SourceKind::Npm)
@@ -147,6 +146,7 @@ fn a_failed_package_check_still_carries_the_release() {
     let report = Report {
         packages: Err("npm is not installed".into()),
         skipped: Vec::new(),
+        refreshed: Vec::new(),
         release: Some(release.clone()),
     };
     assert!(report.packages.is_err());
@@ -353,7 +353,7 @@ fn a_source_that_cannot_be_listed_does_not_hide_the_others() {
         listed(SourceKind::Go, Ok(vec!["gopls"])),
     ];
 
-    let listing = collect(&sources).unwrap();
+    let listing = collect(&sources, &|_| {}).unwrap();
     let names: Vec<&str> = listing
         .installed
         .iter()
@@ -377,7 +377,7 @@ fn the_check_fails_only_when_no_source_could_be_listed() {
         listed(SourceKind::Pnpm, Err("pnpm crashed")),
     ];
 
-    let error = collect(&sources).err().unwrap().to_string();
+    let error = collect(&sources, &|_| {}).err().unwrap().to_string();
 
     assert!(error.contains("npm: EOF while parsing"), "{error}");
     assert!(error.contains("pnpm: pnpm crashed"), "{error}");
@@ -390,7 +390,7 @@ fn sources_that_list_nothing_without_failing_are_an_empty_success() {
         listed(SourceKind::Cargo, Ok(Vec::new())),
     ];
 
-    let listing = collect(&sources).unwrap();
+    let listing = collect(&sources, &|_| {}).unwrap();
 
     assert!(listing.installed.is_empty());
     assert!(listing.skipped.is_empty());
@@ -480,5 +480,85 @@ fn a_skill_marked_external_reads_unknown_and_an_offered_hash_reads_outdated() {
         Status::Outdated {
             latest: "9d1e4a2".to_string()
         }
+    );
+}
+
+fn winget_package(name: &str, status: Status) -> Package {
+    Package {
+        name: name.to_string(),
+        current: "Unknown".to_string(),
+        source: SourceKind::Winget,
+        status,
+    }
+}
+
+#[test]
+fn a_winget_package_with_no_version_to_compare_is_ignored_on_its_own() {
+    let mut config = Config::default();
+    let mut packages = vec![
+        winget_package("Vendor.Tool", Status::Unknown),
+        winget_package("Other.Tool", Status::Current),
+    ];
+
+    assert!(ignore_unversioned(&mut packages, &mut config));
+
+    assert_eq!(packages[0].status, Status::Ignored);
+    assert_eq!(packages[1].status, Status::Current);
+    assert!(config.is_ignored("Vendor.Tool"));
+    assert!(!config.is_ignored("Other.Tool"));
+}
+
+#[test]
+fn an_unknown_package_from_another_source_is_never_ignored_on_its_own() {
+    let mut config = Config::default();
+    let mut packages = vec![Package {
+        source: SourceKind::Npm,
+        ..winget_package("left-pad", Status::Unknown)
+    }];
+
+    assert!(!ignore_unversioned(&mut packages, &mut config));
+
+    assert_eq!(packages[0].status, Status::Unknown);
+    assert!(!config.is_ignored("left-pad"));
+}
+
+#[test]
+fn a_winget_package_the_user_unignored_stays_unignored() {
+    let mut config = Config::default();
+    let mut packages = vec![winget_package("Vendor.Tool", Status::Unknown)];
+    ignore_unversioned(&mut packages, &mut config);
+    config.set_ignored("Vendor.Tool", false);
+    let mut rechecked = vec![winget_package("Vendor.Tool", Status::Unknown)];
+
+    assert!(!ignore_unversioned(&mut rechecked, &mut config));
+
+    assert_eq!(rechecked[0].status, Status::Unknown);
+    assert!(!config.is_ignored("Vendor.Tool"));
+}
+
+#[test]
+fn a_package_that_changed_during_the_listing_is_reported_from_and_to() {
+    let items = vec![
+        Installed::new("pdf", "e4f5g6h", SourceKind::Skills)
+            .with_previous(Some("a1b2c3d".to_string())),
+        Installed::new("docx", "0c9d8e7", SourceKind::Skills),
+    ];
+
+    assert_eq!(refreshed(&items), ["pdf a1b2c3d → e4f5g6h"]);
+}
+
+#[test]
+fn each_source_is_announced_before_it_is_listed() {
+    let sources = vec![
+        listed(SourceKind::Npm, Err("npm crashed")),
+        listed(SourceKind::Skills, Ok(vec!["pdf"])),
+    ];
+    let announced = std::cell::RefCell::new(Vec::new());
+
+    collect(&sources, &|source| announced.borrow_mut().push(source)).unwrap();
+
+    assert_eq!(
+        announced.into_inner(),
+        [Some(SourceKind::Npm), Some(SourceKind::Skills)]
     );
 }

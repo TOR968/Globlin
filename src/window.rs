@@ -3,7 +3,10 @@ use std::cmp::Reverse;
 use serde::Serialize;
 
 use crate::config::Config;
-use crate::model::{Activity, Batch, Blocked, InUse, Package, RowState, SourceKind, Status, KINDS};
+use crate::model::{
+    Activity, Batch, Blocked, InUse, Package, RowState, SourceKind, Status, UpdateTarget, KINDS,
+};
+use crate::queue::Pending;
 use crate::tray::{self, SelfUpdate, View};
 
 mod shell;
@@ -49,6 +52,7 @@ pub struct Row {
     pub status: &'static str,
     pub elevation: Option<Elevation>,
     pub in_use: Option<InUseTag>,
+    pub pending: Option<&'static str>,
     pub update_id: String,
     pub ignore_id: String,
     pub remove_id: String,
@@ -78,6 +82,7 @@ pub struct SourceRow {
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct BatchRow {
+    pub key: String,
     pub name: String,
     pub source: &'static str,
     pub from: String,
@@ -137,20 +142,15 @@ fn snapshot_on(view: &View, config: &Config, os: &str) -> Snapshot {
         monochrome_icon: config.monochrome_icon,
         self_update,
         managed_by,
-        packages: package_rows(view.packages, &sources, config, view.in_use),
+        packages: package_rows(view, &sources, config),
         sources,
         batch: batch_rows(view),
         approvals: view.approvals.iter().map(approval_row).collect(),
     }
 }
 
-fn package_rows(
-    packages: &[Package],
-    sources: &[SourceRow],
-    config: &Config,
-    in_use: &[InUse],
-) -> Vec<Row> {
-    let mut ordered: Vec<&Package> = packages.iter().collect();
+fn package_rows(view: &View, sources: &[SourceRow], config: &Config) -> Vec<Row> {
+    let mut ordered: Vec<&Package> = view.packages.iter().collect();
     ordered.sort_by_key(|package| {
         (
             sources
@@ -161,11 +161,11 @@ fn package_rows(
     });
     ordered
         .into_iter()
-        .map(|package| row(package, config, in_use))
+        .map(|package| row(package, config, view))
         .collect()
 }
 
-fn row(package: &Package, config: &Config, in_use: &[InUse]) -> Row {
+fn row(package: &Package, config: &Config, view: &View) -> Row {
     Row {
         key: tray::key_of(package),
         name: package.name.clone(),
@@ -174,10 +174,15 @@ fn row(package: &Package, config: &Config, in_use: &[InUse]) -> Row {
         latest: package.latest().map(ToString::to_string),
         status: package.status.label(),
         elevation: elevation(package.source, config),
-        in_use: in_use
+        in_use: view
+            .in_use
             .iter()
             .find(|entry| entry.target.is(&package.name, package.source))
             .map(in_use_tag),
+        pending: view
+            .queue
+            .pending(&package.name, package.source, view.activity)
+            .map(Pending::label),
         update_id: tray::update_id(package),
         ignore_id: tray::ignore_id(package),
         remove_id: tray::remove_id(package),
@@ -267,18 +272,27 @@ fn batch_rows(view: &View) -> Vec<BatchRow> {
     let Some(Activity::Updating { batch }) = view.activity else {
         return Vec::new();
     };
-    batch
+    let running = batch
         .targets
         .iter()
         .enumerate()
-        .map(|(position, target)| BatchRow {
-            name: target.name.clone(),
-            source: target.source.label(),
-            from: target.from.clone(),
-            to: target.to.clone(),
-            state: state_label(batch, position),
-        })
-        .collect()
+        .map(|(position, target)| batch_row(target, state_label(batch, position)));
+    let waiting = view
+        .queue
+        .queued_updates()
+        .map(|target| batch_row(target, "queued"));
+    running.chain(waiting).collect()
+}
+
+fn batch_row(target: &UpdateTarget, state: &'static str) -> BatchRow {
+    BatchRow {
+        key: tray::target_key(target),
+        name: target.name.clone(),
+        source: target.source.label(),
+        from: target.from.clone(),
+        to: target.to.clone(),
+        state,
+    }
 }
 
 fn approval_row(blocked: &Blocked) -> ApprovalRow {

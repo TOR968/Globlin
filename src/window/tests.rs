@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use super::*;
 use crate::config::Sources;
-use crate::model::{Batch, Blocked, BlockedScript, InUse, UpdateTarget};
+use crate::model::{Batch, Blocked, BlockedScript, InUse, RemoveTarget, UpdateTarget};
+use crate::queue::{self, Queue};
 
 fn package(name: &str, source: SourceKind, status: Status) -> Package {
     Package {
@@ -27,6 +28,7 @@ fn view<'a>(packages: &'a [Package], activity: Option<&'a Activity>) -> View<'a>
     View {
         packages,
         activity,
+        queue: &queue::IDLE,
         approvals: &[],
         in_use: &[],
         autostart: true,
@@ -283,6 +285,7 @@ fn a_batch_row_carries_its_target_apart_so_the_window_can_group_it_by_source() {
     assert_eq!(
         snapshot.batch,
         vec![BatchRow {
+            key: "bun:docx".to_string(),
             name: "docx".to_string(),
             source: "bun",
             from: "9.9.0".to_string(),
@@ -292,9 +295,82 @@ fn a_batch_row_carries_its_target_apart_so_the_window_can_group_it_by_source() {
     );
 }
 
+fn npm_target(name: &str) -> UpdateTarget {
+    UpdateTarget {
+        name: name.to_string(),
+        source: SourceKind::Npm,
+        from: "1.2.3".to_string(),
+        to: "2.0.0".to_string(),
+    }
+}
+
+#[test]
+fn updates_queued_behind_a_running_batch_follow_it_as_queued_rows() {
+    let activity = Activity::Updating {
+        batch: Batch::new(vec![npm_target("alpha")]),
+    };
+    let mut waiting = Queue::new();
+    waiting.push_update(vec![npm_target("beta")], Vec::new(), false, Some(&activity));
+    let view = View {
+        queue: &waiting,
+        ..view(&[], Some(&activity))
+    };
+
+    let snapshot = snapshot(&view, &config());
+
+    let rows: Vec<(&str, &str)> = snapshot
+        .batch
+        .iter()
+        .map(|row| (row.key.as_str(), row.state))
+        .collect();
+    assert_eq!(rows, [("npm:alpha", "active"), ("npm:beta", "queued")]);
+}
+
+#[test]
+fn a_package_waiting_in_the_queue_reaches_the_page_marked_pending() {
+    let packages = [
+        outdated("alpha", SourceKind::Npm, "2.0.0"),
+        package("beta", SourceKind::Npm, Status::Current),
+        package("gamma", SourceKind::Npm, Status::Current),
+    ];
+    let activity = Activity::Checking { source: None };
+    let mut waiting = Queue::new();
+    waiting.push_update(
+        vec![npm_target("alpha")],
+        Vec::new(),
+        false,
+        Some(&activity),
+    );
+    waiting.push_remove(
+        RemoveTarget {
+            name: "beta".to_string(),
+            source: SourceKind::Npm,
+        },
+        Some(&activity),
+    );
+    let view = View {
+        queue: &waiting,
+        ..view(&packages, Some(&activity))
+    };
+
+    let snapshot = snapshot(&view, &config());
+
+    let pending = |name: &str| {
+        snapshot
+            .packages
+            .iter()
+            .find(|row| row.name == name)
+            .and_then(|row| row.pending)
+    };
+    assert_eq!(pending("alpha"), Some("update"));
+    assert_eq!(pending("beta"), Some("uninstall"));
+    assert_eq!(pending("gamma"), None);
+    assert!(snapshot.batch.is_empty());
+}
+
 #[test]
 fn the_tick_carries_only_what_the_animation_changes() {
-    let activity = Activity::Checking;
+    let activity = Activity::Checking { source: None };
     let update = tick(&view(&[], Some(&activity)));
 
     assert!(update.busy);
@@ -307,6 +383,7 @@ fn a_winget_managed_install_tells_the_window_not_to_offer_self_updates() {
     let managed = View {
         packages: &[],
         activity: None,
+        queue: &queue::IDLE,
         approvals: &[],
         in_use: &[],
         autostart: false,
