@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::config::Config;
 use crate::model::{BlockedScript, Installed, Refusal, SourceKind, KINDS};
 use crate::process;
-use crate::Result;
+use crate::{platform, Result};
 
 mod brew;
 mod bun;
@@ -297,7 +297,19 @@ pub(crate) fn plain_name(name: &str) -> Option<&str> {
 }
 
 pub(crate) fn quoted(text: &str) -> String {
-    format!("'{}'", text.replace('\'', "''"))
+    let mut escaped = String::with_capacity(text.len() + 2);
+    escaped.push('\'');
+    for glyph in text.chars() {
+        if matches!(
+            glyph,
+            '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}'
+        ) {
+            escaped.push(glyph);
+        }
+        escaped.push(glyph);
+    }
+    escaped.push('\'');
+    escaped
 }
 
 pub(crate) fn pinned_to(name: &str, version: &str) -> String {
@@ -319,13 +331,17 @@ pub(crate) fn hidden_command(program: &Path) -> Command {
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     let mut command = Command::new(program);
-    command.creation_flags(CREATE_NO_WINDOW);
+    command
+        .creation_flags(CREATE_NO_WINDOW)
+        .current_dir(platform::data_dir());
     command
 }
 
 #[cfg(not(windows))]
 pub(crate) fn hidden_command(program: &Path) -> Command {
-    Command::new(program)
+    let mut command = Command::new(program);
+    command.current_dir(platform::data_dir());
+    command
 }
 
 #[derive(Deserialize)]

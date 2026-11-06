@@ -361,7 +361,9 @@ const LOCK: &str = r#"{
 fn origins(registry: Option<&str>) -> Origins {
     Origins {
         root: None,
-        registry: registry.map(str::to_owned),
+        registries: registry
+            .map(|registry| BTreeMap::from([("registry".to_owned(), registry.to_owned())]))
+            .unwrap_or_default(),
         lock: parse_lock(LOCK).unwrap(),
     }
 }
@@ -378,16 +380,68 @@ fn only_packages_resolved_from_the_registry_are_checked_against_it() {
 }
 
 #[test]
-fn a_registry_prefix_must_end_at_a_path_boundary() {
+fn a_public_registry_prefix_must_end_at_a_path_boundary() {
+    assert!(resolves_publicly(
+        "https://registry.npmjs.org/x/-/x-1.0.0.tgz"
+    ));
+    assert!(!resolves_publicly(
+        "https://registry.npmjs.org.evil.example/x/-/x-1.0.0.tgz"
+    ));
+}
+
+#[test]
+fn every_package_npm_would_install_from_a_private_registry_is_external() {
+    let origins = origins(Some("https://npm.corp.example/"));
+
+    assert!(origins.is_external("prettier"));
+    assert!(origins.is_external("never-locked"));
+}
+
+#[test]
+fn a_scoped_private_registry_makes_only_its_own_scope_external() {
     let origins = Origins {
-        registry: Some("https://npm.corp.example/team".to_owned()),
+        registries: parse_registries(
+            r#"{"registry": "https://registry.npmjs.org/", "@corp:registry": "https://npm.corp.example/", "json": true}"#,
+        ),
         ..Origins::default()
     };
 
-    assert!(origins.resolves_through_registry("https://npm.corp.example/team/x/-/x-1.0.0.tgz"));
-    assert!(
-        !origins.resolves_through_registry("https://npm.corp.example/team-evil/x/-/x-1.0.0.tgz")
+    assert!(origins.is_external("@corp/cli"));
+    assert!(!origins.is_external("@other/cli"));
+    assert!(!origins.is_external("prettier"));
+}
+
+#[test]
+fn only_registry_settings_are_read_from_the_npm_config() {
+    let registries = parse_registries(
+        r#"{"registry": "https://registry.npmjs.org/", "@corp:registry": "https://npm.corp.example/", "prefix": "C:\\npm", "@corp:_authToken": "secret"}"#,
     );
+
+    assert_eq!(
+        registries.keys().collect::<Vec<_>>(),
+        vec!["@corp:registry", "registry"]
+    );
+}
+
+#[test]
+fn an_alias_installed_under_another_name_is_external() {
+    let root = std::env::temp_dir().join("globlin-npm-alias");
+    for (folder, name) in [("tool", "other-package"), ("plain", "plain")] {
+        let dir = root.join(folder);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            format!(r#"{{"name": "{name}", "version": "1.0.0"}}"#),
+        )
+        .unwrap();
+    }
+    let origins = Origins {
+        root: Some(root),
+        ..Origins::default()
+    };
+
+    assert!(origins.is_external("tool"));
+    assert!(!origins.is_external("plain"));
 }
 
 #[test]
@@ -421,6 +475,21 @@ fn a_downloaded_npm_override_is_not_trusted() {
 
     assert!(!trusted_override(&marked));
     assert!(trusted_override(&clean));
+}
+
+#[cfg(windows)]
+#[test]
+fn an_npm_override_on_a_network_path_is_not_trusted() {
+    for remote in [
+        r"\\attacker.example\share\npm.cmd",
+        r"\\attacker.example@SSL\DavWWWRoot\npm.cmd",
+        r"\\?\UNC\attacker.example\share\npm.cmd",
+        r"\\?\GLOBALROOT\Device\Mup\attacker.example\share\npm.cmd",
+        "npm.cmd",
+    ] {
+        assert!(!trusted_override(Path::new(remote)), "{remote}");
+    }
+    assert!(trusted_override(Path::new(r"C:\tools\npm.cmd")));
 }
 
 #[test]

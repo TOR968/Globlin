@@ -80,9 +80,11 @@ impl SourceKind {
             Self::Pipx => Catalog::PyPi,
             Self::Dotnet => Catalog::NuGet,
             Self::PsGallery => Catalog::PsGallery,
-            Self::Uv | Self::Scoop | Self::Go | Self::Gem | Self::Brew => Catalog::SelfResolved,
+            Self::Uv | Self::Scoop | Self::Go | Self::Gem | Self::Brew | Self::Choco => {
+                Catalog::SelfResolved
+            }
             Self::Cargo => Catalog::Crates,
-            Self::Winget | Self::Choco | Self::Skills => Catalog::SelfReported,
+            Self::Winget | Self::Skills => Catalog::SelfReported,
         }
     }
 

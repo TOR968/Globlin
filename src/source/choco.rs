@@ -12,6 +12,7 @@ use crate::Result;
 const EXECUTABLE: &str = "choco";
 
 const LOCAL_ONLY_UNTIL: u64 = 2;
+const REPORT_EXIT_CODES: [i32; 2] = [0, 2];
 
 const SHELLS: [&str; 2] = ["powershell", "pwsh"];
 const REBOOT_PENDING: &str = "1641, 3010";
@@ -56,6 +57,18 @@ impl Choco {
             .unwrap_or_default()
     }
 
+    fn outdated_report(&self) -> Option<String> {
+        run_listing(hidden_command(&self.command).args(["outdated", "-r", "--ignore-pinned"]))
+            .ok()
+            .filter(|output| {
+                output
+                    .status
+                    .code()
+                    .is_some_and(|code| REPORT_EXIT_CODES.contains(&code))
+            })
+            .map(|output| stdout_text(&output))
+    }
+
     fn list_arguments(&self) -> Vec<&'static str> {
         if major_version(&self.run(&["--version"])).unwrap_or(LOCAL_ONLY_UNTIL) < LOCAL_ONLY_UNTIL {
             vec!["list", "-r", "--local-only"]
@@ -72,9 +85,9 @@ impl PackageSource for Choco {
 
     fn installed(&self) -> Result<Vec<Installed>> {
         let listing = run_listing(hidden_command(&self.command).args(self.list_arguments()))?;
-        let outdated = self.run(&["outdated", "-r", "--ignore-pinned"]);
+        let outdated = self.outdated_report();
         listed(
-            merge(&stdout_text(&listing), &outdated),
+            merge(&stdout_text(&listing), outdated.as_deref()),
             "choco list",
             &listing,
         )
@@ -107,12 +120,17 @@ fn major_version(raw: &str) -> Option<u64> {
         .ok()
 }
 
-fn merge(listing: &str, outdated: &str) -> Vec<Installed> {
-    let upgrades = parse_outdated(outdated);
+fn merge(listing: &str, outdated: Option<&str>) -> Vec<Installed> {
+    let upgrades = outdated.map(parse_outdated);
     parse_listing(listing)
         .into_iter()
         .map(|installed| {
-            let available = upgrades.get(&installed.name).cloned();
+            let available = upgrades.as_ref().map(|upgrades| {
+                upgrades
+                    .get(&installed.name)
+                    .cloned()
+                    .unwrap_or_else(|| installed.version.clone())
+            });
             installed.with_available(available)
         })
         .collect()

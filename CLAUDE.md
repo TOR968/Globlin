@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 678 tests (647 run, 31 ignored) on Windows, no network, no side effects
+cargo test                     # 694 tests (663 run, 31 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -102,11 +102,11 @@ from and what its absence means. Five are remote and resolved in `registry.rs` f
 megabytes), `NuGet` (dotnet — the flat-container index) and `PsGallery` (psgallery — the version read
 from the package endpoint's 302 `Location`, no body downloaded); the last three compare with
 `registry::numeric_is_newer`, because PEP 440 and NuGet are not semver. Two are filled by the source into
-`Installed.available`, and they differ only in what `None` means: `SelfReported` (winget, choco, skills) —
-`None` is "no upgrade"; `SelfResolved` (uv, scoop, go, gem, brew) — the source always fills the version it
+`Installed.available`, and they differ only in what `None` means: `SelfReported` (winget, skills) —
+`None` is "no upgrade"; `SelfResolved` (uv, scoop, go, gem, brew, choco) — the source always fills the version it
 compared against, so `None` can only mean it could not find out, and reads `Unknown`. uv and gem are
 `SelfResolved` because their outdated reports list *only* outdated packages, so a failed report and an
-up-to-date machine would otherwise look identical. `check.rs` must never send `Git.Git` to
+up-to-date machine would otherwise look identical; choco joined them for the same reason. `check.rs` must never send `Git.Git` to
 registry.npmjs.org. A version that cannot be compared reads `Unknown`, never `Current`. The model stores
 versions as `String`, because winget and choco emit `1.2.3.4` and `2024.01.15`, which are not semver
 and must still be displayable. The full endpoint rationale is in `docs/DEVELOPMENT.md#seven-catalogs`.

@@ -43,8 +43,8 @@ version to compare against come from, and what does its absence mean?*
 | `PyPi` | pipx | `registry::pypi_latest`, the RSS release feed | `registry::numeric_is_newer` |
 | `NuGet` | dotnet | `registry::nuget_latest`, the flat-container `index.json` | `registry::numeric_is_newer` |
 | `PsGallery` | psgallery | `registry::psgallery_latest`, the package endpoint's redirect | `registry::numeric_is_newer` |
-| `SelfResolved` | uv, scoop, go, gem, brew | the source fills `Installed.available` | `registry::is_newer`, falling back to inequality |
-| `SelfReported` | winget, choco, skills | the source fills `Installed.available` | presence |
+| `SelfResolved` | uv, scoop, go, gem, brew, choco | the source fills `Installed.available` | `registry::is_newer`, falling back to inequality |
+| `SelfReported` | winget, skills | the source fills `Installed.available` | presence |
 
 The first five are remote: the source reports only what is installed, and `check.rs` asks the registry
 for the union of names in that catalog. A name the registry did not answer for is `Unknown`, never
@@ -66,6 +66,19 @@ only a worker's terminal message clears it, so one hung child used to disable Ch
 until Globlin was restarted — and would now leave every queued job waiting behind it. The go source also sets `GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never`,
 so `go list -m <private module>@latest` fails at once instead of waiting on a credential prompt.
 
+**Every child process runs in the data directory.** `source::hidden_command` sets `current_dir` to
+`platform::data_dir()`, never the directory Globlin was started from. That one is the Downloads folder
+for a double-clicked portable exe and whatever repository a terminal was in, and the children trust it:
+an npm `.cmd` shim with no `node.exe` beside it runs a bare `node` that `cmd.exe` looks up in the current
+directory first, the scoop shim does the same with `pwsh`, and `npx` loads that directory's `.npmrc`,
+`node_modules/.bin` and `.npm-extension.cjs`.
+
+**The exe resolves its DLLs from System32 only.** `.cargo/config.toml` links the MSVC CRT statically, so
+the exe imports no `VCRUNTIME140*.dll`, and `build.rs` links with `/DEPENDENTLOADFLAG:0x800`
+(`LOAD_LIBRARY_SEARCH_SYSTEM32`), so the loader resolves the rest — `dwmapi.dll`, `comctl32.dll`,
+`bcrypt.dll`, none of them KnownDLLs — from System32 instead of the exe's own folder. A portable copy
+sits in Downloads, where a planted `dwmapi.dll` would otherwise run inside Globlin before `main`.
+
 **A failed listing is an error, not an empty source.** `source::listed` turns a listing whose command
 exited non-zero *and* produced no rows into `"<command> listed nothing and <status>: <stderr>"`, which
 `check.rs` reports as skipped. Rows from a command that exited badly are kept — `npm ls -g` and
@@ -75,10 +88,11 @@ exited non-zero *and* produced no rows into `"<command> listed nothing and <stat
 looked and found no upgrade — `winget list` simply has no `Available` cell for that row. For
 `SelfResolved`, the source always fills `available` with the version it compared against, the installed
 one included, so `None` can only mean it could not find out — and that reads `Unknown`. uv and gem are
-here rather than beside winget because `uv tool list --outdated` and `gem outdated` list *only* the
-outdated packages: a failed run and an up-to-date machine would otherwise print the same empty report.
+here rather than beside winget because `uv tool list --outdated`, `gem outdated` and `choco outdated -r`
+list *only* the outdated packages: a failed run and an up-to-date machine would otherwise print the same empty report.
 Both sources therefore run the plain listing and the outdated report separately, and a non-zero exit
-from the report leaves every package unresolved. scoop resolves against the local bucket manifest and go
+from the report leaves every package unresolved (choco also accepts exit code 2, which
+`useEnhancedExitCodes` returns when something is outdated, and a timed-out report counts as failed). scoop resolves against the local bucket manifest and go
 against `go list -m <module>@latest`; a missing manifest or an offline proxy is `None` for the same
 reason. A resolved version that differs from the installed one is `Outdated` only when it is not older:
 `registry::is_newer` compares as semver (a leading `v` stripped) and then numerically, and an install
@@ -90,10 +104,16 @@ still read `Outdated` when they differ, since the tool itself reported them.
 an npm-family package that did not come from the registry Globlin would compare it against (and a
 winget row whose installed version is `Unknown`, see [Refusals](#refusals-that-are-not-failures)), and
 `check.rs` leaves it out of the registry request and reads it as `Unknown`, which also means it never
-gets an **Update** button. npm reads `<npm root -g>/.package-lock.json`: an entry marked `link`, or one
-whose `resolved` URL is neither `https://registry.npmjs.org/` nor the configured `npm config get
-registry`, is external (a scoped private registry, a git URL, a tarball, `npm link`, `npm i -g ./dir`);
-with no lockfile entry, a symlink in the global `node_modules` is. bun and yarn read the spec in their
+gets an **Update** button. For npm, a package is external when the registry npm would install it from
+— its `@scope:registry`, else `registry`, both read from one `npm config ls --json` — is not
+registry.npmjs.org or one of its public mirrors (registry.npmmirror.com, registry.yarnpkg.com): Globlin
+compares against public npm, and a private registry that also proxies npmjs would otherwise install a
+public package squatting the private name. So is a folder whose `package.json` names another package (an
+`npm i -g tool@npm:other` alias), and a symlink (`npm link`, `npm i -g ./dir`). npm 7 and later write
+no hidden lockfile for `-g` and no `_resolved` into `package.json`, so a global installed from a git URL
+or a tarball cannot be told apart from a registry one; npm 12 refuses those installs by default
+(`allow-git`, `allow-remote`). When a `<npm root -g>/.package-lock.json` does exist, an entry marked
+`link`, or one whose `resolved` URL is not under one of those public registries, is external too. bun and yarn read the spec in their
 global `package.json` — anything containing `:` or `/` (`file:`, `link:`, `github:`, `npm:` aliases,
 URLs, `user/repo`) is external. pnpm already drops such entries, because their version is not semver.
 Before this, a public package squatting the name of a private or linked tool at a higher version showed
@@ -845,7 +865,9 @@ Things about the environment the code has to work around, all verified rather th
   *remote* community feed — thousands of packages — and the local set needs `--local-only`; in 2.x that
   flag is gone and `choco list -r` is local. Guessing wrong is not a small error, so the source reads
   `choco --version` first and picks the argument list from the major version. `choco outdated -r` is
-  stable across both and supplies the upgrades, merged onto the listing by name.
+  stable across both and supplies the upgrades, merged onto the listing by name. It prints only the
+  outdated packages, so choco is `SelfResolved`: a report that fails or times out leaves every package
+  `Unknown` instead of reading as an up-to-date machine.
 
 ## The landing page
 
@@ -1024,8 +1046,16 @@ look for names that no longer exist and stop finding updates, so they have to in
 everything from 0.4.0 on updates itself through `SHA256SUMS`.
 
 `.github/minisign-sign.py` writes the prehashed (`ED`, BLAKE2b-512) format `minisign -V` and the
-`minisign-verify` crate read, from the `MINISIGN_SECRET_KEY` repository secret — base64 of an 8-byte key
-id followed by the 32-byte Ed25519 seed, not minisign's own encrypted key file, so CI needs no password.
+`minisign-verify` crate read, from the `MINISIGN_SECRET_KEY` secret — base64 of an 8-byte key id
+followed by the 32-byte Ed25519 seed, not minisign's own encrypted key file, so CI needs no password.
+It uses the Python standard library only (RFC 8032 Ed25519, checked against the RFC's first test vector
+before every run): the step that holds the key installs nothing, so no PyPI package can run code beside
+it. The trusted comment carries `version:<semver>`, and `verify_signature` refuses a signature whose
+version is not the one `offer` read from the release tag, so the signed files of an older release
+cannot be replayed under a newer tag (prefixed or not). Releases up to v0.4.22 carry no version; a
+build that checks for it does not accept them, which is the point. The publish job runs in the `release`
+environment and first refuses a tag whose commit is not on `origin/master`; keep `MINISIGN_SECRET_KEY`
+as a secret of that environment (required reviewer, `v*` tags only), not of the repository.
 The publish job fails rather than publish unsigned files when the secret is missing. The private key
 exists only in that secret and in the maintainer's offline backup; **losing it means shipping a build with
 a new public key, which every installed copy will refuse until the user downloads it by hand**, so the
@@ -1122,7 +1152,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-678 tests on Windows: 647 run by default (no network, no side effects), 31 `#[ignore]`d because they
+694 tests on Windows: 663 run by default (no network, no side effects), 31 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
@@ -1182,7 +1212,7 @@ determining versions.
   The `publish` job then refuses to continue if the tag does not match the `version` in `Cargo.toml`, so
   a `v0.2.0` tag on a `0.1.0` manifest fails instead of publishing a mislabelled build, builds
   `globlin-setup-x64.exe` and `globlin-setup-arm64.exe` from the two binaries (Inno Setup is preinstalled
-  on `windows-latest`; `build-installer.ps1` falls back to `choco install innosetup`), scans them too,
+  on `windows-latest`, and `build-installer.ps1` fails rather than fetch an unpinned copy), scans them too,
   and creates one GitHub Release with fourteen files. Twelve are the release proper: the two installers
   and the two portable `.exe`s; the `build-macos` job's `globlin-macos-apple-silicon.zip`; the
   `build-linux` jobs' two `.deb`, two `.rpm` and two `.AppImage` files (no VirusTotal scan for the macOS
@@ -1410,7 +1440,10 @@ Experimental, x64 and ARM64, shipped as a deb and an rpm.
   the AUR smoke tests now run `ldd /usr/bin/globlin` and fail on any `not found`.
 - **Tray.** `tray-icon` uses Ayatana/libappindicator, which reports no clicks — any click opens the menu,
   and **Open Globlin** is the way to the window. GNOME shows no tray at all without the AppIndicator
-  extension.
+  extension. It hands the indicator host every icon frame as a PNG file, so `Tray::new` names the
+  directory: `$XDG_RUNTIME_DIR/tray-icon`, or `<data dir>/tray-icon` when that variable is unset. The
+  crate's own fallback is a shared `/tmp/tray-icon` it writes into by predictable name, following
+  symlinks, so another local user who created it first could aim Globlin's writes at the victim's files.
 - **Notifications** go through `notify-rust` over D-Bus with a `default` action, so clicking the body
   fires the shared hook that opens the window (on desktops whose notification server supports actions).
 - **Single instance and "show the window"** — the shared `globlin.lock`, plus a Unix socket,

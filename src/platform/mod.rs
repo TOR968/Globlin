@@ -40,6 +40,18 @@ fn notification_clicked() {
     }
 }
 
+#[cfg(windows)]
+pub fn downloaded(path: &std::path::Path) -> bool {
+    let mut stream = path.as_os_str().to_owned();
+    stream.push(":Zone.Identifier");
+    std::path::Path::new(&stream).exists()
+}
+
+#[cfg(not(windows))]
+pub fn downloaded(_path: &std::path::Path) -> bool {
+    false
+}
+
 pub fn data_dir() -> PathBuf {
     let dir = if cfg!(test) {
         std::env::temp_dir().join(TEST_DATA_DIR)

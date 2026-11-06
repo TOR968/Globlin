@@ -358,13 +358,17 @@ fn an_apple_silicon_build_updates_from_the_app_bundle_archive() {
     assert!(!is_bundle_archive(X64_ASSET));
 }
 
-const TEST_KEY: &str = "RWQBAgMEBQYHCAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4";
+const TEST_KEY: &str = "RWQBAgMEBQYHCEg7kxgTCKCJnoP+m+x3ivX5yBhYm7e0d0wGl5xSNRWo";
 const TEST_PAYLOAD: &[u8] = b"globlin signed payload\n";
 const TEST_SIGNATURE: &str = "untrusted comment: signature from the Globlin release key
-RUQBAgMEBQYHCN3Ym7l77bIICJUAhd6tO6IOyFAd/AdFw85eXSMkje3hkTaFvzFBADKYxxbPCkW3gj5XSRHIy6ok7Rm7q3rKYw8=
-trusted comment: timestamp:1791676683\tfile:payload.bin\thashed
-aP6o1JiJTh21SJbDwfjHHkVkwp6LQ54WlQVNvNQPiJopPRdrxeCHdEMSswrikEsLxuMvw/b6CI2slt12VDxXBg==
+RUQBAgMEBQYHCN6N6CId08Gn6ChmKz5Hbqice1LziqzWuYKztEVnBojSM9r2KYElQX7jIhMaNkmSXRDiDwTNBb4MgphqUNLX2ws=
+trusted comment: timestamp:1791676683\tfile:payload.bin\tversion:0.2.0\thashed
++o+oQf9ckyYPRdKUWk21pK0WX+fEWL892ALcOE3bIQ12z+M8TFb9yAO8u+LMeKGKV7/4U5Z+NlBhU9nNfvJQAQ==
 ";
+
+fn signed() -> Version {
+    Version::new(0, 2, 0)
+}
 
 #[test]
 fn the_signature_asset_is_offered_beside_the_binary() {
@@ -378,21 +382,26 @@ fn the_signature_asset_is_offered_beside_the_binary() {
 
 #[test]
 fn a_signature_made_by_the_release_signer_verifies() {
-    verify_signature(TEST_PAYLOAD, TEST_SIGNATURE, TEST_KEY).unwrap();
+    verify_signature(TEST_PAYLOAD, TEST_SIGNATURE, TEST_KEY, &signed()).unwrap();
 }
 
 #[test]
 fn a_binary_that_was_altered_after_signing_is_refused() {
-    let error = verify_signature(b"globlin signed payload!\n", TEST_SIGNATURE, TEST_KEY)
-        .unwrap_err()
-        .to_string();
+    let error = verify_signature(
+        b"globlin signed payload!\n",
+        TEST_SIGNATURE,
+        TEST_KEY,
+        &signed(),
+    )
+    .unwrap_err()
+    .to_string();
 
     assert!(error.contains("does not match"), "{error}");
 }
 
 #[test]
 fn a_signature_from_another_key_is_refused() {
-    assert!(verify_signature(TEST_PAYLOAD, TEST_SIGNATURE, RELEASE_PUBLIC_KEY).is_err());
+    assert!(verify_signature(TEST_PAYLOAD, TEST_SIGNATURE, RELEASE_PUBLIC_KEY, &signed()).is_err());
 }
 
 #[test]
@@ -403,14 +412,25 @@ fn the_embedded_release_key_parses() {
 const TEST_SUMS: &str =
     "fd4480655eef515505bce10a51b6fe850aa90f96dc629e1609a9add10dd33ecc  globlin.exe\n";
 const TEST_SUMS_SIGNATURE: &str = "untrusted comment: signature from the Globlin release key
-RUQBAgMEBQYHCK8/wx82j0oHtKJd/99IvK8HBCRioXDJp6e+uOkM31uL78ucoE0i0vevTyT8sasSjYLHpp2skFCb5cNvbso3bAg=
+RUQBAgMEBQYHCBM2AMDy1a2bBhORkczTQWynPJ8sut7UO1fbWmCTdycCceGvtKSmlh7QFX/3jXskIcIQtPjD7qfrb0E0prJcJQY=
+trusted comment: timestamp:1791688336\tfile:SHA256SUMS\tversion:0.2.0\thashed
+J9PpYCB66EdHcrAXwhSmTiK4VpwRpqxPV+CJlXeEa/6PPKyA4U26vlR6UCrnmrpc7vyTAhFWKZUDdJ33J6Y/CA==
+";
+const UNVERSIONED_SUMS_SIGNATURE: &str = "untrusted comment: signature from the Globlin release key
+RUQBAgMEBQYHCBM2AMDy1a2bBhORkczTQWynPJ8sut7UO1fbWmCTdycCceGvtKSmlh7QFX/3jXskIcIQtPjD7qfrb0E0prJcJQY=
 trusted comment: timestamp:1791688336\tfile:SHA256SUMS\thashed
-7sY4oB6xo6de2DvK2HJoCu/YuGPjFw0oMXkM6MXbmyB4H99/pyNAqsXqGt3kyCE50su2E2kzCyIZSsVWGb1ADg==
+Ql/npCk15/GEMQk6a62nJX/3jfZXDM06X7dOhNc9zDz63O0AEigTzADABK0Su2vvADw74SXZSBXOLXpdi/MjAg==
 ";
 
 #[test]
 fn a_signed_sums_file_vouches_for_the_binary_it_lists() {
-    verify_signature(TEST_SUMS.as_bytes(), TEST_SUMS_SIGNATURE, TEST_KEY).unwrap();
+    verify_signature(
+        TEST_SUMS.as_bytes(),
+        TEST_SUMS_SIGNATURE,
+        TEST_KEY,
+        &signed(),
+    )
+    .unwrap();
     verify(TEST_PAYLOAD, TEST_SUMS, X64_ASSET).unwrap();
 }
 
@@ -418,7 +438,42 @@ fn a_signed_sums_file_vouches_for_the_binary_it_lists() {
 fn a_sums_file_edited_after_signing_is_refused() {
     let forged = TEST_SUMS.replace("fd44", "0d44");
 
-    assert!(verify_signature(forged.as_bytes(), TEST_SUMS_SIGNATURE, TEST_KEY).is_err());
+    assert!(verify_signature(forged.as_bytes(), TEST_SUMS_SIGNATURE, TEST_KEY, &signed()).is_err());
+}
+
+#[test]
+fn a_signed_sums_file_from_another_release_is_refused_under_a_newer_tag() {
+    for tag in ["v99.0.0", "99.0.0"] {
+        let release = offer(&location(tag), &current(), X64_ASSET).unwrap();
+
+        let error = verify_signature(
+            TEST_SUMS.as_bytes(),
+            TEST_SUMS_SIGNATURE,
+            TEST_KEY,
+            &release.version,
+        )
+        .unwrap_err()
+        .to_string();
+
+        assert!(
+            error.contains("is for 0.2.0, not the offered 99.0.0"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn a_signature_that_names_no_version_is_refused() {
+    let error = verify_signature(
+        TEST_SUMS.as_bytes(),
+        UNVERSIONED_SUMS_SIGNATURE,
+        TEST_KEY,
+        &signed(),
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(error.contains("does not name the version"), "{error}");
 }
 
 #[test]

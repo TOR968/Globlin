@@ -198,7 +198,7 @@ fn the_npm_registry_and_the_self_reporting_sources_are_told_apart() {
     assert_eq!(SourceKind::Pnpm.catalog(), Catalog::Npm);
     assert_eq!(SourceKind::Yarn.catalog(), Catalog::Npm);
     assert_eq!(SourceKind::Winget.catalog(), Catalog::SelfReported);
-    assert_eq!(SourceKind::Choco.catalog(), Catalog::SelfReported);
+    assert_eq!(SourceKind::Choco.catalog(), Catalog::SelfResolved);
 }
 
 #[test]
