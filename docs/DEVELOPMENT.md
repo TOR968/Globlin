@@ -954,7 +954,10 @@ the scope, which is why it is not optional.
 the Start menu, a pinned icon or the exe, so the window opens once the `App` exists. **Background** —
 `--background`, which every autostart entry carries (the `Run` value `set_autostart` writes, the
 installer's autostart task, the macOS LaunchAgent): tray only. **Replaced** — `--replaced`, self-update's
-relaunch: tray only, plus the "updated" notification; it wins over `--background`.
+relaunch: the "updated" notification, and it wins over `--background`. It stays tray-only unless the old
+instance's window was visible when the update finished. Then `on_replaced` adds `--window`, and the new
+instance opens the window again. Without that, an update made from the window looked like Globlin had
+quit, because it came back only as a tray or menu-bar icon.
 
 An Opened start that loses the single-instance race does not just exit, which is what made a pinned icon
 look dead while Globlin sat in the tray: on Windows it sets the auto-reset event `Local\globlin-show`,
@@ -1160,7 +1163,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-695 tests on Windows: 664 run by default (no network, no side effects), 31 `#[ignore]`d because they
+696 tests on Windows: 665 run by default (no network, no side effects), 31 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the

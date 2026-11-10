@@ -55,13 +55,13 @@ const CLAIM_PAUSE: Duration = Duration::from_millis(200);
 enum Launch {
     Opened,
     Background,
-    Replaced,
+    Replaced { window: bool },
 }
 
 fn main() {
     platform::prepare_environment();
     let launch = launch_kind(std::env::args());
-    let replaced = launch == Launch::Replaced;
+    let replaced = matches!(launch, Launch::Replaced { .. });
     if !claim(replaced) {
         if launch == Launch::Opened {
             platform::signal_running_instance();
@@ -77,19 +77,29 @@ fn main() {
         )
         .ok();
     }
-    run(launch == Launch::Opened);
+    run(matches!(
+        launch,
+        Launch::Opened | Launch::Replaced { window: true }
+    ));
 }
 
 fn launch_kind<S: AsRef<str>>(args: impl Iterator<Item = S>) -> Launch {
-    let mut launch = Launch::Opened;
+    let (mut replaced, mut window, mut background) = (false, false, false);
     for argument in args {
         match argument.as_ref() {
-            selfupdate::RESTART_FLAG => return Launch::Replaced,
-            platform::BACKGROUND_FLAG => launch = Launch::Background,
+            selfupdate::RESTART_FLAG => replaced = true,
+            selfupdate::WINDOW_FLAG => window = true,
+            platform::BACKGROUND_FLAG => background = true,
             _ => {}
         }
     }
-    launch
+    if replaced {
+        Launch::Replaced { window }
+    } else if background {
+        Launch::Background
+    } else {
+        Launch::Opened
+    }
 }
 
 fn refresh_autostart() {

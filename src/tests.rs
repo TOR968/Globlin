@@ -21,7 +21,7 @@ fn the_background_flag_marks_an_autostart_launch() {
 fn only_the_restart_flag_marks_a_replaced_launch() {
     assert_eq!(
         launch_kind(["globlin.exe", selfupdate::RESTART_FLAG].iter()),
-        Launch::Replaced
+        Launch::Replaced { window: false }
     );
     assert_eq!(
         launch_kind(
@@ -32,6 +32,33 @@ fn only_the_restart_flag_marks_a_replaced_launch() {
             ]
             .iter()
         ),
-        Launch::Replaced
+        Launch::Replaced { window: false }
+    );
+}
+
+#[test]
+fn a_relaunch_reopens_the_window_only_when_the_window_flag_is_passed() {
+    assert_eq!(
+        launch_kind(
+            [
+                "globlin.exe",
+                selfupdate::RESTART_FLAG,
+                selfupdate::WINDOW_FLAG
+            ]
+            .iter()
+        ),
+        Launch::Replaced { window: true }
+    );
+    assert_eq!(
+        launch_kind(
+            [
+                "globlin.exe",
+                selfupdate::WINDOW_FLAG,
+                platform::BACKGROUND_FLAG,
+                selfupdate::RESTART_FLAG
+            ]
+            .iter()
+        ),
+        Launch::Replaced { window: true }
     );
 }
