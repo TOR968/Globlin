@@ -312,9 +312,11 @@ fn should_discard_staged(current: &Path) -> bool {
 }
 
 pub fn relaunch() -> Result<()> {
-    Command::new(platform::program_path()?)
-        .arg(RESTART_FLAG)
-        .spawn()?;
+    let mut command = Command::new(platform::program_path()?);
+    command.arg(RESTART_FLAG);
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
+    command.spawn()?;
     Ok(())
 }
 

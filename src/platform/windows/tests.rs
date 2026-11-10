@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn com_stays_up_after_a_worker_thread_uninitializes_the_last_apartment() {
+    use windows_sys::Win32::System::Com::{
+        CoGetApartmentType, CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED,
+    };
+
+    keep_multithreaded_apartment();
+    std::thread::spawn(|| unsafe {
+        CoInitializeEx(std::ptr::null(), COINIT_MULTITHREADED as u32);
+        CoUninitialize();
+    })
+    .join()
+    .unwrap();
+
+    let apartment = std::thread::spawn(|| {
+        let (mut kind, mut qualifier) = (0, 0);
+        unsafe { CoGetApartmentType(&raw mut kind, &raw mut qualifier) }
+    })
+    .join()
+    .unwrap();
+    assert_eq!(
+        apartment, 0,
+        "a thread with no COM of its own found no apartment to join"
+    );
+}
+
+#[test]
 #[ignore = "writes to the HKCU Run key: cargo test -- --ignored --exact platform::windows::tests::autostart_round_trips_through_the_run_key"]
 fn autostart_round_trips_through_the_run_key() {
     let was_enabled = autostart_enabled();
