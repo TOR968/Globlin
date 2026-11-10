@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.25](https://github.com/TOR968/Globlin/compare/v0.4.24...v0.4.25) - 2026-11-10
+
+### Fixed
+
+- reopen the window after a self-update when it was open before
+
 ## [0.4.24](https://github.com/TOR968/Globlin/compare/v0.4.23...v0.4.24) - 2026-11-10
 
 ### Fixed
