@@ -30,6 +30,7 @@ const SHOW_EVENT: &str = r"Local\globlin-show";
 const SETUP_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{380BD341-81C1-4AC3-AA2E-BC70BE5CC8F7}_is1";
 
 pub fn prepare_environment() {
+    keep_multithreaded_apartment();
     restore_profile_variables();
     let registered: Vec<String> = [
         registry_value(HKEY_LOCAL_MACHINE, SYSTEM_ENVIRONMENT, "Path"),
@@ -44,6 +45,13 @@ pub fn prepare_environment() {
         "PATH",
         append_missing_paths(&current, &registered.join(";")),
     );
+}
+
+fn keep_multithreaded_apartment() {
+    use windows_sys::Win32::System::Com::CoIncrementMTAUsage;
+
+    let mut cookie = std::ptr::null_mut();
+    unsafe { CoIncrementMTAUsage(&raw mut cookie) };
 }
 
 fn restore_profile_variables() {

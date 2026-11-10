@@ -1029,6 +1029,12 @@ A successful swap restarts the app itself: it spawns the new `.exe` with `--repl
 process waits up to 10 seconds (50 attempts, 200 ms apart) for the single-instance mutex the old process is
 still holding while it shuts down, then raises a `Globlin — updated / now running <version>` toast.
 
+On macOS and Linux the new process is spawned in a process group of its own (`process_group(0)`). A
+Globlin started at login is a launchd job (the LaunchAgent), and when a job's main process exits, launchd
+kills every process left in its process group unless the plist sets `AbandonProcessGroup`. A child
+spawned in the parent's group therefore died with the old instance, and the user saw Globlin quit and
+never come back after an update.
+
 ### The release signature
 
 A checksum published in the same release as the binary proves the download is intact, not that the
@@ -1054,8 +1060,10 @@ it. The trusted comment carries `version:<semver>`, and `verify_signature` refus
 version is not the one `offer` read from the release tag, so the signed files of an older release
 cannot be replayed under a newer tag (prefixed or not). Releases up to v0.4.22 carry no version; a
 build that checks for it does not accept them, which is the point. The publish job runs in the `release`
-environment and first refuses a tag whose commit is not on `origin/master`; keep `MINISIGN_SECRET_KEY`
-as a secret of that environment (required reviewer, `v*` tags only), not of the repository.
+environment, which deploys only from `v*` tags and needs no manual approval, and first refuses a tag
+whose commit is not on `origin/master`. The `Release tags` ruleset lets only admins create, move or
+delete a tag, so release-plz's token (acting as the maintainer) still tags. `MINISIGN_SECRET_KEY` is a
+repository secret today; moving it onto the `release` environment hides it from every other workflow.
 The publish job fails rather than publish unsigned files when the secret is missing. The private key
 exists only in that secret and in the maintainer's offline backup; **losing it means shipping a build with
 a new public key, which every installed copy will refuse until the user downloads it by hand**, so the
@@ -1152,7 +1160,7 @@ which is why the script polls for the removal instead of trusting `-Wait`.
 cargo test
 ```
 
-694 tests on Windows: 663 run by default (no network, no side effects), 31 `#[ignore]`d because they
+695 tests on Windows: 664 run by default (no network, no side effects), 31 `#[ignore]`d because they
 touch the real system — the HKCU Run key, a real toast, a real `npm install -g` (two of them), one that
 runs the real `npm config get/set` against a temporary userconfig, five icon/PNG dump tests (the `.ico`,
 the README images, the site images, the macOS iconset and the Linux hicolor icons), one that writes the
@@ -1381,6 +1389,17 @@ suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
   machine and user `Path` entries (variables expanded) that the inherited `PATH` lacks — never reordering
   what is already there. A launcher with a stale or stripped environment therefore cannot hide npm, scoop
   or a shim's target.
+- On Windows `prepare_environment` also calls `CoIncrementMTAUsage` once and never releases it, so the
+  process always has a multithreaded COM apartment. Without it, toasts crashed Globlin with an access
+  violation a few minutes after a logon autostart. `winget.exe` is an app execution alias, and starting
+  one makes `CreateProcess` initialise COM on the worker thread, read the AppX state repository, and
+  uninitialise it again. A toast raised in that window got its WinRT factories (`XmlDocument`,
+  `ToastNotificationManager`) through the borrowed apartment, so `windows-core` never took its own MTA
+  reference, and cached them. When the worker's `CoUninitialize` closed the last apartment, COM unloaded
+  `msxml6.dll`, `wpnapps.dll` and `wintypes.dll`, and the next toast called through the cached, dangling
+  factory. The crash dumps in `%LOCALAPPDATA%\CrashDumps` show exactly that: the faulting frame is
+  `XmlDocument::new` inside `Toast::show`, and those three DLLs are in the unloaded-module list.
+  `platform::windows::tests::com_stays_up_after_a_worker_thread_uninitializes_the_last_apartment` pins it.
 
 The `App` — and with it the tray — is created on `StartCause::Init`, on every OS, because macOS refuses
 a status item before its event loop runs. Two test quirks off Windows: the five `tray::menu` tests that
