@@ -183,6 +183,7 @@ const USER_AGENT: &str = "globlin";
 const TIMEOUT: Duration = Duration::from_secs(30);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_mins(2);
 pub const RESTART_FLAG: &str = "--replaced";
+pub const WINDOW_FLAG: &str = "--window";
 
 pub fn latest() -> Result<Option<Release>> {
     let asset = running_asset()?;
@@ -311,9 +312,12 @@ fn should_discard_staged(current: &Path) -> bool {
     current.exists()
 }
 
-pub fn relaunch() -> Result<()> {
+pub fn relaunch(show_window: bool) -> Result<()> {
     let mut command = Command::new(platform::program_path()?);
     command.arg(RESTART_FLAG);
+    if show_window {
+        command.arg(WINDOW_FLAG);
+    }
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(&mut command, 0);
     command.spawn()?;

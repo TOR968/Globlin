@@ -447,7 +447,8 @@ impl App {
         match result {
             Ok(version) => {
                 self.available_release = None;
-                if selfupdate::relaunch().is_ok() {
+                let window_open = self.window.as_ref().is_some_and(Window::visible);
+                if selfupdate::relaunch(window_open).is_ok() {
                     return Control::Exit;
                 }
                 self.pending_restart = Some(version);
