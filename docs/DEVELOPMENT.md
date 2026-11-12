@@ -1122,8 +1122,17 @@ do nothing.
 
 `Config`, `Sources` and `Snapshot` carry `#[allow(clippy::struct_excessive_bools)]` for the opposite
 reason: every bool there is one independent user switch (`auto_update`, `auto_approve_scripts`,
-`update_all_on_start`, `choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
+`update_all_on_start`, `silent_updates`, `choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
 rename them. The allow goes on such a struct only when that is true of every field.
+
+**Silent updates** (`silent_updates`) reuses the "only notify on change" bookkeeping instead of adding
+its own. `notice::fresh` is the outdated packages whose stamp is not yet in `last_notified`;
+`App::announce_new_updates` skips the toast and hands exactly those to `start_update`. Because the
+stamps are remembered either way, a version that failed, was skipped or is in use is tried once and
+then left for the window — the re-check that follows every update would otherwise start the same batch
+again, UAC prompt included, forever. Turning the switch on runs **Update all** once, since everything
+already outdated is already in `last_notified`. `notice::shows` drops every update toast but a failure
+while the switch is on. It adds no elevation of its own and never closes a program: both stay a click.
 
 ### When the installer owns the directory
 
