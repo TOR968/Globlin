@@ -1464,7 +1464,7 @@
         if (row.elevation) cell.append(elevationTag(row.elevation));
         if (row.in_use) {
           const tag = make("span", "tag in-use", "in use: " + row.in_use.programs);
-          tag.title = "The last update failed while these programs were running from its folder.";
+          tag.title = "The last update failed while these programs were running from its folder or had its files open.";
           cell.append(tag);
         }
         if (row.pending) {

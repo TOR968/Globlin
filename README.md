@@ -235,7 +235,8 @@ The window puts updates first:
   *skipped* and the notification names the reason instead of reporting a failure. When an installer is
   refused because another installation is still running, Globlin tries that package once more at the end
   of the batch. When a winget update fails while programs from its folder are running (Git's installer
-  and an open terminal, or ChatGPT's background service), the row reads *in use: bash ×9* and offers
+  and an open terminal, or ChatGPT's background service) or while another program has its files open
+  (a browser using OBS's virtual camera), the row reads *in use: bash ×9* and offers
   **Close & update**: it closes those programs without saving anything — stopping a service asks for an
   administrator — updates, and starts again the programs you had open. It never runs on its own, not
   even from **Update all**. A winget package whose installed version winget itself reports as `Unknown` reads *not
