@@ -22,6 +22,30 @@ fn current(name: &str) -> Package {
 }
 
 #[test]
+fn only_versions_not_seen_before_are_fresh_so_a_failed_update_is_not_retried_every_check() {
+    let packages = vec![
+        behind("prettier", "3.9.6", "3.10.0", SourceKind::Npm),
+        behind("eslint", "9.0.0", "9.1.0", SourceKind::Npm),
+        current("typescript"),
+    ];
+    let already = vec!["npm:prettier@3.10.0".to_string()];
+
+    let fresh = fresh(&packages, &already);
+
+    assert_eq!(fresh.len(), 1);
+    assert_eq!(fresh[0].name, "eslint");
+    assert_eq!(fresh[0].to, "9.1.0");
+}
+
+#[test]
+fn silent_updates_hide_every_toast_but_a_failure() {
+    assert!(shows(false, false));
+    assert!(shows(false, true));
+    assert!(shows(true, true));
+    assert!(!shows(true, false));
+}
+
+#[test]
 fn an_unchanged_set_of_updates_is_not_announced_again() {
     let packages = vec![behind("prettier", "3.9.6", "3.10.0", SourceKind::Npm)];
     let already = vec!["npm:prettier@3.10.0".to_string()];

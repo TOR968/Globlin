@@ -1,4 +1,4 @@
-use crate::model::{self, Package};
+use crate::model::{self, Package, UpdateTarget};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Decision {
@@ -26,6 +26,22 @@ pub fn decide(packages: &[Package], last_notified: &[String]) -> Decision {
         body: body(packages),
         stamps,
     }
+}
+
+pub fn fresh(packages: &[Package], last_notified: &[String]) -> Vec<UpdateTarget> {
+    packages
+        .iter()
+        .filter(|package| {
+            package
+                .stamp()
+                .is_some_and(|stamp| !last_notified.contains(&stamp))
+        })
+        .filter_map(Package::update_target)
+        .collect()
+}
+
+pub fn shows(silent: bool, failed: bool) -> bool {
+    failed || !silent
 }
 
 fn title(packages: &[Package]) -> String {

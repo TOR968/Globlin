@@ -751,6 +751,14 @@ fn the_auto_approve_id_parses_back_to_its_action() {
 }
 
 #[test]
+fn the_silent_updates_id_parses_back_to_its_action() {
+    assert_eq!(
+        Action::from_key(ID_SILENT_UPDATES),
+        Some(Action::ToggleSilentUpdates)
+    );
+}
+
+#[test]
 fn the_update_on_start_id_parses_back_to_its_action() {
     assert_eq!(
         Action::from_key(ID_UPDATE_ON_START),

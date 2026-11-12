@@ -251,6 +251,79 @@ fn a_shared_folder_or_any_folder_above_one_is_never_used_to_find_programs() {
 }
 
 #[test]
+fn a_package_winget_gives_no_folder_for_is_found_through_its_uninstaller() {
+    let details = r"OBS Studio [XPFFH613W8V6LV]
+Version: 32.2.2
+Local Identifier: ARP\Machine\X86\OBS Studio
+Installed Scope: Machine
+";
+    let reply = r#"
+HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\OBS Studio
+    UninstallString    REG_SZ    "C:\Program Files\obs-studio\uninstall.exe"
+"#;
+
+    assert_eq!(
+        uninstaller_query(details).unwrap(),
+        [
+            "query",
+            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OBS Studio",
+            "/v",
+            "UninstallString",
+            "/reg:32",
+        ]
+    );
+    assert_eq!(
+        uninstaller_query("Local Identifier: MSIX\\OpenAI.Codex_1\n"),
+        None
+    );
+    assert_eq!(
+        uninstaller_folder(reply, r"C:\WINDOWS").as_deref(),
+        Some(r"C:\Program Files\obs-studio\")
+    );
+    assert_eq!(
+        uninstaller_folder(
+            r"  UninstallString  REG_SZ  C:\Tools\Foo\unins000.exe /SILENT",
+            r"C:\WINDOWS"
+        )
+        .as_deref(),
+        Some(r"C:\Tools\Foo\")
+    );
+}
+
+#[test]
+fn an_uninstaller_inside_windows_or_without_a_folder_names_no_package_folder() {
+    for command in [
+        r"MsiExec.exe /X{1D8E6291-B0D5-35EC-8441-6616F567A0F7}",
+        r"C:\Windows\System32\msiexec.exe /X{1D8E6291}",
+        r#""C:\windows\SysWOW64\rundll32.exe" foo.dll,Uninstall"#,
+    ] {
+        let reply = format!("    UninstallString    REG_SZ    {command}");
+        assert_eq!(uninstaller_folder(&reply, r"C:\WINDOWS"), None, "{command}");
+    }
+    assert_eq!(
+        uninstaller_folder(
+            "ERROR: The system was unable to find the key",
+            r"C:\WINDOWS"
+        ),
+        None
+    );
+}
+
+#[test]
+fn another_program_with_the_package_files_loaded_is_listed_closed_and_started_again() {
+    let root = r"c:\program files\obs-studio\";
+
+    for script in [
+        running_script(root),
+        close_script(root),
+        started_by_user_script(root),
+    ] {
+        assert!(script.contains("$holder.Modules"), "{script}");
+    }
+    assert!(started_by_user_script(root).contains("$holders -contains $_.ProcessId"));
+}
+
+#[test]
 fn a_running_service_from_the_package_folder_is_listed_and_marked_as_a_service() {
     let script = running_script(r"c:\program files\windowsapps\openai.codex_1_x64__x\");
 

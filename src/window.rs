@@ -31,6 +31,7 @@ pub struct Snapshot {
     pub auto_update: bool,
     pub auto_approve: bool,
     pub update_on_start: bool,
+    pub silent_updates: bool,
     pub choco_one_prompt: Option<bool>,
     pub winget_one_prompt: Option<bool>,
     pub monochrome_icon: bool,
@@ -133,6 +134,7 @@ fn snapshot_on(view: &View, config: &Config, os: &str) -> Snapshot {
         auto_update,
         auto_approve: config.auto_approve_scripts,
         update_on_start: config.update_all_on_start,
+        silent_updates: config.silent_updates,
         choco_one_prompt: SourceKind::Choco
             .available_on(os)
             .then_some(config.choco_one_prompt),

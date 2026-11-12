@@ -235,7 +235,8 @@ The window puts updates first:
   *skipped* and the notification names the reason instead of reporting a failure. When an installer is
   refused because another installation is still running, Globlin tries that package once more at the end
   of the batch. When a winget update fails while programs from its folder are running (Git's installer
-  and an open terminal, or ChatGPT's background service), the row reads *in use: bash ×9* and offers
+  and an open terminal, or ChatGPT's background service) or while another program has its files open
+  (a browser using OBS's virtual camera), the row reads *in use: bash ×9* and offers
   **Close & update**: it closes those programs without saving anything — stopping a service asks for an
   administrator — updates, and starts again the programs you had open. It never runs on its own, not
   even from **Update all**. A winget package whose installed version winget itself reports as `Unknown` reads *not
@@ -415,6 +416,7 @@ edits are never silently overwritten.
   "auto_update": false,
   "auto_approve_scripts": false,
   "update_all_on_start": false,
+  "silent_updates": false,
   "choco_one_prompt": false,
   "winget_one_prompt": false,
   "monochrome_icon": false,
@@ -441,6 +443,12 @@ edits are never silently overwritten.
 - **`update_all_on_start`** — the **Update everything when Globlin starts** switch in the window's
   Settings: once the first check after launch finishes, it runs **Update all** a single time.
   Ignored packages are skipped, as with the button.
+- **`silent_updates`** — the **Silent updates** switch in the window's Settings: every version a check
+  sees for the first time is updated straight away, the "updates available" notification is not shown,
+  and an update only notifies when it fails. A version that failed or was skipped is not retried on its
+  own; it waits in the window. Windows still shows its administrator prompt for an installer that needs
+  one — turn on the two **One administrator prompt** switches to get at most one per source — and
+  nothing is closed for you: a package that is *in use* still waits for **Close & update**.
 - **`choco_one_prompt`** — the **One administrator prompt for all choco updates** switch in the window's
   Settings (Windows only); see [Using it](#using-it).
 - **`winget_one_prompt`** — the **One administrator prompt for all winget updates** switch in the

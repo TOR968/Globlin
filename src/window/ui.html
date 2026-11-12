@@ -1147,6 +1147,13 @@
               </div>
               <button id="update-on-start" class="switch" type="button" aria-pressed="false" aria-labelledby="update-on-start-label"></button>
             </div>
+            <div class="setting">
+              <div class="setting-text">
+                <span class="setting-label" id="silent-updates-label">Silent updates</span>
+                <span class="setting-note">Updates new versions as soon as a check finds them, with no notification unless one fails. Windows still asks before an installer that needs an administrator.</span>
+              </div>
+              <button id="silent-updates" class="switch" type="button" aria-pressed="false" aria-labelledby="silent-updates-label"></button>
+            </div>
             <div id="choco-one-prompt-row" class="setting" hidden>
               <div class="setting-text">
                 <span class="setting-label" id="choco-one-prompt-label">One administrator prompt for all choco updates</span>
@@ -1464,7 +1471,7 @@
         if (row.elevation) cell.append(elevationTag(row.elevation));
         if (row.in_use) {
           const tag = make("span", "tag in-use", "in use: " + row.in_use.programs);
-          tag.title = "The last update failed while these programs were running from its folder.";
+          tag.title = "The last update failed while these programs were running from its folder or had its files open.";
           cell.append(tag);
         }
         if (row.pending) {
@@ -1719,6 +1726,7 @@
         setSwitch(el("autostart"), snapshot.autostart);
         setSwitch(el("auto-approve"), snapshot.auto_approve);
         setSwitch(el("update-on-start"), snapshot.update_on_start);
+        setSwitch(el("silent-updates"), snapshot.silent_updates);
         el("choco-one-prompt-row").hidden = snapshot.choco_one_prompt === null;
         setSwitch(el("choco-one-prompt"), Boolean(snapshot.choco_one_prompt));
         el("winget-one-prompt-row").hidden = snapshot.winget_one_prompt === null;
@@ -1845,6 +1853,7 @@
       el("auto-update").onclick = () => send("auto-update");
       el("auto-approve").onclick = () => send("auto-approve");
       el("update-on-start").onclick = () => send("update-on-start");
+      el("silent-updates").onclick = () => send("silent-updates");
       el("choco-one-prompt").onclick = () => send("choco-one-prompt");
       el("winget-one-prompt").onclick = () => send("winget-one-prompt");
       el("monochrome-icon").onclick = () => send("monochrome-icon");

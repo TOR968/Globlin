@@ -30,9 +30,19 @@ const PROCESSES: &str = "Get-Process | Where-Object { $_.Path -and \
 const SERVICES: &str = "Get-CimInstance Win32_Service | Where-Object { $_.State -eq 'Running' -and \
     $_.PathName -and $_.PathName.TrimStart([char]34).StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }";
 const SERVICE_SUFFIX: &str = " (service)";
+const HOLDERS: &str = "Get-Process | Where-Object { -not ($_.Path -and \
+    $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) } | ForEach-Object { $holder = $_; \
+    try { if ($holder.Modules | Where-Object { $_.FileName -and \
+    $_.FileName.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }) { $holder } } catch { } }";
+const REGISTRY: &str = "reg";
+const UNINSTALL_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+const UNINSTALLER: &str = "UninstallString";
+const REGISTRY_TEXT: &str = "REG_SZ";
+const PROGRAM_END: &str = ".exe";
 const STARTED_BY_USER: &str = "$all = @(Get-CimInstance Win32_Process); \
     $inside = @($all | Where-Object { $_.ExecutablePath -and \
-    $_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }); \
+    ($_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -or \
+    $holders -contains $_.ProcessId) }); \
     $shell = @($all | Where-Object { $_.Name -eq 'explorer.exe' } | ForEach-Object { $_.ProcessId }); \
     $roots = @($inside | Where-Object { $inside.ProcessId -notcontains $_.ParentProcessId }); \
     $shown = @($roots | Where-Object { ($shell -contains $_.ParentProcessId) -or \
@@ -46,7 +56,8 @@ const PACKAGED_APPS: &str = "$package = $null; $apps = @(); \
     } catch { $package = $null } }; \
     @($roots | ForEach-Object { $path = $_.ExecutablePath; \
     $arguments = [string]$_.CommandLine -replace '^\\s*(\\x22[^\\x22]*\\x22|\\S+)\\s*', ''; \
-    $app = $apps | Where-Object { $_.Executable -eq $path.Substring($root.Length) } | Select-Object -First 1; \
+    $app = $apps | Where-Object { $path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -and \
+    $_.Executable -eq $path.Substring($root.Length) } | Select-Object -First 1; \
     if ($app) { 'shell:AppsFolder\\' + $package.PackageFamilyName + '!' + $app.Id } \
     elseif ($shown -contains $path) { $path + [char]9 + $arguments } }) | Select-Object -Unique";
 const UPGRADE_FLAGS: &str =
@@ -137,7 +148,9 @@ impl Winget {
             "--accept-source-agreements",
         ]))
         .ok()?;
-        narrow_location(&installed_location(&stdout_text(&output))?, &broad_dirs())
+        let details = stdout_text(&output);
+        let location = installed_location(&details).or_else(|| registered_folder(&details))?;
+        narrow_location(&location, &broad_dirs())
     }
 
     fn started_by_user(&self, location: &str) -> Vec<String> {
@@ -261,14 +274,16 @@ fn running_script(location: &str) -> String {
     format!(
         "$ErrorActionPreference = 'Stop'; $root = {}; \
          {PROCESSES} | ForEach-Object {{ $_.ProcessName }}; \
-         {SERVICES} | ForEach-Object {{ $_.Name + '{SERVICE_SUFFIX}' }}",
+         {SERVICES} | ForEach-Object {{ $_.Name + '{SERVICE_SUFFIX}' }}; \
+         {HOLDERS} | ForEach-Object {{ $_.ProcessName }}",
         quoted(location),
     )
 }
 
 fn started_by_user_script(location: &str) -> String {
     format!(
-        "$ErrorActionPreference = 'Stop'; $root = {}; {STARTED_BY_USER}; {PACKAGED_APPS}",
+        "$ErrorActionPreference = 'Stop'; $root = {}; \
+         $holders = @({HOLDERS} | ForEach-Object {{ $_.Id }}); {STARTED_BY_USER}; {PACKAGED_APPS}",
         quoted(location),
     )
 }
@@ -306,7 +321,7 @@ fn close_script(location: &str) -> String {
     format!(
         "$ErrorActionPreference = 'Stop'; $root = {}; \
          {SERVICES} | ForEach-Object {{ Stop-Service -Name $_.Name -Force }}; \
-         {PROCESSES} | Stop-Process -Force",
+         @({HOLDERS}) + @({PROCESSES}) | Stop-Process -Force",
         quoted(location),
     )
 }
@@ -318,6 +333,58 @@ fn installed_location(details: &str) -> Option<String> {
         .map(str::trim)
         .filter(|location| !location.is_empty())
         .map(String::from)
+}
+
+fn registered_folder(details: &str) -> Option<String> {
+    let query = uninstaller_query(details)?;
+    let output = run_listing(hidden_command(REGISTRY.as_ref()).args(query)).ok()?;
+    uninstaller_folder(&stdout_text(&output), &std::env::var("SystemRoot").ok()?)
+}
+
+fn uninstaller_query(details: &str) -> Option<[String; 5]> {
+    let identifier = details
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("Local Identifier:"))?;
+    let mut parts = identifier
+        .trim()
+        .strip_prefix(REGISTRY_ONLY)?
+        .splitn(3, '\\');
+    let hive = match parts.next()? {
+        "Machine" => "HKLM",
+        "User" => "HKCU",
+        _ => return None,
+    };
+    let view = match parts.next()? {
+        "X86" => "/reg:32",
+        "X64" => "/reg:64",
+        _ => return None,
+    };
+    let key = parts.next().filter(|key| !key.is_empty())?;
+    Some([
+        "query".into(),
+        format!("{hive}\\{UNINSTALL_KEY}\\{key}"),
+        "/v".into(),
+        UNINSTALLER.into(),
+        view.into(),
+    ])
+}
+
+fn uninstaller_folder(reply: &str, system: &str) -> Option<String> {
+    let (_, command) = reply
+        .lines()
+        .find_map(|line| line.split_once(REGISTRY_TEXT))?;
+    let command = command.trim();
+    let program = if let Some(quoted) = command.strip_prefix('"') {
+        quoted.split('"').next()?
+    } else {
+        let end = command.to_ascii_lowercase().find(PROGRAM_END)? + PROGRAM_END.len();
+        &command[..end]
+    };
+    let folder = &program[..=program.rfind('\\')?];
+    let in_windows = folder
+        .to_ascii_lowercase()
+        .starts_with(&system.to_ascii_lowercase());
+    (!in_windows).then(|| folder.to_string())
 }
 
 fn narrow_location(location: &str, broad: &[String]) -> Option<String> {

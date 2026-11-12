@@ -275,6 +275,20 @@ an update: Teams and Obsidian update fine while running, and a pre-check would c
 package. The trade-off is a real failure that happens while the program is open reads *in use*; its log
 is still written.
 
+Two things the first version missed, both seen with OBS Studio from the Store (`XPFFH613W8V6LV`). Its
+silent installer exits 6 when *other* programs have its DLLs loaded — Chrome holding
+`obs-virtualcam-module64.dll` — and the Store manifest mistranslates 6 as `noNetwork`, so winget
+reports `0x8A150107`. So the listing also names every process outside the folder that has a module
+loaded from it (`HOLDERS`: `Get-Process` and its `Modules`, a few seconds, errors on protected processes
+swallowed); **Close & update** stops those too, and `started_by_user_script` treats them as inside the
+folder, so a holder the user started (a browser's main process) is started again while a helper
+subprocess is not. A holder running elevated cannot be read unelevated and is not seen. And winget
+prints no `Installed Location:` for an installer that never wrote `InstallLocation`, so
+`winget::registered_folder` falls back to the folder of the `UninstallString` under the `Uninstall` key
+named by `Local Identifier: ARP\<Machine|User>\<X86|X64>\<key>`, read with `reg query … /reg:32|64`. An
+uninstaller inside `%SystemRoot%` (`msiexec`, `rundll32`) names no folder: closing everything that runs
+from System32 is not an option.
+
 The button is per row and two-click (like **Uninstall**); **Update all** and **Update N** never close
 anything. `close-update:` re-finds the processes and services at click time (not the PIDs from the
 failure), stops the services with `Stop-Service -Force` and then the processes with `Stop-Process -Force`,
@@ -1108,8 +1122,17 @@ do nothing.
 
 `Config`, `Sources` and `Snapshot` carry `#[allow(clippy::struct_excessive_bools)]` for the opposite
 reason: every bool there is one independent user switch (`auto_update`, `auto_approve_scripts`,
-`update_all_on_start`, `choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
+`update_all_on_start`, `silent_updates`, `choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
 rename them. The allow goes on such a struct only when that is true of every field.
+
+**Silent updates** (`silent_updates`) reuses the "only notify on change" bookkeeping instead of adding
+its own. `notice::fresh` is the outdated packages whose stamp is not yet in `last_notified`;
+`App::announce_new_updates` skips the toast and hands exactly those to `start_update`. Because the
+stamps are remembered either way, a version that failed, was skipped or is in use is tried once and
+then left for the window — the re-check that follows every update would otherwise start the same batch
+again, UAC prompt included, forever. Turning the switch on runs **Update all** once, since everything
+already outdated is already in `last_notified`. `notice::shows` drops every update toast but a failure
+while the switch is on. It adds no elevation of its own and never closes a program: both stay a click.
 
 ### When the installer owns the directory
 

@@ -190,6 +190,7 @@ impl App {
             Action::ToggleAutoUpdate => self.toggle_auto_update(),
             Action::ToggleAutoApprove => self.toggle_auto_approve(),
             Action::ToggleUpdateOnStart => self.toggle_update_on_start(),
+            Action::ToggleSilentUpdates => self.toggle_silent_updates(),
             Action::ToggleChocoOnePrompt => self.toggle_choco_one_prompt(),
             Action::ToggleWingetOnePrompt => self.toggle_winget_one_prompt(),
             Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
@@ -420,6 +421,15 @@ impl App {
         self.save_setting();
     }
 
+    fn toggle_silent_updates(&mut self) {
+        self.config.silent_updates = !self.config.silent_updates;
+        self.save_setting();
+        if self.config.silent_updates {
+            let targets = self.every_outdated_target();
+            self.start_update(targets, Vec::new(), false);
+        }
+    }
+
     fn toggle_choco_one_prompt(&mut self) {
         self.config.choco_one_prompt = !self.config.choco_one_prompt;
         self.save_setting();
@@ -590,6 +600,8 @@ impl App {
     }
 
     fn announce_new_updates(&mut self) {
+        let silent = self.config.silent_updates;
+        let fresh = notice::fresh(&self.packages, &self.config.last_notified);
         let stamps = match notice::decide(&self.packages, &self.config.last_notified) {
             notice::Decision::Nothing => return,
             notice::Decision::Remember { stamps } => stamps,
@@ -598,12 +610,17 @@ impl App {
                 body,
                 stamps,
             } => {
-                platform::notify(&title, &body).ok();
+                if !silent {
+                    platform::notify(&title, &body).ok();
+                }
                 stamps
             }
         };
         self.config.last_notified = stamps;
         self.config.save().ok();
+        if silent {
+            self.start_update(fresh, Vec::new(), false);
+        }
     }
 
     fn on_updated(&mut self, outcome: &Outcome, target: &EventLoopWindowTarget<Message>) {
@@ -615,7 +632,9 @@ impl App {
             self.queue.push_check();
         }
         let approved = update::auto_approvals(outcome, self.config.auto_approve_scripts);
-        if let Some((title, body)) = update::toast(outcome) {
+        if let Some((title, body)) = update::toast(outcome)
+            .filter(|_| notice::shows(self.config.silent_updates, !outcome.failed.is_empty()))
+        {
             platform::notify(title, &body).ok();
         }
         if !approved.is_empty() {

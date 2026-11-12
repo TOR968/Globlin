@@ -554,6 +554,16 @@ fn the_auto_approve_setting_reaches_the_window_from_the_config() {
 }
 
 #[test]
+fn the_silent_updates_setting_reaches_the_window_from_the_config() {
+    let mut config = config();
+    assert!(!snapshot(&view(&[], None), &config).silent_updates);
+
+    config.silent_updates = true;
+
+    assert!(snapshot(&view(&[], None), &config).silent_updates);
+}
+
+#[test]
 fn the_update_on_start_setting_reaches_the_window_from_the_config() {
     let mut config = config();
     assert!(!snapshot(&view(&[], None), &config).update_on_start);
