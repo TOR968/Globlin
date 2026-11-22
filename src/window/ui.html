@@ -1122,13 +1122,13 @@
             <div class="setting">
               <div class="setting-text">
                 <span class="setting-label" id="autostart-label">Run at startup</span>
-                <span class="setting-note">Starts in the tray when you sign in, without opening this window.</span>
+                <span id="autostart-note" class="setting-note"></span>
               </div>
               <button id="autostart" class="switch" type="button" aria-pressed="false" aria-labelledby="autostart-label"></button>
             </div>
             <div class="setting">
               <div class="setting-text">
-                <span class="setting-label" id="monochrome-icon-label">Monochrome tray icon</span>
+                <span class="setting-label" id="monochrome-icon-label"></span>
                 <span class="setting-note">Draws the goblin in one colour that matches the system icons beside it. A dot means updates are waiting; an exclamation mark means something went wrong.</span>
               </div>
               <button id="monochrome-icon" class="switch" type="button" aria-pressed="false" aria-labelledby="monochrome-icon-label"></button>
@@ -1150,7 +1150,7 @@
             <div class="setting">
               <div class="setting-text">
                 <span class="setting-label" id="silent-updates-label">Silent updates</span>
-                <span class="setting-note">Updates new versions as soon as a check finds them, with no notification unless one fails. Windows still asks before an installer that needs an administrator.</span>
+                <span id="silent-updates-note" class="setting-note"></span>
               </div>
               <button id="silent-updates" class="switch" type="button" aria-pressed="false" aria-labelledby="silent-updates-label"></button>
             </div>
@@ -1723,6 +1723,9 @@
 
       const renderSettings = () => {
         const snapshot = state.snapshot;
+        el("autostart-note").textContent = snapshot.wording.autostart_note;
+        el("monochrome-icon-label").textContent = snapshot.wording.monochrome_label;
+        el("silent-updates-note").textContent = snapshot.wording.silent_note;
         setSwitch(el("autostart"), snapshot.autostart);
         setSwitch(el("auto-approve"), snapshot.auto_approve);
         setSwitch(el("update-on-start"), snapshot.update_on_start);

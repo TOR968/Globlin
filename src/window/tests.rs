@@ -846,6 +846,28 @@ fn the_choco_one_prompt_switch_carries_the_setting_on_windows() {
 }
 
 #[test]
+fn the_settings_call_it_the_menu_bar_on_a_mac_and_the_tray_everywhere_else() {
+    let mac = snapshot_on(&view(&[], None), &config(), "macos").wording;
+    let linux = snapshot_on(&view(&[], None), &config(), "linux").wording;
+
+    assert_eq!(mac.monochrome_label, "Monochrome menu bar icon");
+    assert!(mac.autostart_note.starts_with("Starts in the menu bar "));
+    assert_eq!(linux.monochrome_label, "Monochrome tray icon");
+    assert!(linux.autostart_note.starts_with("Starts in the tray "));
+}
+
+#[test]
+fn only_windows_is_told_that_silent_updates_still_ask_for_an_administrator() {
+    let wording = |os| snapshot_on(&view(&[], None), &config(), os).wording;
+
+    assert!(wording("windows")
+        .silent_note
+        .contains("Windows still asks"));
+    assert!(!wording("macos").silent_note.contains("Windows"));
+    assert!(!wording("linux").silent_note.contains("Windows"));
+}
+
+#[test]
 fn a_platform_without_choco_has_no_choco_one_prompt_switch() {
     let snapshot = snapshot_on(&view(&[], None), &config(), "linux");
 
