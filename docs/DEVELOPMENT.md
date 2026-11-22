@@ -864,6 +864,16 @@ Things about the environment the code has to work around, all verified rather th
   --executables` removes every version and its binstubs without asking. `gem list` puts `default: ` in
   front of default gems and a platform label after native ones (`1.16.5 x64-mingw-ucrt`); both are
   stripped from the version.
+- **A gem the user cannot write is not listed.** macOS ships Ruby 2.6 with its gems in
+  `/Library/Ruby/Gems/2.6.0`, owned by root. `gem outdated` reports dozens of them as behind, and every
+  `gem update` then fails with `Gem::FilePermissionError` — updating them needs `sudo`, and elevation is
+  never Globlin's job. So the source asks `gem environment gempath`, checks each directory with
+  `platform::writable` (`test -w`; always true on Windows), and when at least one is out of reach keeps
+  only the gems whose newest installed version has a `<name>-<version>[-<platform>].gemspec` under a
+  writable directory's `specifications` or `specifications/default`. When every directory is writable, or
+  the paths cannot be read, nothing is filtered. A gem in the user directory is still listed, and because
+  RubyGems before 3.1 does not fall back to it on its own, `gem update` gets `--user-install` whenever
+  `gem environment gemdir` is not writable.
 - **`winget list` has no machine-readable output.** There is no `--json`; `winget export` omits anything
   without a manifest. So the fixed-width table is parsed: find the row of dashes, read column start
   offsets from the header line above it, and slice each row by those offsets. Column *positions* rather
@@ -1124,6 +1134,12 @@ do nothing.
 reason: every bool there is one independent user switch (`auto_update`, `auto_approve_scripts`,
 `update_all_on_start`, `silent_updates`, `choco_one_prompt`, `monochrome_icon`, one per source), any combination is valid, and an enum would only
 rename them. The allow goes on such a struct only when that is true of every field.
+
+**Settings text that depends on the platform comes from the snapshot.** `window::wording(os)` fills
+`Snapshot.wording`: the tray is called the *menu bar* on macOS (*Run at startup*'s note and the
+*Monochrome … icon* label), and the *Silent updates* note mentions the Windows administrator prompt only
+on Windows. The page sets those three texts from the snapshot instead of carrying them in its markup,
+the same way the choco and winget one-prompt switches are hidden off Windows.
 
 **Silent updates** (`silent_updates`) reuses the "only notify on change" bookkeeping instead of adding
 its own. `notice::fresh` is the outdated packages whose stamp is not yet in `last_notified`;

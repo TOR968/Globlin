@@ -77,11 +77,86 @@ fn an_outdated_row_naming_the_same_version_twice_is_not_an_upgrade() {
     assert!(parse_outdated("rake (13.2.1 < 13.2.1)\n").is_empty());
 }
 
+fn gem(user_install: bool) -> Gem {
+    Gem {
+        command: PathBuf::from("gem"),
+        user_install: OnceLock::from(user_install),
+    }
+}
+
+fn scratch(label: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("globlin-test-gem-{label}"));
+    fs::remove_dir_all(&dir).ok();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn with_specification(home: &Path, folder: &[&str], stem: &str) {
+    let directory = folder
+        .iter()
+        .fold(home.join("specifications"), |path, part| path.join(part));
+    fs::create_dir_all(&directory).unwrap();
+    fs::write(directory.join(format!("{stem}.gemspec")), "").unwrap();
+}
+
+fn names(installed: &[Installed]) -> Vec<&str> {
+    installed.iter().map(|item| item.name.as_str()).collect()
+}
+
+#[test]
+fn a_gem_whose_newest_version_sits_in_a_directory_the_user_cannot_write_is_not_listed() {
+    let home = scratch("owned");
+    with_specification(&home, &[], "rake-13.2.1");
+
+    let kept = owned(parse_listing(LISTING), &specifications(&[home]));
+
+    assert_eq!(names(&kept), vec!["rake"]);
+}
+
+#[test]
+fn a_default_gem_and_a_native_gem_are_found_by_their_specification_files() {
+    let home = scratch("default-and-native");
+    with_specification(&home, &["default"], "bundler-2.5.11");
+    with_specification(&home, &[], "nokogiri-1.16.5-x64-mingw-ucrt");
+
+    let kept = owned(parse_listing(LISTING), &specifications(&[home]));
+
+    assert_eq!(names(&kept), vec!["bundler", "nokogiri"]);
+}
+
+#[test]
+fn an_older_version_in_a_writable_directory_does_not_keep_a_gem_whose_newest_is_out_of_reach() {
+    let home = scratch("older-version");
+    with_specification(&home, &[], "rake-13.0.6");
+    with_specification(&home, &[], "rake-13.2.10");
+
+    assert!(owned(parse_listing(LISTING), &specifications(&[home])).is_empty());
+}
+
+#[test]
+fn a_gem_home_that_does_not_exist_yet_owns_nothing() {
+    let home = scratch("missing").join("ruby");
+
+    assert!(specifications(&[home]).is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_directory_the_user_owns_is_writable() {
+    assert!(platform::writable(&scratch("writable")));
+}
+
+#[test]
+fn an_update_goes_to_the_user_directory_when_the_gem_home_cannot_be_written() {
+    assert_eq!(
+        arguments(&gem(true).update_command("rake").unwrap()),
+        vec!["update", "rake", "--user-install"]
+    );
+}
+
 #[test]
 fn the_gem_update_command_updates_the_named_gem() {
-    let gem = Gem {
-        command: PathBuf::from("gem"),
-    };
+    let gem = gem(false);
 
     assert_eq!(
         arguments(&gem.update_command("rake").unwrap()),
@@ -91,9 +166,7 @@ fn the_gem_update_command_updates_the_named_gem() {
 
 #[test]
 fn the_gem_uninstall_command_never_waits_on_a_prompt_nobody_can_see() {
-    let gem = Gem {
-        command: PathBuf::from("gem"),
-    };
+    let gem = gem(false);
 
     assert_eq!(
         arguments(&gem.uninstall_command("rake").unwrap()),

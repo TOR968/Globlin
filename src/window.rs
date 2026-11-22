@@ -21,9 +21,22 @@ const UI: &str = include_str!("window/ui.html");
 const OWN_PAGE_BLANK: &str = "about:blank";
 const OWN_PAGE_DATA: &str = "data:text/html";
 
+const SILENT_NOTE: &str =
+    "Updates new versions as soon as a check finds them, with no notification unless one fails.";
+const SILENT_ELEVATION_NOTE: &str =
+    " Windows still asks before an installer that needs an administrator.";
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct Wording {
+    pub autostart_note: String,
+    pub monochrome_label: String,
+    pub silent_note: String,
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Snapshot {
+    pub wording: Wording,
     pub headline: String,
     pub busy: bool,
     pub version: &'static str,
@@ -127,6 +140,7 @@ fn snapshot_on(view: &View, config: &Config, os: &str) -> Snapshot {
     };
     let sources = source_rows(view.packages, config, os);
     Snapshot {
+        wording: wording(os),
         headline: tray::headline(view),
         busy: view.activity.is_some(),
         version: env!("CARGO_PKG_VERSION"),
@@ -210,6 +224,22 @@ fn in_use_tag(entry: &InUse) -> InUseTag {
     InUseTag {
         programs,
         close_id: tray::close_update_id(&entry.target),
+    }
+}
+
+fn wording(os: &str) -> Wording {
+    let tray = if os == "macos" { "menu bar" } else { "tray" };
+    let elevation = if os == "windows" {
+        SILENT_ELEVATION_NOTE
+    } else {
+        ""
+    };
+    Wording {
+        autostart_note: format!(
+            "Starts in the {tray} when you sign in, without opening this window."
+        ),
+        monochrome_label: format!("Monochrome {tray} icon"),
+        silent_note: format!("{SILENT_NOTE}{elevation}"),
     }
 }
 

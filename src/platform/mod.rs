@@ -27,6 +27,8 @@ pub use linux::*;
 pub const BACKGROUND_FLAG: &str = "--background";
 const TEST_DATA_DIR: &str = "globlin-test-data";
 const APPIMAGE_VARIABLE: &str = "APPIMAGE";
+#[cfg(unix)]
+const WRITABLE_LIMIT: std::time::Duration = std::time::Duration::from_secs(5);
 
 static NOTIFICATION_CLICK: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
@@ -50,6 +52,19 @@ pub fn downloaded(path: &std::path::Path) -> bool {
 #[cfg(not(windows))]
 pub fn downloaded(_path: &std::path::Path) -> bool {
     false
+}
+
+#[cfg(unix)]
+pub fn writable(path: &std::path::Path) -> bool {
+    let mut probe = std::process::Command::new("test");
+    probe.arg("-w").arg(path);
+    crate::process::output_within(&mut probe, WRITABLE_LIMIT)
+        .map_or(true, |output| output.status.success())
+}
+
+#[cfg(not(unix))]
+pub fn writable(_path: &std::path::Path) -> bool {
+    true
 }
 
 pub fn data_dir() -> PathBuf {
