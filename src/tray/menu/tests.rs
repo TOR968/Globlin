@@ -290,6 +290,21 @@ fn an_up_to_date_headline_reports_how_many_are_watched() {
 }
 
 #[test]
+fn a_single_watched_package_is_counted_in_the_singular() {
+    let current = vec![package("a", SourceKind::Brew, Status::Current)];
+    let unknown = vec![package("a", SourceKind::Brew, Status::Unknown)];
+
+    assert_eq!(
+        headline(&view(&current, None, 0)),
+        "Globlin — 1 package, up to date"
+    );
+    assert_eq!(
+        headline(&view(&unknown, None, 0)),
+        "Globlin — 1 package, 1 not checked"
+    );
+}
+
+#[test]
 fn packages_nobody_could_check_are_never_summed_up_as_up_to_date() {
     let packages = vec![
         package("a", SourceKind::Npm, Status::Current),
