@@ -1,25 +1,65 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use super::{
     find_on_path, hidden_command, listed, not_on_path, run_listing, stdout_text, PackageSource,
 };
 use crate::model::{Installed, SourceKind};
+use crate::platform;
 use crate::Result;
 
 const EXECUTABLE: &str = "gem";
 
 const DEFAULT_MARKER: &str = "default: ";
 
+const SPECIFICATIONS: &str = "specifications";
+
+const DEFAULT_SPECIFICATIONS: &str = "default";
+
+const SPECIFICATION_SUFFIX: &str = ".gemspec";
+
+const USER_INSTALL: &str = "--user-install";
+
 pub struct Gem {
     command: PathBuf,
+    user_install: OnceLock<bool>,
 }
 
 impl Gem {
     pub fn new() -> Result<Self> {
         let command = find_on_path(EXECUTABLE).ok_or_else(|| not_on_path("gem"))?;
-        Ok(Self { command })
+        Ok(Self {
+            command,
+            user_install: OnceLock::new(),
+        })
+    }
+
+    fn environment(&self, item: &str) -> Option<String> {
+        let text = self.run(&["environment", item])?;
+        let text = text.trim();
+        (!text.is_empty()).then(|| text.to_string())
+    }
+
+    fn installs_for_the_user(&self) -> bool {
+        *self.user_install.get_or_init(|| {
+            self.environment("gemdir")
+                .is_some_and(|home| !platform::writable(Path::new(&home)))
+        })
+    }
+
+    fn within_reach(&self, installed: Vec<Installed>) -> Vec<Installed> {
+        let Some(paths) = self.environment("gempath") else {
+            return installed;
+        };
+        let (open, shut): (Vec<PathBuf>, Vec<PathBuf>) =
+            std::env::split_paths(&paths).partition(|path| platform::writable(path));
+        if shut.is_empty() {
+            return installed;
+        }
+        owned(installed, &specifications(&open))
     }
 
     fn run(&self, arguments: &[&str]) -> Option<String> {
@@ -36,16 +76,20 @@ impl PackageSource for Gem {
     fn installed(&self) -> Result<Vec<Installed>> {
         let listing = run_listing(hidden_command(&self.command).args(["list", "--local"]))?;
         let outdated = self.run(&["outdated"]);
-        listed(
+        let installed = listed(
             merge(&stdout_text(&listing), outdated.as_deref()),
             "gem list --local",
             &listing,
-        )
+        )?;
+        Ok(self.within_reach(installed))
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
         let mut command = hidden_command(&self.command);
         command.args(["update", name]);
+        if self.installs_for_the_user() {
+            command.arg(USER_INSTALL);
+        }
         Some(command)
     }
 
@@ -68,6 +112,33 @@ fn merge(listing: &str, outdated: Option<&str>) -> Vec<Installed> {
                     .unwrap_or_else(|| installed.version.clone())
             });
             installed.with_available(resolved)
+        })
+        .collect()
+}
+
+fn specifications(homes: &[PathBuf]) -> HashSet<String> {
+    homes
+        .iter()
+        .map(|home| home.join(SPECIFICATIONS))
+        .flat_map(|directory| [directory.join(DEFAULT_SPECIFICATIONS), directory])
+        .filter_map(|directory| fs::read_dir(directory).ok())
+        .flat_map(|entries| entries.filter_map(std::result::Result::ok))
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            name.strip_suffix(SPECIFICATION_SUFFIX).map(str::to_string)
+        })
+        .collect()
+}
+
+fn owned(installed: Vec<Installed>, specifications: &HashSet<String>) -> Vec<Installed> {
+    installed
+        .into_iter()
+        .filter(|gem| {
+            let exact = format!("{}-{}", gem.name, gem.version);
+            let platformed = format!("{exact}-");
+            specifications
+                .iter()
+                .any(|stem| *stem == exact || stem.starts_with(&platformed))
         })
         .collect()
 }
