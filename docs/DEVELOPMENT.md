@@ -527,7 +527,7 @@ looks up the way the colour one does. With no colour left to say which state it 
 shape: Updates adds a badge disc at the lower right, set apart from the head by an erased 1.5-unit gap;
 Error cuts an exclamation mark into that badge; Busy draws the silhouette at 35 % alpha and fills the head
 with the same wave clip at full alpha. Every opaque pixel is exactly the ink colour, so on macOS the image
-works as a template (`with_icon_as_template`/`set_icon_as_template`) and AppKit tints it to the menu bar.
+works as a template (`with_icon_templated`/`set_icon_templated`) and AppKit tints it to the menu bar.
 Elsewhere the ink is chosen by `icon::look`: near-black when `platform::tray_is_light()` says the tray is
 light — on Windows the `SystemUsesLightTheme` value under `HKCU\…\Themes\Personalize`, which is the
 taskbar's half of the theme setting — white otherwise, and always white on Linux, whose panels are dark by
@@ -1493,9 +1493,9 @@ Experimental, x64 and ARM64, shipped as a deb and an rpm.
 
 - **Window.** `wry` on WebKitGTK 4.1, attached to tao's GTK box. Build dependencies: `libgtk-3-dev`,
   `libayatana-appindicator3-dev`, `libwebkit2gtk-4.1-dev` — every Linux CI job installs exactly those.
-- **No libxdo.** `tray-icon` is built with `default-features = false, features = ["gtk"]`. Its default
-  `libxdo` feature only makes muda's predefined Copy/Cut/Paste/Select All items work, and the tray uses
-  none of them — only separators. Linked in, it tied the binary to the build machine's soname: the
+- **No libxdo.** `tray-icon` 0.26 dropped its `libxdo` feature, so the default features (the
+  `libappindicator` backend) link nothing of it; up to 0.24 the crate had to be built with
+  `default-features = false, features = ["gtk"]` to keep it out. Linked in, it tied the binary to the build machine's soname: the
   Ubuntu 22.04 release linked `libxdo.so.3`, Arch's `xdotool` ships `libxdo.so.4`, and `globlin-bin`
   0.4.3 failed at load with `libxdo.so.3: cannot open shared object file` before `main` ran. The deb and
   the AUR smoke tests now run `ldd /usr/bin/globlin` and fail on any `not found`.

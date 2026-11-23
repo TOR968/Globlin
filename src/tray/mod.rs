@@ -42,14 +42,21 @@ impl Tray {
         };
         let built = menu::build(&view)?;
         let look = look_for(monochrome);
-        let icon = TrayIconBuilder::new()
+        let first = icon::tray(IconState::Busy, 0, 0.0, look)?;
+        let builder = TrayIconBuilder::new()
             .with_tooltip(menu::headline(&view))
-            .with_icon(icon::tray(IconState::Busy, 0, 0.0, look)?)
-            .with_icon_as_template(monochrome)
             .with_menu(Box::new(built.menu))
             .with_menu_on_left_click(false)
-            .with_temp_dir_path(icon_frame_dir())
-            .build()?;
+            .with_temp_dir_path(icon_frame_dir());
+        #[cfg(target_os = "macos")]
+        let builder = if monochrome {
+            builder.with_icon_templated(first)
+        } else {
+            builder.with_icon(first)
+        };
+        #[cfg(not(target_os = "macos"))]
+        let builder = builder.with_icon(first);
+        let icon = builder.build()?;
         Ok(Self {
             icon,
             header: built.header,
@@ -86,9 +93,10 @@ impl Tray {
 
     fn show(&self, icon: Icon) -> Result<()> {
         #[cfg(target_os = "macos")]
-        self.icon
-            .set_icon_with_as_template(Some(icon), matches!(self.look, Look::Mono(_)))?;
-        #[cfg(not(target_os = "macos"))]
+        if matches!(self.look, Look::Mono(_)) {
+            self.icon.set_icon_templated(Some(icon))?;
+            return Ok(());
+        }
         self.icon.set_icon(Some(icon))?;
         Ok(())
     }
