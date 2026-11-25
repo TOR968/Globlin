@@ -35,8 +35,11 @@
         --warn-text: #e0a35c;
         --eye: #0f1215;
         --switch-off: #2c333c;
+        --switch-on: #23965f;
         --focus: #5aa9e6;
+        --field-line: #5b6573;
         --shade: rgba(0, 0, 0, 0.55);
+        --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
       }
 
       @media (prefers-color-scheme: light) {
@@ -51,7 +54,7 @@
           --text: #1b1f24;
           --text-2: #39414b;
           --muted: #5c6570;
-          --faint: #78818c;
+          --faint: #656e79;
           --control: #f3f5f7;
           --control-line: #d3d8de;
           --control-hover: #aeb6c0;
@@ -69,8 +72,10 @@
           --red-text: #b4352b;
           --warn-text: #9a5b00;
           --eye: #1b1f24;
-          --switch-off: #c9cfd6;
+          --switch-off: #808a96;
+          --switch-on: #1d7f54;
           --focus: #2f6aa3;
+          --field-line: #808a96;
           --shade: rgba(20, 24, 30, 0.35);
         }
       }
@@ -110,12 +115,7 @@
         color: inherit;
       }
 
-      button {
-        cursor: pointer;
-      }
-
       button:disabled {
-        cursor: default;
         opacity: 0.45;
       }
 
@@ -125,8 +125,20 @@
       }
 
       .mono {
-        font-family: "Cascadia Mono", Consolas, ui-monospace, monospace;
+        font-family: var(--mono);
         font-size: 12px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
       }
 
       .btn {
@@ -140,6 +152,15 @@
 
       .btn:hover:not(:disabled) {
         border-color: var(--control-hover);
+      }
+
+      .btn:active:not(:disabled) {
+        background: var(--track);
+      }
+
+      .btn.primary:active:not(:disabled) {
+        background: var(--amber);
+        filter: brightness(0.92);
       }
 
       .btn.icon {
@@ -252,7 +273,7 @@
         width: 240px;
         height: 34px;
         padding: 0 10px;
-        border: 1px solid var(--control-line);
+        border: 1px solid var(--field-line);
         border-radius: 8px;
         color: var(--faint);
       }
@@ -336,6 +357,10 @@
         border-color: var(--control-hover);
       }
 
+      .chip:active:not(:disabled) {
+        background: var(--track);
+      }
+
       .chip[aria-pressed="true"] {
         border-color: var(--control-hover);
         background: var(--track);
@@ -344,7 +369,7 @@
 
       .chip .count {
         color: var(--muted);
-        font-family: "Cascadia Mono", Consolas, ui-monospace, monospace;
+        font-family: var(--mono);
         font-variant-numeric: tabular-nums;
       }
 
@@ -493,7 +518,7 @@
         min-height: 46px;
         padding: 0 22px 0 46px;
         display: grid;
-        grid-template-columns: 18px minmax(0, 1fr) 210px 104px 64px 74px;
+        grid-template-columns: 18px minmax(0, 1fr) auto 104px 64px 74px;
         align-items: center;
         gap: 12px;
         border-top: 1px solid var(--row-line);
@@ -511,6 +536,7 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        user-select: text;
       }
 
       .update-row .name {
@@ -532,7 +558,6 @@
         color: var(--muted);
         font-size: 11px;
         white-space: nowrap;
-        cursor: help;
       }
 
       .version {
@@ -541,6 +566,15 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        user-select: text;
+      }
+
+      .update-row .version {
+        max-width: 210px;
+      }
+
+      #settings-version {
+        user-select: text;
       }
 
       .version .to {
@@ -558,6 +592,10 @@
 
       .update-row .act:hover:not(:disabled) {
         border-color: var(--control-hover);
+      }
+
+      .update-row .act:active:not(:disabled) {
+        background: var(--track);
       }
 
       .tag.pending {
@@ -683,6 +721,7 @@
       }
 
       .tile {
+        min-width: 0;
         height: 76px;
         padding: 12px 14px;
         border-radius: 12px;
@@ -697,6 +736,10 @@
 
       .tile:hover {
         border-color: var(--control-line);
+      }
+
+      .tile:active:not(:disabled) {
+        background: var(--track);
       }
 
       .tile[aria-pressed="true"] {
@@ -717,8 +760,12 @@
       }
 
       .tile-count {
+        max-width: 100%;
         color: var(--muted);
         font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .tick-mark {
@@ -750,10 +797,6 @@
         display: flex;
         align-items: center;
         gap: 10px;
-      }
-
-      .panel-head .group-note {
-        flex: 1;
       }
 
       .package-row {
@@ -807,10 +850,6 @@
 
       footer .spacer {
         flex: 1;
-      }
-
-      footer .dot {
-        color: var(--faint);
       }
 
       .support {
@@ -958,31 +997,35 @@
       }
 
       .switch[aria-pressed="true"] {
-        background: var(--green);
+        background: var(--switch-on);
         justify-content: flex-end;
       }
 
-      .overlay {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-        background: var(--shade);
+      .dialog {
+        width: min(680px, calc(100% - 48px));
+        max-height: calc(100% - 48px);
+        overflow-y: auto;
+        padding: 22px;
+        background: var(--card);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 14px;
       }
 
-      .dialog {
-        width: min(680px, 100%);
-        max-height: 100%;
-        overflow-y: auto;
+      .dialog[open] {
         display: flex;
         flex-direction: column;
         gap: 18px;
-        padding: 22px;
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 14px;
+      }
+
+      .dialog:modal {
+        overscroll-behavior: contain;
+      }
+
+      .dialog::backdrop {
+        background: var(--shade);
+        overflow: hidden;
+        overscroll-behavior: contain;
       }
 
       .approval h3 {
@@ -1019,7 +1062,7 @@
       .approval code {
         display: block;
         color: var(--muted);
-        font: 12px/1.4 "Cascadia Mono", Consolas, ui-monospace, monospace;
+        font: 12px/1.4 var(--mono);
         white-space: pre-wrap;
         word-break: break-all;
         user-select: text;
@@ -1029,6 +1072,17 @@
         display: flex;
         justify-content: flex-end;
         gap: 8px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation-duration: 2.4s;
+        }
+
+        .progress span,
+        .chevron {
+          transition: none;
+        }
       }
     </style>
   </head>
@@ -1056,7 +1110,7 @@
       <span class="app">Globlin</span>
       <label class="search">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
-        <input id="search" type="search" placeholder="Search packages" aria-label="Search packages" autocomplete="off" />
+        <input id="search" type="search" spellcheck="false" autofocus placeholder="Search packages" aria-label="Search packages" autocomplete="off" />
       </label>
       <button id="check" class="btn" type="button">Check now</button>
       <button id="open-settings" class="btn icon" type="button" aria-label="Settings" title="Settings">
@@ -1075,7 +1129,7 @@
     </header>
 
     <main id="main-view" class="scroll">
-      <div id="filters" class="chips" role="group" aria-label="Filter by status"></div>
+      <div id="filters" class="chips" data-key="filters" role="group" aria-label="Filter by status"></div>
 
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-head">
@@ -1083,6 +1137,7 @@
             <div class="hero-text">
               <h1 id="hero-title">Globlin</h1>
               <p id="hero-note" class="hero-note"></p>
+              <span id="hero-status" class="sr-only" role="status"></span>
             </div>
             <button id="update-selected" class="btn big" type="button" disabled>Update selected</button>
             <button id="update-all" class="btn big primary" type="button" disabled>Update all</button>
@@ -1102,15 +1157,16 @@
           <h2 id="rest-title"></h2>
           <span id="rest-note"></span>
         </div>
-        <div id="tiles" class="tiles"></div>
+        <div id="tiles" class="tiles" data-key="tiles"></div>
         <div id="lists" class="rest"></div>
-        <div id="absent" class="rest-note"></div>
+        <div id="absent" class="rest-note" data-key="absent"></div>
       </section>
     </main>
 
     <div id="settings-view" hidden>
       <nav class="settings-nav" aria-label="Settings sections">
         <button type="button" data-section="general" aria-current="true">General</button>
+        <button type="button" data-section="updates">Updates</button>
         <button type="button" data-section="sources">Sources</button>
         <button type="button" data-section="diagnostics">Diagnostics</button>
         <button type="button" data-section="about">About</button>
@@ -1133,13 +1189,10 @@
               </div>
               <button id="monochrome-icon" class="switch" type="button" aria-pressed="false" aria-labelledby="monochrome-icon-label"></button>
             </div>
-            <div class="setting">
-              <div class="setting-text">
-                <span class="setting-label" id="auto-approve-label">Approve npm install scripts automatically</span>
-                <span class="setting-note warn">Skips the approval dialog. Any dependency’s install scripts then run without you seeing them.</span>
-              </div>
-              <button id="auto-approve" class="switch" type="button" aria-pressed="false" aria-labelledby="auto-approve-label"></button>
-            </div>
+          </section>
+
+          <section id="updates" aria-labelledby="updates-title">
+            <h2 id="updates-title">Updates</h2>
             <div class="setting">
               <div class="setting-text">
                 <span class="setting-label" id="update-on-start-label">Update everything when Globlin starts</span>
@@ -1154,6 +1207,13 @@
               </div>
               <button id="silent-updates" class="switch" type="button" aria-pressed="false" aria-labelledby="silent-updates-label"></button>
             </div>
+            <div class="setting">
+              <div class="setting-text">
+                <span class="setting-label" id="auto-approve-label">Approve npm install scripts automatically</span>
+                <span class="setting-note warn">Skips the approval dialog. Any dependency’s install scripts then run without you seeing them.</span>
+              </div>
+              <button id="auto-approve" class="switch" type="button" aria-pressed="false" aria-labelledby="auto-approve-label"></button>
+            </div>
             <div id="choco-one-prompt-row" class="setting" hidden>
               <div class="setting-text">
                 <span class="setting-label" id="choco-one-prompt-label">One administrator prompt for all choco updates</span>
@@ -1167,20 +1227,6 @@
                 <span class="setting-note">Runs every winget update in a batch as administrator under a single Windows prompt. Their rows finish together when the last one is done. A few installers refuse to run as administrator and then fail.</span>
               </div>
               <button id="winget-one-prompt" class="switch" type="button" aria-pressed="false" aria-labelledby="winget-one-prompt-label"></button>
-            </div>
-            <div class="setting">
-              <div class="setting-text">
-                <span class="setting-label" id="auto-update-label">Update Globlin automatically</span>
-                <span id="auto-update-note" class="setting-note">Installs new Globlin releases in the background, verified against their signature.</span>
-              </div>
-              <button id="auto-update" class="switch" type="button" aria-pressed="false" aria-labelledby="auto-update-label"></button>
-            </div>
-            <div id="self-row" class="setting" hidden>
-              <div class="setting-text">
-                <span id="self-label" class="setting-label"></span>
-                <span class="setting-note">Globlin restarts into the new version when the update finishes.</span>
-              </div>
-              <button id="self-update" class="btn" type="button">Update now</button>
             </div>
           </section>
 
@@ -1207,6 +1253,20 @@
                 <span class="setting-label">Version</span>
                 <span id="settings-version" class="setting-note mono"></span>
               </div>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <span class="setting-label" id="auto-update-label">Update Globlin automatically</span>
+                <span id="auto-update-note" class="setting-note">Installs new Globlin releases in the background, verified against their signature.</span>
+              </div>
+              <button id="auto-update" class="switch" type="button" aria-pressed="false" aria-labelledby="auto-update-label"></button>
+            </div>
+            <div id="self-row" class="setting" hidden>
+              <div class="setting-text">
+                <span id="self-label" class="setting-label"></span>
+                <span class="setting-note">Globlin restarts into the new version when the update finishes.</span>
+              </div>
+              <button id="self-update" class="btn" type="button">Update now</button>
             </div>
             <div class="setting">
               <div class="setting-text">
@@ -1238,17 +1298,10 @@
       <span id="version"></span>
       <button id="footer-self" class="link blue" type="button" hidden></button>
       <span class="spacer"></span>
-      <button id="footer-patreon" class="link support" type="button">
-        <svg class="heart" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path></svg>
-        Support on Patreon
-      </button>
-      <span class="dot" aria-hidden="true">·</span>
-      <button id="footer-repo" class="link blue" type="button">GitHub</button>
-      <span class="dot" aria-hidden="true">·</span>
       <button id="open-log" class="link blue" type="button">Open last log</button>
     </footer>
 
-    <div id="approvals" class="overlay" hidden></div>
+    <dialog id="approvals" class="dialog" aria-label="Install scripts need approval"></dialog>
 
     <script>
       const send = (id) => window.ipc.postMessage(id);
@@ -1281,6 +1334,29 @@
       };
 
       const el = (id) => document.getElementById(id);
+
+      const CONTROLS = "button, input";
+
+      const captureFocus = () => {
+        const active = document.activeElement;
+        const host = active && active.closest("[data-key]");
+        if (!host) return null;
+        if (host === active) return { key: host.dataset.key, index: -1 };
+        const index = [...host.querySelectorAll(CONTROLS)].indexOf(active);
+        return index < 0 ? null : { key: host.dataset.key, index };
+      };
+
+      const restoreFocus = (saved) => {
+        if (!saved) return;
+        const host = document.querySelector('[data-key="' + CSS.escape(saved.key) + '"]');
+        if (!host) return;
+        const target = saved.index < 0 ? host : host.querySelectorAll(CONTROLS)[saved.index];
+        if (target) target.focus();
+      };
+
+      const setText = (node, value) => {
+        if (node.textContent !== value) node.textContent = value;
+      };
 
       const make = (tag, className, text) => {
         const node = document.createElement(tag);
@@ -1382,8 +1458,9 @@
       const renderHeroText = () => {
         const snapshot = state.snapshot;
         const text = heroText(snapshot);
-        el("hero-title").textContent = text.title;
-        el("hero-note").textContent = text.note;
+        setText(el("hero-title"), text.title);
+        setText(el("hero-note"), text.note);
+        setText(el("hero-status"), text.title.replace(/\.+$/, ""));
         document.body.dataset.state = pageState(snapshot);
         const batch = snapshot.batch;
         const progress = el("progress");
@@ -1435,6 +1512,7 @@
 
       const groupHead = (key, auto, name, note) => {
         const head = make("div", "group-head");
+        head.dataset.key = "head:" + key;
         const open = isExpanded(key, auto);
         const toggle = button("group-toggle", "", () => flip(key, auto));
         toggle.setAttribute("aria-expanded", String(open));
@@ -1443,11 +1521,14 @@
         return { head, open };
       };
 
-      const showMore = (key, hidden, noun) =>
-        button("more", "Show " + hidden + " more " + noun, () => {
+      const showMore = (key, hidden, noun) => {
+        const more = button("more", "Show " + hidden + " more " + noun, () => {
           state.more.add(key);
           draw();
         });
+        more.dataset.key = "more:" + key;
+        return more;
+      };
 
       const versionCell = (row) => {
         const cell = make("span", "version mono");
@@ -1470,7 +1551,8 @@
         cell.append(make("span", "name", row.name));
         if (row.elevation) cell.append(elevationTag(row.elevation));
         if (row.in_use) {
-          const tag = make("span", "tag in-use", "in use: " + row.in_use.programs);
+          const closing = state.confirming === "close:" + row.key;
+          const tag = make("span", "tag in-use", closing ? "closes " + row.in_use.programs + " without saving" : "in use: " + row.in_use.programs);
           tag.title = "The last update failed while these programs were running from its folder or had its files open.";
           cell.append(tag);
         }
@@ -1519,6 +1601,7 @@
 
       const updateRow = (row) => {
         const line = make("div", "update-row");
+        line.dataset.key = "row:" + row.key;
         const box = make("input");
         box.type = "checkbox";
         box.setAttribute("aria-label", "Select " + row.name);
@@ -1607,7 +1690,6 @@
 
       const renderHero = () => {
         renderHeroText();
-        applyBusy();
         const host = el("groups");
         host.replaceChildren();
         renderBatchGroups(host);
@@ -1617,6 +1699,7 @@
 
       const packageRow = (row) => {
         const line = make("div", "package-row " + row.status);
+        line.dataset.key = "row:" + row.key;
         const sign = make("span", "sign", PACKAGE_SIGNS[row.status] || "");
         sign.setAttribute("aria-hidden", "true");
         line.append(sign, nameCell(row), versionCell(row), ignoreButton(row), removeButton(row));
@@ -1682,6 +1765,7 @@
           if (!rows.length) continue;
           const panel = make("div", "panel");
           const head = make("div", "panel-head");
+          head.dataset.key = "panel:" + label;
           head.append(make("span", "group-name", label), make("span", "group-note", tileCount(rows)));
           if (state.open.has(label)) {
             const close = button("link", "Close", () => {
@@ -1750,8 +1834,9 @@
           const line = make("div", "setting source-setting" + (source.enabled ? "" : " off"));
           const label = make("span", "setting-label", source.label);
           label.id = "source-" + source.label.replace(/\W+/g, "-");
-          line.append(label, make("span", "setting-note", sourceNote(source)));
-          if (source.elevation) line.append(elevationTag(source.elevation));
+          line.dataset.key = "source:" + source.id;
+          const note = sourceNote(source) + (source.elevation ? ". " + source.elevation.detail : "");
+          line.append(label, make("span", "setting-note", note));
           const toggle = button("switch", "", () => send(source.id));
           toggle.setAttribute("aria-labelledby", label.id);
           setSwitch(toggle, source.enabled);
@@ -1771,14 +1856,14 @@
       const renderApprovals = () => {
         const host = el("approvals");
         const entries = state.snapshot.approvals;
-        host.hidden = !entries.length;
         host.replaceChildren();
-        if (!entries.length) return;
-        const dialog = make("div", "dialog");
-        dialog.setAttribute("role", "dialog");
-        dialog.setAttribute("aria-modal", "true");
+        if (!entries.length) {
+          if (host.open) host.close();
+          return;
+        }
         for (const entry of entries) {
           const card = make("div", "approval");
+          card.dataset.key = "approval:" + entry.approve_id;
           const title = make("h3", "", entry.name + " " + entry.from + " → " + entry.to);
           const count = entry.scripts.length;
           const note = make(
@@ -1797,11 +1882,12 @@
           const buttons = make("div", "buttons");
           const later = button("btn", "Not now", () => send(entry.dismiss_id));
           const allow = button("btn primary", "Allow and update", () => send(entry.approve_id));
+          if (entry === entries[0]) later.autofocus = true;
           buttons.append(later, allow);
           card.append(title, note, list, buttons);
-          dialog.append(card);
+          host.append(card);
         }
-        host.append(dialog);
+        if (!host.open) host.showModal();
       };
 
       const showView = () => {
@@ -1813,14 +1899,52 @@
         el("settings-view").hidden = !settings;
       };
 
+      const markSection = (name) => {
+        for (const link of document.querySelectorAll(".settings-nav button")) {
+          if (link.dataset.section === name) link.setAttribute("aria-current", "true");
+          else link.removeAttribute("aria-current");
+        }
+      };
+
+      let skipNextScroll = false;
+
+      const jumpToSection = (name) => {
+        const box = document.querySelector("#settings-view .scroll");
+        const before = box.scrollTop;
+        skipNextScroll = true;
+        el(name).scrollIntoView();
+        if (box.scrollTop === before) skipNextScroll = false;
+      };
+
+      const sectionInView = () => {
+        const box = document.querySelector("#settings-view .scroll");
+        const sections = [...box.querySelectorAll("section")];
+        if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) return sections.at(-1).id;
+        const line = box.getBoundingClientRect().top + 40;
+        let current = sections[0];
+        for (const section of sections) {
+          if (section.getBoundingClientRect().top <= line) current = section;
+        }
+        return current.id;
+      };
+
       const openSettings = (section) => {
         state.view = "settings";
         draw();
-        if (section) el(section).scrollIntoView();
+        markSection(section || "general");
+        el("close-settings").focus();
+        if (section) jumpToSection(section);
+      };
+
+      const closeSettings = () => {
+        state.view = "main";
+        draw();
+        el("open-settings").focus();
       };
 
       const draw = () => {
         if (!state.snapshot) return;
+        const saved = captureFocus();
         const known = new Set(state.snapshot.packages.map((row) => row.key));
         for (const key of [...state.selected]) if (!known.has(key)) state.selected.delete(key);
         showView();
@@ -1832,6 +1956,7 @@
         renderFooter();
         renderApprovals();
         applyBusy();
+        restoreFocus(saved);
       };
 
       el("search").oninput = (event) => {
@@ -1847,9 +1972,7 @@
         state.selected.clear();
       };
       el("open-log").onclick = () => send("open-log");
-      el("footer-patreon").onclick = () => send("open-patreon");
       el("settings-patreon").onclick = () => send("open-patreon");
-      el("footer-repo").onclick = () => send("open-repo");
       el("settings-repo").onclick = () => send("open-repo");
       el("settings-log").onclick = () => send("open-log");
       el("autostart").onclick = () => send("autostart");
@@ -1863,20 +1986,54 @@
       el("self-update").onclick = () => send("update-self");
       el("footer-self").onclick = () => send("update-self");
       el("open-settings").onclick = () => openSettings();
-      el("close-settings").onclick = () => {
-        state.view = "main";
-        draw();
-      };
+      el("close-settings").onclick = closeSettings;
+      el("approvals").addEventListener("close", () => {
+        for (const entry of state.snapshot.approvals) send(entry.dismiss_id);
+      });
       for (const link of document.querySelectorAll(".settings-nav button")) {
         link.onclick = () => {
-          for (const other of document.querySelectorAll(".settings-nav button")) other.removeAttribute("aria-current");
-          link.setAttribute("aria-current", "true");
-          el(link.dataset.section).scrollIntoView({ behavior: "smooth" });
+          markSection(link.dataset.section);
+          jumpToSection(link.dataset.section);
         };
       }
+      document.querySelector("#settings-view .scroll").addEventListener(
+        "scroll",
+        () => {
+          if (skipNextScroll) {
+            skipNextScroll = false;
+            return;
+          }
+          markSection(sectionInView());
+        },
+        { passive: true },
+      );
+      document.addEventListener("contextmenu", (event) => {
+        if (!event.target.closest("input, .name, .version, code")) event.preventDefault();
+      });
       document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && state.view === "settings") {
-          state.view = "main";
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "w") {
+          event.preventDefault();
+          send("close-window");
+          return;
+        }
+        if (el("approvals").open) return;
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+          event.preventDefault();
+          if (state.view === "settings") closeSettings();
+          const search = el("search");
+          search.focus();
+          search.select();
+          return;
+        }
+        if (event.key !== "Escape") return;
+        if (state.view === "settings") {
+          closeSettings();
+        } else if (state.confirming) {
+          state.confirming = null;
+          draw();
+        } else if (el("search").value) {
+          el("search").value = "";
+          state.query = "";
           draw();
         }
       });
@@ -1894,8 +2051,13 @@
           snapshot.headline = update.headline;
           snapshot.busy = update.busy;
           snapshot.batch = update.batch;
-          if (shapeOf(update.batch) !== state.batchShape) renderHero();
-          else renderHeroText();
+          if (shapeOf(update.batch) !== state.batchShape) {
+            const saved = captureFocus();
+            renderHero();
+            restoreFocus(saved);
+          } else {
+            renderHeroText();
+          }
           applyBusy();
         },
       };
