@@ -23,6 +23,9 @@ async function showLatestVersion(): Promise<void> {
   document.querySelectorAll('[data-version]').forEach((node) => {
     node.textContent = tag;
   });
+  document.querySelectorAll<HTMLElement>('[data-version-line]').forEach((node) => {
+    node.hidden = false;
+  });
 }
 
 function osButton(os: Os): HTMLAnchorElement | null {

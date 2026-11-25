@@ -15,9 +15,9 @@ const links = [
   <div class="shell">
     <a class="brand" href="/">
       <img src={image('logo.png')} width="28" height="28" alt="" />
-      Globlin
+      <span class="brand-name">Globlin</span>
     </a>
-    <nav class="site-nav">
+    <nav class="site-nav" aria-label="Sections">
       {links.map((link) => <a href={link.href}>{link.label}</a>)}
     </nav>
   </div>

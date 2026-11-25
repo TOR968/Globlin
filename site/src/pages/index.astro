@@ -22,15 +22,6 @@ const heroStates = [
   { className: 'state state-d', icon: 'icon-error.png' },
 ];
 
-const badges = [
-  'Installer or portable',
-  'Windows x64 and ARM64',
-  'macOS on Apple Silicon',
-  'Linux deb, rpm and AppImage',
-  'Signed updates',
-  'Open source, GPL-3.0',
-];
-
 const shot: { formats: ImageOutputFormat[]; fallbackFormat: ImageOutputFormat; widths: number[] } = {
   formats: ['avif', 'webp'],
   fallbackFormat: 'webp',
@@ -44,12 +35,11 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
   <OsSprite />
   <SiteHeader />
 
-  <main>
+  <main id="main">
     <section class="hero">
       <div class="shell">
         <div class="hero-grid">
           <div>
-            <p class="eyebrow">Tray app for Windows, macOS and Linux · <span class="tag">Beta</span></p>
             <h1>Keep every global package up to date</h1>
             <p>
               Globlin is a free, open-source tray app that checks your globally installed packages across
@@ -80,9 +70,6 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
             {heroStates.map((state) => <img class={state.className} src={image(state.icon)} width="64" height="64" alt="" />)}
           </div>
         </div>
-        <ul class="badges">
-          {badges.map((badge) => <li>{badge}</li>)}
-        </ul>
         <figure class="shot shot-hero">
           <Picture src={updatesShot} {...shot} sizes={heroSizes} loading="eager" fetchpriority="high" alt="The Globlin window: three updates ready at the top with an Update all button, grouped by package manager, and every other package manager summarised as up to date below" />
         </figure>
@@ -91,7 +78,6 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
 
     <section class="section" id="window">
       <div class="shell">
-        <p class="eyebrow">What you actually see</p>
         <h2>Updates first, everything else one click away</h2>
         <p class="lede">
           What has fallen behind sits at the top, grouped by package manager, with one button for all of
@@ -113,7 +99,6 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
 
     <section class="section" id="features">
       <div class="shell">
-        <p class="eyebrow">Features</p>
         <h2>It watches, it tells you, it waits for your click</h2>
         <p class="lede">Globlin never touches anything on its own unless you turn that on.</p>
         <div class="grid">
@@ -131,7 +116,6 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
 
     <section class="section" id="states">
       <div class="shell">
-        <p class="eyebrow">Icon states</p>
         <h2>The goblin&rsquo;s colour is the status</h2>
         <p class="lede">
           The tray goblin is drawn from code, not loaded from an image file, so what it shows always
@@ -152,7 +136,6 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
 
     <section class="section" id="install">
       <div class="shell">
-        <p class="eyebrow">Install</p>
         <h2>Pick the build for your machine</h2>
         <p class="lede">
           The same app for every platform, all of it beta. Checksums and minisign signatures for every
@@ -209,13 +192,12 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
         <div class="hero-actions">
           <a class="button button-ghost" href={RELEASES}>All releases</a>
         </div>
-        <p class="download-note">Latest: <span data-version>latest</span></p>
+        <p class="download-note" data-version-line hidden>Latest: <span data-version>latest</span></p>
       </div>
     </section>
 
     <section class="section faq" id="faq">
       <div class="shell">
-        <p class="eyebrow">FAQ</p>
         <h2>Questions worth answering</h2>
         {
           faq.map((entry) => (

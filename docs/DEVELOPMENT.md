@@ -954,8 +954,8 @@ shipped first, the beacon was blocked, the analytics panel showed zero visits wi
 and Lighthouse marked the console error down to 92 on Best Practices. A blocked beacon is silent, so
 the symptom to look for is missing data rather than a failure.
 
-Images under `/img/` are cached for a day, and every reference to one in `index.html` carries a
-`?v=<version>` query. They were cached for a year as `immutable` until the goblin replaced the `G` logo:
+Images under `/img/` are cached for a day, and every reference to one goes through the `image()`
+helper in `site/src/data/site.ts`, which adds a `?v=<version>` query. They were cached for a year as `immutable` until the goblin replaced the `G` logo:
 the files are regenerated in place under the same names, so browsers kept showing the old logo with no
 way to refresh it. Bump the `?v=` value whenever the dump tests rewrite `site/public/img/`.
 
