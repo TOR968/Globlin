@@ -3,9 +3,9 @@ use super::*;
 #[test]
 fn defaults_ignore_the_self_updating_packages() {
     let config = Config::default();
-    assert!(config.is_ignored("npm"));
-    assert!(config.is_ignored("@anthropic-ai/claude-code"));
-    assert!(!config.is_ignored("prettier"));
+    assert!(config.is_ignored("npm", SourceKind::Npm));
+    assert!(config.is_ignored("@anthropic-ai/claude-code", SourceKind::Npm));
+    assert!(!config.is_ignored("prettier", SourceKind::Npm));
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn missing_fields_fall_back_to_defaults() {
 #[test]
 fn an_explicit_empty_ignore_list_is_respected() {
     let restored: Config = serde_json::from_str(r#"{"ignore":[]}"#).unwrap();
-    assert!(!restored.is_ignored("npm"));
+    assert!(!restored.is_ignored("npm", SourceKind::Npm));
 }
 
 #[test]
@@ -69,25 +69,25 @@ fn interval_never_collapses_to_zero() {
 #[test]
 fn ignoring_the_same_package_twice_does_not_duplicate_the_entry() {
     let mut config = Config::default();
-    config.set_ignored("prettier", true);
-    config.set_ignored("prettier", true);
+    config.set_ignored("prettier", SourceKind::Npm, true);
+    config.set_ignored("prettier", SourceKind::Npm, true);
 
     assert_eq!(
         config
             .ignore
             .iter()
-            .filter(|name| *name == "prettier")
+            .filter(|name| *name == "npm:prettier")
             .count(),
         1
     );
-    assert!(config.is_ignored("prettier"));
+    assert!(config.is_ignored("prettier", SourceKind::Npm));
 }
 
 #[test]
 fn un_ignoring_a_package_that_was_never_ignored_changes_nothing() {
     let mut config = Config::default();
     let before = config.ignore.clone();
-    config.set_ignored("prettier", false);
+    config.set_ignored("prettier", SourceKind::Npm, false);
 
     assert_eq!(config.ignore, before);
 }
@@ -95,10 +95,10 @@ fn un_ignoring_a_package_that_was_never_ignored_changes_nothing() {
 #[test]
 fn un_ignoring_removes_only_the_named_package() {
     let mut config = Config::default();
-    config.set_ignored("npm", false);
+    config.set_ignored("npm", SourceKind::Npm, false);
 
-    assert!(!config.is_ignored("npm"));
-    assert!(config.is_ignored("@anthropic-ai/claude-code"));
+    assert!(!config.is_ignored("npm", SourceKind::Npm));
+    assert!(config.is_ignored("@anthropic-ai/claude-code", SourceKind::Npm));
 }
 
 #[test]
@@ -146,5 +146,53 @@ fn only_the_sources_whose_one_prompt_switch_is_on_share_a_prompt() {
     assert_eq!(
         config.one_prompt_kinds(),
         vec![SourceKind::Choco, SourceKind::Winget]
+    );
+}
+
+#[test]
+fn ignoring_a_package_in_one_source_leaves_the_same_name_in_another_source_alone() {
+    let mut config = Config::default();
+    config.set_ignored("prettier", SourceKind::Npm, true);
+
+    assert!(config.is_ignored("prettier", SourceKind::Npm));
+    assert!(!config.is_ignored("prettier", SourceKind::Pnpm));
+}
+
+#[test]
+fn a_bare_legacy_entry_ignores_the_name_in_every_source() {
+    let config = Config {
+        ignore: vec!["prettier".to_string()],
+        ..Default::default()
+    };
+
+    assert!(config.is_ignored("prettier", SourceKind::Npm));
+    assert!(config.is_ignored("prettier", SourceKind::Pnpm));
+}
+
+#[test]
+fn un_ignoring_removes_both_the_bare_and_the_scoped_entry() {
+    let mut config = Config {
+        ignore: vec!["prettier".to_string(), "npm:prettier".to_string()],
+        ..Default::default()
+    };
+    config.set_ignored("prettier", SourceKind::Npm, false);
+
+    assert!(config.ignore.is_empty());
+}
+
+#[test]
+fn ignored_in_strips_the_source_prefix_and_keeps_bare_entries() {
+    let config = Config {
+        ignore: vec![
+            "npm:prettier".to_string(),
+            "pnpm:eslint".to_string(),
+            "tsc".to_string(),
+        ],
+        ..Default::default()
+    };
+
+    assert_eq!(
+        config.ignored_in(SourceKind::Npm),
+        ["prettier", "pnpm:eslint", "tsc"]
     );
 }

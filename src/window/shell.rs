@@ -1,13 +1,17 @@
-use tao::dpi::LogicalSize;
+use tao::dpi::{LogicalSize, PhysicalPosition};
 use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
-use tao::window::{Icon, Window as HostWindow, WindowBuilder, WindowId};
+use tao::window::{Icon, Theme, Window as HostWindow, WindowBuilder, WindowId};
 use wry::{NewWindowResponse, WebView, WebViewBuilder};
 
-use super::{is_own_page, script, tick_script, Snapshot, Tick, HEIGHT, TITLE, UI, WIDTH};
+use super::{
+    is_own_page, on_a_screen, script, tick_script, Screen, Snapshot, Tick, HEIGHT, TITLE, UI, WIDTH,
+};
 use crate::icon::{self, IconState};
 use crate::{Message, Result};
 
-const MIN_WIDTH: f64 = 680.0;
+const DARK_BACKGROUND: (u8, u8, u8, u8) = (15, 18, 21, 255);
+const LIGHT_BACKGROUND: (u8, u8, u8, u8) = (244, 245, 247, 255);
+const MIN_WIDTH: f64 = 760.0;
 const MIN_HEIGHT: f64 = 440.0;
 const ICON_SIZE: u32 = 64;
 
@@ -20,18 +24,37 @@ impl Window {
     pub fn new(
         target: &EventLoopWindowTarget<Message>,
         proxy: EventLoopProxy<Message>,
+        size: Option<(u32, u32)>,
+        position: Option<(i32, i32)>,
     ) -> Result<Self> {
-        let host = with_taskbar_icon(
-            WindowBuilder::new()
-                .with_title(TITLE)
-                .with_inner_size(LogicalSize::new(WIDTH, HEIGHT))
-                .with_min_inner_size(LogicalSize::new(MIN_WIDTH, MIN_HEIGHT))
-                .with_window_icon(app_icon())
-                .with_visible(false),
-        )
-        .build(target)?;
+        let (width, height) = size.map_or((WIDTH, HEIGHT), |(width, height)| {
+            (f64::from(width), f64::from(height))
+        });
+        let screens: Vec<Screen> = target
+            .available_monitors()
+            .map(|monitor| {
+                let origin = monitor.position();
+                let extent = monitor.size();
+                ((origin.x, origin.y), (extent.width, extent.height))
+            })
+            .collect();
+        let mut builder = WindowBuilder::new()
+            .with_title(TITLE)
+            .with_inner_size(LogicalSize::new(width, height))
+            .with_min_inner_size(LogicalSize::new(MIN_WIDTH, MIN_HEIGHT))
+            .with_window_icon(app_icon())
+            .with_visible(false);
+        if let Some((x, y)) = position.filter(|&point| on_a_screen(point, &screens)) {
+            builder = builder.with_position(PhysicalPosition::new(x, y));
+        }
+        let host = with_taskbar_icon(builder).build(target)?;
         let builder = WebViewBuilder::new()
             .with_html(UI)
+            .with_background_color(if host.theme() == Theme::Dark {
+                DARK_BACKGROUND
+            } else {
+                LIGHT_BACKGROUND
+            })
             .with_navigation_handler(|uri| is_own_page(&uri))
             .with_new_window_req_handler(|_, _| NewWindowResponse::Deny)
             .with_drag_drop_handler(|_| true)
@@ -55,6 +78,21 @@ impl Window {
 
     pub fn hide(&self) {
         self.host.set_visible(false);
+    }
+
+    pub fn size(&self) -> (u32, u32) {
+        let logical = self
+            .host
+            .inner_size()
+            .to_logical::<u32>(self.host.scale_factor());
+        (logical.width, logical.height)
+    }
+
+    pub fn position(&self) -> Option<(i32, i32)> {
+        self.host
+            .outer_position()
+            .ok()
+            .map(|position| (position.x, position.y))
     }
 
     pub fn visible(&self) -> bool {

@@ -29,6 +29,8 @@ pub struct Config {
     pub winget_one_prompt: bool,
     pub monochrome_icon: bool,
     pub last_self_notice: Option<String>,
+    pub window_size: Option<(u32, u32)>,
+    pub window_position: Option<(i32, i32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,6 +72,8 @@ impl Default for Config {
             winget_one_prompt: false,
             monochrome_icon: false,
             last_self_notice: None,
+            window_size: None,
+            window_position: None,
         }
     }
 }
@@ -120,7 +124,7 @@ impl Config {
     pub fn save(&self) -> Result<()> {
         let body = serde_json::to_string_pretty(self)?;
         let mut last_error = None;
-        for path in write_paths() {
+        for path in candidate_paths() {
             match replace_atomically(&path, &body) {
                 Ok(()) => return Ok(()),
                 Err(error) => last_error = Some(error),
@@ -136,8 +140,11 @@ impl Config {
         Duration::from_secs(self.check_interval_hours.max(1) * 3600)
     }
 
-    pub fn is_ignored(&self, name: &str) -> bool {
-        self.ignore.iter().any(|ignored| ignored == name)
+    pub fn is_ignored(&self, name: &str, source: SourceKind) -> bool {
+        let scoped = scoped_name(name, source);
+        self.ignore
+            .iter()
+            .any(|ignored| ignored == name || *ignored == scoped)
     }
 
     pub fn one_prompt_kinds(&self) -> Vec<SourceKind> {
@@ -193,23 +200,33 @@ impl Config {
         *slot = enabled;
     }
 
-    pub fn set_ignored(&mut self, name: &str, ignored: bool) {
+    pub fn set_ignored(&mut self, name: &str, source: SourceKind, ignored: bool) {
+        let scoped = scoped_name(name, source);
         if ignored {
-            if !self.is_ignored(name) {
-                self.ignore.push(name.to_string());
+            if !self.is_ignored(name, source) {
+                self.ignore.push(scoped);
             }
         } else {
-            self.ignore.retain(|entry| entry != name);
+            self.ignore
+                .retain(|entry| entry != name && *entry != scoped);
         }
     }
+
+    pub fn ignored_in(&self, source: SourceKind) -> Vec<String> {
+        let prefix = scoped_name("", source);
+        self.ignore
+            .iter()
+            .map(|entry| entry.strip_prefix(&prefix).unwrap_or(entry).to_string())
+            .collect()
+    }
+}
+
+fn scoped_name(name: &str, source: SourceKind) -> String {
+    format!("{}:{name}", source.label())
 }
 
 fn read_path() -> Option<PathBuf> {
     candidate_paths().into_iter().find(|path| path.is_file())
-}
-
-fn write_paths() -> Vec<PathBuf> {
-    candidate_paths()
 }
 
 fn candidate_paths() -> Vec<PathBuf> {

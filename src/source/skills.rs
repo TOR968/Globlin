@@ -45,7 +45,7 @@ impl Skills {
             not_installed("no home directory to look for the skills.sh lock file in".into())
         })?;
         Ok(Self {
-            ignored: config.ignore.clone(),
+            ignored: config.ignored_in(SourceKind::Skills),
             ..Self::at(lock, npx_beside(config.npm_cmd.as_deref()))?
         })
     }

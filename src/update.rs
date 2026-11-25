@@ -35,15 +35,8 @@ pub struct Skipped {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Step {
-    Started {
-        target: UpdateTarget,
-        index: usize,
-        total: usize,
-    },
-    Finished {
-        index: usize,
-        state: RowState,
-    },
+    Started { index: usize },
+    Finished { index: usize, state: RowState },
 }
 
 struct Failure {
@@ -115,7 +108,7 @@ fn drive(
     let mut busy = Vec::new();
 
     for job in jobs {
-        announce_start(announce, targets, job[0]);
+        announce(Step::Started { index: job[0] });
         let mut refused = Vec::new();
         for (index, result) in job.iter().copied().zip(execute(&job)) {
             match result {
@@ -132,21 +125,13 @@ fn drive(
         std::thread::sleep(busy_pause);
     }
     for job in busy {
-        announce_start(announce, targets, job[0]);
+        announce(Step::Started { index: job[0] });
         for (index, result) in job.iter().copied().zip(execute(&job)) {
             record(&mut outcome, &mut report, targets, index, result, announce);
         }
     }
 
     outcome
-}
-
-fn announce_start(announce: &impl Fn(Step), targets: &[UpdateTarget], index: usize) {
-    announce(Step::Started {
-        target: targets[index].clone(),
-        index,
-        total: targets.len(),
-    });
 }
 
 fn record(

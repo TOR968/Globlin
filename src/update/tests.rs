@@ -91,26 +91,7 @@ fn every_target_announces_a_start_and_a_finish() {
     assert!(matches!(seen[0], Step::Started { index: 0, .. }));
     assert!(matches!(seen[1], Step::Finished { index: 0, .. }));
     assert_eq!(started(&seen).len(), 3);
-    assert!(
-        matches!(seen[2], Step::Started { index: 1, ref target, total: 3 } if target.name == "beta")
-    );
-}
-
-#[test]
-fn a_start_carries_both_versions_so_the_menu_can_show_them() {
-    let fake = UnrunnableNpm::new("versions");
-    let seen = Mutex::new(Vec::new());
-
-    run(&fake.config, &[target("alpha")], &[], |step| {
-        seen.lock().unwrap().push(step);
-    });
-
-    let seen = seen.lock().unwrap();
-    let Step::Started { target, .. } = &seen[0] else {
-        panic!("the first step should be a start: {:?}", seen[0]);
-    };
-    assert_eq!(target.from, "1.0.0");
-    assert_eq!(target.to, "2.0.0");
+    assert!(matches!(seen[2], Step::Started { index: 1 }));
 }
 
 #[test]

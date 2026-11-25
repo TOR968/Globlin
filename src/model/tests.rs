@@ -204,7 +204,7 @@ fn the_npm_registry_and_the_self_reporting_sources_are_told_apart() {
 #[test]
 fn every_source_has_a_distinct_label_and_suffix() {
     let labels: std::collections::HashSet<&str> = KINDS.iter().map(|kind| kind.label()).collect();
-    let suffixes: std::collections::HashSet<&str> =
+    let suffixes: std::collections::HashSet<String> =
         KINDS.iter().map(|kind| kind.suffix()).collect();
 
     assert_eq!(labels.len(), KINDS.len());
