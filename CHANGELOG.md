@@ -7,6 +7,25 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.29](https://github.com/TOR968/Globlin/compare/v0.4.28...v0.4.29) - 2026-11-25
+
+### Added
+
+- ignore a package in one source only, and remember the window's size and position
+
+### Fixed
+
+- keep keyboard focus across redraws, make the approval dialog a real modal and fix light-theme contrast
+- stop waiting forever when the macOS update archive will not unpack
+- run Update everything on start once a check succeeds, not after a failed first check
+
+### Other
+
+- Merge pull request #146 from TOR968/deps/tray-icon-0.26
+- Merge branch 'master' into release-plz-2026-11-23T14-52-45Z
+- release v0.4.28
+- *(deps)* bump tray-icon from 0.24 to 0.26
+
 ## [0.4.28](https://github.com/TOR968/Globlin/compare/v0.4.27...v0.4.28) - 2026-11-23
 
 ### Fixed
