@@ -12,7 +12,7 @@ homepage = "https://globlin.pages.dev"
 section = "utils"
 priority = "optional"
 depends = "$auto, libayatana-appindicator3-1 | libappindicator3-1"
-extended-description = "A tray app that watches your globally installed packages across npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem, Homebrew and the PowerShell Gallery, and tells you when one falls behind. Beta."
+extended-description = "A tray app that watches your globally installed packages across npm, bun, pnpm, yarn, pipx, uv, cargo, go, dotnet, gem, Homebrew and the PowerShell Gallery, and tells you when one falls behind."
 assets = [
     ["target/release/globlin", "usr/bin/", "755"],
     ["packaging/linux/globlin.desktop", "usr/share/applications/", "644"],

@@ -13,10 +13,6 @@
   [**globlin.pages.dev**](https://globlin.pages.dev)
 </div>
 
-> **Beta.** Globlin is still in beta on every platform: the Windows builds are in daily use; the installer,
-> the ARM64 builds and the macOS and Linux builds are new. Please
-> [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
-
 **[Install](#install)** · **[Using it](#using-it)** · **[Sources](#sources)** ·
 **[Icon states](#icon-states)** · **[Keeping itself updated](#keeping-itself-updated)** ·
 **[More](#more)** · **[License](#license)**

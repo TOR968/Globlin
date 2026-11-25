@@ -37,8 +37,7 @@ $file = 'globlin-setup-x64.exe'
 
 @CHANGELOG@
 
-**Beta.** Globlin is still in beta on every platform — the installer, the ARM64 builds and the macOS and
-Linux builds are new. Please [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
+Please [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
 A tray app for Windows, macOS and Linux that watches your global packages — npm, bun, pnpm, yarn, pipx,
 uv, cargo, go, dotnet, gem, Homebrew, scoop, winget, choco and the PowerShell Gallery — notifies you when
