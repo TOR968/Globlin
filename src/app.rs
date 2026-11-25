@@ -569,7 +569,7 @@ impl App {
         if self.wants_auto_update() {
             self.start_self_update();
         }
-        if self.update_on_start && self.activity.is_none() {
+        if self.update_on_start && self.activity.is_none() && !self.failed {
             self.update_on_start = false;
             let targets = self.every_outdated_target();
             self.start_update(targets, Vec::new(), false);
