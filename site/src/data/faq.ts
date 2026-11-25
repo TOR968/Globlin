@@ -18,7 +18,7 @@ export const faq: Question[] = [
   {
     question: 'Does it work on macOS or Linux?',
     answer:
-      'Both, in beta. macOS yes, in beta: every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux gets a deb for Debian and Ubuntu, an rpm for Fedora and openSUSE and an AppImage that updates itself, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon.',
+      'Both, in beta. Every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux gets a deb for Debian and Ubuntu, an rpm for Fedora and openSUSE and an AppImage that updates itself, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon.',
   },
   {
     question: 'Do I need Node.js installed?',
@@ -28,7 +28,7 @@ export const faq: Question[] = [
   {
     question: 'Will it update anything without asking?',
     answer:
-      'No. Packages are only ever updated when you click. Globlin can update itself unattended, but that setting is off by default and applies to Globlin alone.',
+      'Not unless you turn that on. Out of the box, packages are only updated when you click. Two settings, both off by default, change that: Silent updates installs new versions as soon as a check finds them, and Update everything when Globlin starts runs Update all once after the first check. Globlin can also update itself unattended; that is a separate setting, also off by default.',
   },
   {
     question: 'How is this different from npm-check-updates?',

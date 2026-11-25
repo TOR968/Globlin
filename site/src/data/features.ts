@@ -18,7 +18,7 @@ export const features: Feature[] = [
   },
   {
     title: 'An ignore list that costs nothing',
-    body: 'Ignored packages still show their version but are never checked, flagged or notified about. Untick one and it is re-checked immediately.',
+    body: 'Ignored packages still show their version but are never checked, flagged or notified about. Ignoring is per package manager, so the same name elsewhere is still watched. Unignore one and it is re-checked immediately.',
   },
   {
     title: 'Uninstall without a dialog',
