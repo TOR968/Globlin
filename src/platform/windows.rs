@@ -132,6 +132,10 @@ pub fn claim_single_instance() -> bool {
     true
 }
 
+pub const fn launched_at_login() -> bool {
+    false
+}
+
 pub fn signal_running_instance() {
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{OpenEventW, SetEvent, EVENT_MODIFY_STATE};

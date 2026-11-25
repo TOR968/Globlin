@@ -8,7 +8,7 @@ export interface Question {
 export const faq: Question[] = [
   {
     question: 'Is Globlin stable?',
-    answer: `It is in beta on every platform. The Windows builds are in daily use; the installer, the ARM64 builds and the macOS and Linux builds are new. Please <a href="${ISSUES}">report anything that misbehaves</a>.`,
+    answer: `Yes. Every release is built and tested on Windows, macOS and Linux, and the app is in daily use. Please <a href="${ISSUES}">report anything that misbehaves</a>.`,
   },
   {
     question: 'Is Globlin free?',
@@ -18,7 +18,7 @@ export const faq: Question[] = [
   {
     question: 'Does it work on macOS or Linux?',
     answer:
-      'Both, in beta. Every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux gets a deb for Debian and Ubuntu, an rpm for Fedora and openSUSE and an AppImage that updates itself, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon.',
+      'Both. Every release includes an Apple Silicon build of Globlin.app that lives in the menu bar. It is signed ad hoc rather than notarised, so the first launch has to be allowed under System Settings → Privacy &amp; Security → Open Anyway. Linux gets a deb for Debian and Ubuntu, an rpm for Fedora and openSUSE and an AppImage that updates itself, for x64 and ARM64; GNOME needs the AppIndicator extension to show the tray icon.',
   },
   {
     question: 'Do I need Node.js installed?',
@@ -43,7 +43,7 @@ export const faq: Question[] = [
   {
     question: 'How do I remove it?',
     answer:
-      'If you used the installer, uninstall Globlin from Settings → Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin and ~/Library/LaunchAgents/dev.globlin.app.plist. On Linux, remove the package (<code>sudo apt remove globlin</code> or <code>sudo dnf remove globlin</code>) and delete ~/.local/share/globlin.',
+      'If you used the installer, uninstall Globlin from Settings → Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin. On macOS 13 and later the login item goes away with the app; on macOS 11–12 also delete ~/Library/LaunchAgents/dev.globlin.app.plist. On Linux, remove the package (<code>sudo apt remove globlin</code> or <code>sudo dnf remove globlin</code>) and delete ~/.local/share/globlin.',
   },
 ];
 

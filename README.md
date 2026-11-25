@@ -13,10 +13,6 @@
   [**globlin.pages.dev**](https://globlin.pages.dev)
 </div>
 
-> **Beta.** Globlin is still in beta on every platform: the Windows builds are in daily use, the installer
-> and the ARM64 builds are new, and the macOS and Linux builds are experimental. Please
-> [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
-
 **[Install](#install)** · **[Using it](#using-it)** · **[Sources](#sources)** ·
 **[Icon states](#icon-states)** · **[Keeping itself updated](#keeping-itself-updated)** ·
 **[More](#more)** · **[License](#license)**
@@ -31,7 +27,7 @@ batch. It never touches anything on its own unless you turn that on.
 
 On Windows it is one ~3.3 MB `.exe` with no runtime dependencies — run it portable, or let the
 per-user installer put it in place. The window is drawn by WebView2, which ships with Windows 11 and with
-any up-to-date Windows 10. Experimental builds exist for macOS (Apple Silicon) and Linux (deb, rpm, AUR, AppImage).
+any up-to-date Windows 10. Builds also exist for macOS (Apple Silicon) and Linux (deb, rpm, AUR, AppImage).
 
 ## Install
 
@@ -47,7 +43,7 @@ Windows on ARM (Snapdragon and other ARM64 laptops):
 Both update themselves the same way. Right-click the tray icon and tick **Run at startup** if you want it
 running every time you log in.
 
-### macOS (experimental)
+### macOS
 
 Apple Silicon (M1 and later), macOS 11 or newer. The app is signed ad hoc, not notarised, so macOS asks
 you to allow it once:
@@ -70,12 +66,13 @@ you to allow it once:
    startup** in the window's Settings or the menu.
 
 After that it updates itself like the Windows builds — no need to repeat the steps. Its settings and logs
-are in `~/Library/Application Support/globlin/`; *Run at startup* writes
-`~/Library/LaunchAgents/dev.globlin.app.plist`. Homebrew packages are compared with your local taps, so run
+are in `~/Library/Application Support/globlin/`; *Run at startup* adds Globlin to
+System Settings > General > Login Items on macOS 13 and later; only macOS 11–12 (or an install made before
+this version) uses `~/Library/LaunchAgents/dev.globlin.app.plist`. Homebrew packages are compared with your local taps, so run
 `brew update` now and then. It is new and tested on one Mac so far — please
 [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 
-### Linux (experimental)
+### Linux
 
 A `.deb` for Debian and Ubuntu (`globlin-amd64.deb`, `globlin-arm64.deb`) and an `.rpm` for Fedora,
 openSUSE and friends (`globlin-x86_64.rpm`, `globlin-aarch64.rpm`):

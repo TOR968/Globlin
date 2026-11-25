@@ -33,3 +33,16 @@ fn a_path_with_xml_characters_is_escaped_in_the_launch_agent() {
         "{plist}"
     );
 }
+
+#[test]
+fn a_login_item_that_is_enabled_or_awaiting_approval_counts_as_on() {
+    assert!(counts_as_enabled(1));
+    assert!(counts_as_enabled(2));
+}
+
+#[test]
+fn a_login_item_that_is_unregistered_missing_or_unknown_counts_as_off() {
+    assert!(!counts_as_enabled(0));
+    assert!(!counts_as_enabled(3));
+    assert!(!counts_as_enabled(42));
+}

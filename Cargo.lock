@@ -879,6 +879,7 @@ dependencies = [
  "mac-notification-sys",
  "minisign-verify",
  "notify-rust",
+ "objc2",
  "semver",
  "serde",
  "serde_json",

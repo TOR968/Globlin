@@ -3,17 +3,16 @@ interface Props {
   icon: string;
   name: string;
   meta: string;
-  experimental?: boolean;
 }
 
-const { icon, name, meta, experimental = false } = Astro.props;
+const { icon, name, meta } = Astro.props;
 ---
 
 <article class="platform">
   <div class="platform-head">
     <svg class="platform-logo" aria-hidden="true"><use href={`#os-${icon}`}></use></svg>
     <div>
-      <h3>{name}{experimental && <> <span class="tag">Experimental</span></>}</h3>
+      <h3>{name}</h3>
       <p class="platform-meta">{meta}</p>
     </div>
   </div>
