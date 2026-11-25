@@ -977,7 +977,8 @@ the scope, which is why it is not optional.
 `main::launch_kind` sorts every start into three kinds. **Opened** — no flag: the user started it from
 the Start menu, a pinned icon or the exe, so the window opens once the `App` exists. **Background** —
 `--background`, which every autostart entry carries (the `Run` value `set_autostart` writes, the
-installer's autostart task, the macOS LaunchAgent): tray only. **Replaced** — `--replaced`, self-update's
+installer's autostart task, the macOS LaunchAgent fallback): tray only. A macOS login item carries no
+flag; `platform::launched_at_login` keeps it tray-only instead. **Replaced** — `--replaced`, self-update's
 relaunch: the "updated" notification, and it wins over `--background`. It stays tray-only unless the old
 instance's window was visible when the update finished. Then `on_replaced` adds `--window`, and the new
 instance opens the window again. Without that, an update made from the window looked like Globlin had
@@ -1057,7 +1058,7 @@ process waits up to 10 seconds (50 attempts, 200 ms apart) for the single-instan
 still holding while it shuts down, then raises a `Globlin — updated / now running <version>` toast.
 
 On macOS and Linux the new process is spawned in a process group of its own (`process_group(0)`). A
-Globlin started at login is a launchd job (the LaunchAgent), and when a job's main process exits, launchd
+Globlin started at login through the LaunchAgent fallback is a launchd job, and when a job's main process exits, launchd
 kills every process left in its process group unless the plist sets `AbandonProcessGroup`. A child
 spawned in the parent's group therefore died with the old instance, and the user saw Globlin quit and
 never come back after an update.
@@ -1473,8 +1474,12 @@ walks users through *Open Anyway*).
   `OnceLock` for the life of the process.
 - **Notifications** go through `mac-notification-sys` under bundle id `dev.globlin.app`, each on its own
   thread with `wait_for_click`; a click fires the shared hook that opens the window.
-- **Autostart** is a LaunchAgent, `~/Library/LaunchAgents/dev.globlin.app.plist`, whose presence is the
-  setting. `SMAppService` would be the modern route, but it needs a properly signed app.
+- **Autostart** on macOS 13 and later registers the bundle as a login item through `SMAppService.mainApp`,
+  so System Settings > General > Login Items shows it as Globlin with its icon. A login item starts with no
+  arguments, so `platform::launched_at_login` reads the `keyAELaunchedAsLogInItem` launch Apple event
+  during `StartCause::Init` and keeps the window closed. On macOS 11 and 12, or when running outside a
+  bundle, autostart falls back to a LaunchAgent, `~/Library/LaunchAgents/dev.globlin.app.plist`. An
+  existing LaunchAgent is replaced by the login item on the next launch (`refresh_autostart`).
 - **Config** always lives in `~/Library/Application Support/globlin/` — never next to the exe, which is
   inside the bundle.
 - **Self-update** replaces the whole bundle: it downloads `globlin-macos-apple-silicon.zip` (the same

@@ -144,7 +144,7 @@ fn run(show_window: bool) -> ! {
             match App::new(proxy.clone()) {
                 Ok(started) => {
                     app = Some(started);
-                    if show_window {
+                    if show_window && !platform::launched_at_login() {
                         proxy.send_event(Message::ShowWindow).ok();
                     }
                 }

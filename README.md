@@ -70,8 +70,9 @@ you to allow it once:
    startup** in the window's Settings or the menu.
 
 After that it updates itself like the Windows builds — no need to repeat the steps. Its settings and logs
-are in `~/Library/Application Support/globlin/`; *Run at startup* writes
-`~/Library/LaunchAgents/dev.globlin.app.plist`. Homebrew packages are compared with your local taps, so run
+are in `~/Library/Application Support/globlin/`; *Run at startup* adds Globlin to
+System Settings > General > Login Items on macOS 13 and later; only macOS 11–12 (or an install made before
+this version) uses `~/Library/LaunchAgents/dev.globlin.app.plist`. Homebrew packages are compared with your local taps, so run
 `brew update` now and then. It is new and tested on one Mac so far — please
 [open an issue](https://github.com/TOR968/Globlin/issues) when something misbehaves.
 

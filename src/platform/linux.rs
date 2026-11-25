@@ -26,6 +26,10 @@ pub fn claim_single_instance() -> bool {
     super::unix::claim_instance_lock(&super::data_dir())
 }
 
+pub const fn launched_at_login() -> bool {
+    false
+}
+
 pub fn signal_running_instance() {
     if let Ok(mut stream) = UnixStream::connect(super::data_dir().join(SHOW_SOCKET)) {
         stream.write_all(b"show").ok();

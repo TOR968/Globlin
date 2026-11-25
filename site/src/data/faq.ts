@@ -43,7 +43,7 @@ export const faq: Question[] = [
   {
     question: 'How do I remove it?',
     answer:
-      'If you used the installer, uninstall Globlin from Settings → Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin and ~/Library/LaunchAgents/dev.globlin.app.plist. On Linux, remove the package (<code>sudo apt remove globlin</code> or <code>sudo dnf remove globlin</code>) and delete ~/.local/share/globlin.',
+      'If you used the installer, uninstall Globlin from Settings → Apps. For the portable exe, quit from the tray menu, delete the .exe and its .json, then delete the globlin folder in %LOCALAPPDATA%. On macOS, quit, move Globlin.app to the Trash, and delete ~/Library/Application Support/globlin. On macOS 13 and later the login item goes away with the app; on macOS 11–12 also delete ~/Library/LaunchAgents/dev.globlin.app.plist. On Linux, remove the package (<code>sudo apt remove globlin</code> or <code>sudo dnf remove globlin</code>) and delete ~/.local/share/globlin.',
   },
 ];
 
