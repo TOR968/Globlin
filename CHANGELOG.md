@@ -7,6 +7,18 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.30](https://github.com/TOR968/Globlin/compare/v0.4.29...v0.4.30) - 2026-11-25
+
+### Fixed
+
+- *(macos)* register as a login item so Login Items shows Globlin with its icon
+
+### Other
+
+- drop the beta label from the README, release notes and package descriptions
+- stop calling the macOS and Linux builds experimental
+- Merge pull request #150 from TOR968/chore/site-audit
+
 ## [0.4.29](https://github.com/TOR968/Globlin/compare/v0.4.28...v0.4.29) - 2026-11-25
 
 ### Added
