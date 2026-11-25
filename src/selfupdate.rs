@@ -256,14 +256,20 @@ fn install_bundle(archive: &[u8]) -> Result<()> {
     fs::create_dir_all(&staging)?;
     let archive_path = staging.join(MACOS_ASSET);
     fs::write(&archive_path, archive)?;
-    let unpacked = Command::new("/usr/bin/ditto")
-        .args(["-x", "-k"])
-        .arg(&archive_path)
-        .arg(&staging)
-        .status()?;
-    if !unpacked.success() {
+    let mut ditto = Command::new("/usr/bin/ditto");
+    ditto.args(["-x", "-k"]).arg(&archive_path).arg(&staging);
+    let unpacked = crate::process::output_within(&mut ditto, crate::process::LISTING_LIMIT)
+        .map_err(|error| error.to_string())
+        .and_then(|output| {
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(output.status.to_string())
+            }
+        });
+    if let Err(reason) = unpacked {
         fs::remove_dir_all(&staging).ok();
-        return Err(format!("ditto could not unpack the update: {unpacked}").into());
+        return Err(format!("ditto could not unpack the update: {reason}").into());
     }
     let staged = unpacked_bundle(&staging)?;
     let swapped = swap(&bundle, &staged);
