@@ -1391,7 +1391,7 @@ interpolating `${{ github.ref_name }}` into `run:` text.
 
 ## Other platforms
 
-Windows is the main platform; macOS and Linux work and are experimental. `ci.yml` runs clippy and the
+Windows is the main platform; macOS and Linux are supported alongside it. `ci.yml` runs clippy and the
 suite on Windows x64 and ARM64, macOS ARM64, and Linux x64 and ARM64. The seams:
 
 - `src/platform/` — `windows.rs`, `macos.rs` and `linux.rs`, each real. `platform/mod.rs` holds what
@@ -1452,7 +1452,7 @@ Windows paths.
 
 ### macOS
 
-Experimental, Apple Silicon only, signed ad hoc (no Apple Developer ID, so no notarisation — the README
+Apple Silicon only, signed ad hoc (no Apple Developer ID, so no notarisation — the README
 walks users through *Open Anyway*).
 
 - **Bundle.** `.github/bundle-macos.sh` builds `Globlin.app`: an `Info.plist` with the `Cargo.toml`
@@ -1494,7 +1494,7 @@ walks users through *Open Anyway*).
 
 ### Linux
 
-Experimental, x64 and ARM64, shipped as a deb and an rpm.
+x64 and ARM64, shipped as a deb and an rpm.
 
 - **Window.** `wry` on WebKitGTK 4.1, attached to tao's GTK box. Build dependencies: `libgtk-3-dev`,
   `libayatana-appindicator3-dev`, `libwebkit2gtk-4.1-dev` — every Linux CI job installs exactly those.

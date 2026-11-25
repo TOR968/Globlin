@@ -4,11 +4,11 @@
 | --- | --- | --- |
 | Windows installer — recommended | [`globlin-setup-x64.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-setup-x64.exe) | [`globlin-setup-arm64.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-setup-arm64.exe) |
 | Windows portable — no install | [`globlin.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin.exe) | [`globlin-arm64.exe`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-arm64.exe) |
-| macOS 11+ on Apple Silicon (experimental) | — | [`globlin-macos-apple-silicon.zip`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-macos-apple-silicon.zip) |
-| Debian, Ubuntu (experimental) | [`globlin-amd64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-amd64.deb) | [`globlin-arm64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-arm64.deb) |
-| Fedora, openSUSE (experimental) | [`globlin-x86_64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-x86_64.rpm) | [`globlin-aarch64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-aarch64.rpm) |
-| Any Linux, updates itself (experimental) | [`globlin-x86_64.AppImage`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-x86_64.AppImage) | [`globlin-aarch64.AppImage`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-aarch64.AppImage) |
-| Arch Linux (experimental) | [`globlin-bin.PKGBUILD`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-bin.PKGBUILD) | same file |
+| macOS 11+ on Apple Silicon | — | [`globlin-macos-apple-silicon.zip`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-macos-apple-silicon.zip) |
+| Debian, Ubuntu | [`globlin-amd64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-amd64.deb) | [`globlin-arm64.deb`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-arm64.deb) |
+| Fedora, openSUSE | [`globlin-x86_64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-x86_64.rpm) | [`globlin-aarch64.rpm`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-aarch64.rpm) |
+| Any Linux, updates itself | [`globlin-x86_64.AppImage`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-x86_64.AppImage) | [`globlin-aarch64.AppImage`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-aarch64.AppImage) |
+| Arch Linux | [`globlin-bin.PKGBUILD`](https://github.com/TOR968/Globlin/releases/download/@TAG@/globlin-bin.PKGBUILD) | same file |
 
 The other two files, `SHA256SUMS` and `SHA256SUMS.minisig`, are for checking a download — and they are
 what the app itself checks before it installs an update of itself. Running Globlin 0.3.x? It cannot

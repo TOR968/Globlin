@@ -46,7 +46,7 @@ window, the screenshot dump) instead.
 
 The crate compiles, lints and tests on Windows x64/ARM64, macOS ARM64 and Linux x64/ARM64 (the `ci.yml`
 matrix). Windows is the main platform; macOS (Apple Silicon, ad-hoc signed `Globlin.app`) and Linux (deb,
-rpm and a self-updating AppImage, x64 and ARM64) are experimental. Each has a real arm in `src/platform/`; `src/window/shell.rs`
+rpm and a self-updating AppImage, x64 and ARM64) are supported alongside it. Each has a real arm in `src/platform/`; `src/window/shell.rs`
 serves all three — see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#other-platforms).
 
 ## Architecture
