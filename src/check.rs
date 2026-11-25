@@ -150,7 +150,7 @@ pub fn ignore_unversioned(packages: &mut [Package], config: &mut Config) -> bool
             continue;
         }
         config.auto_ignored.push(package.name.clone());
-        config.set_ignored(&package.name, true);
+        config.set_ignored(&package.name, package.source, true);
         package.status = Status::Ignored;
         changed = true;
     }
@@ -162,7 +162,7 @@ fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> V
         .iter()
         .filter(|item| item.source.catalog() == catalog)
         .filter(|item| !item.external)
-        .filter(|item| !config.is_ignored(&item.name))
+        .filter(|item| !config.is_ignored(&item.name, item.source))
         .map(|item| item.name.clone())
         .collect::<BTreeSet<String>>()
         .into_iter()
@@ -170,7 +170,7 @@ fn lookup_names(installed: &[Installed], config: &Config, catalog: Catalog) -> V
 }
 
 fn classify(installed: Installed, config: &Config, latest: &Latest) -> Package {
-    let status = if config.is_ignored(&installed.name) {
+    let status = if config.is_ignored(&installed.name, installed.source) {
         Status::Ignored
     } else if installed.external {
         Status::Unknown

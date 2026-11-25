@@ -28,6 +28,24 @@ const SETTLE_DELAY: Duration = Duration::from_secs(2);
 const PATREON_URL: &str = "https://www.patreon.com/cw/TOR968/membership";
 const REPO_URL: &str = env!("CARGO_PKG_REPOSITORY");
 
+macro_rules! view {
+    ($app:expr) => {
+        view_of(
+            &$app.packages,
+            $app.activity.as_ref(),
+            &$app.queue,
+            &$app.approvals,
+            &$app.in_use,
+            $app.available_release.as_ref(),
+            $app.pending_restart.as_ref(),
+            $app.config.auto_update,
+            $app.autostart,
+            $app.frame,
+            $app.elapsed(),
+        )
+    };
+}
+
 pub enum Control {
     Continue,
     Exit,
@@ -46,6 +64,7 @@ pub struct App {
     in_use: Vec<InUse>,
     window: Option<Window>,
     failed: bool,
+    autostart: bool,
     skipped: Vec<String>,
     update_on_start: bool,
     frame: u32,
@@ -73,6 +92,7 @@ impl App {
             in_use: Vec::new(),
             window: None,
             failed: false,
+            autostart: platform::autostart_enabled(),
             skipped: Vec::new(),
             update_on_start,
             frame: 0,
@@ -121,9 +141,27 @@ impl App {
     }
 
     pub fn close_window(&mut self, id: WindowId, target: &EventLoopWindowTarget<Message>) {
-        if let Some(window) = self.window.as_ref().filter(|window| window.id() == id) {
-            window.hide();
-            window::show_in_dock(target, false);
+        if self.window.as_ref().is_some_and(|window| window.id() == id) {
+            self.hide_window(target);
+        }
+    }
+
+    fn hide_window(&mut self, target: &EventLoopWindowTarget<Message>) {
+        let Some(window) = self.window.as_ref() else {
+            return;
+        };
+        let size = window.size();
+        let position = window.position();
+        window.hide();
+        window::show_in_dock(target, false);
+        if size.0 > 0 && size.1 > 0 {
+            let changed =
+                self.config.window_size != Some(size) || self.config.window_position != position;
+            self.config.window_size = Some(size);
+            self.config.window_position = position;
+            if changed {
+                self.config.save().ok();
+            }
         }
     }
 
@@ -147,7 +185,11 @@ impl App {
             return Control::Continue;
         };
         match action {
-            Action::Quit => return Control::Exit,
+            Action::Quit => {
+                self.hide_window(target);
+                return Control::Exit;
+            }
+            Action::CloseWindow => self.hide_window(target),
             Action::CheckNow => self.start_check(),
             Action::OpenWindow => self.open_window(target),
             Action::WindowReady => self.render_window(),
@@ -170,7 +212,7 @@ impl App {
                     self.start_update(vec![target], Vec::new(), true);
                 }
             }
-            Action::ToggleIgnore { name } => self.toggle_ignore(&name),
+            Action::ToggleIgnore { name, source } => self.toggle_ignore(&name, source),
             Action::Remove { name, source } => {
                 if self.find(&name, source).is_some() {
                     self.start_remove(RemoveTarget { name, source });
@@ -187,13 +229,13 @@ impl App {
                 self.config.last_self_notice = None;
                 self.start_self_update();
             }
-            Action::ToggleAutoUpdate => self.toggle_auto_update(),
-            Action::ToggleAutoApprove => self.toggle_auto_approve(),
-            Action::ToggleUpdateOnStart => self.toggle_update_on_start(),
+            Action::ToggleAutoUpdate => self.flip(|config| &mut config.auto_update),
+            Action::ToggleAutoApprove => self.flip(|config| &mut config.auto_approve_scripts),
+            Action::ToggleUpdateOnStart => self.flip(|config| &mut config.update_all_on_start),
             Action::ToggleSilentUpdates => self.toggle_silent_updates(),
-            Action::ToggleChocoOnePrompt => self.toggle_choco_one_prompt(),
-            Action::ToggleWingetOnePrompt => self.toggle_winget_one_prompt(),
-            Action::ToggleMonochromeIcon => self.toggle_monochrome_icon(),
+            Action::ToggleChocoOnePrompt => self.flip(|config| &mut config.choco_one_prompt),
+            Action::ToggleWingetOnePrompt => self.flip(|config| &mut config.winget_one_prompt),
+            Action::ToggleMonochromeIcon => self.flip(|config| &mut config.monochrome_icon),
             Action::OpenLog => open_log(),
             Action::OpenPatreon => open_url(PATREON_URL),
             Action::OpenRepo => open_url(REPO_URL),
@@ -224,7 +266,12 @@ impl App {
 
     fn open_window(&mut self, target: &EventLoopWindowTarget<Message>) {
         if self.window.is_none() {
-            match Window::new(target, self.proxy.clone()) {
+            match Window::new(
+                target,
+                self.proxy.clone(),
+                self.config.window_size,
+                self.config.window_position,
+            ) {
                 Ok(window) => self.window = Some(window),
                 Err(error) => {
                     platform::notify("Globlin", &format!("Could not open the window: {error}"))
@@ -251,19 +298,19 @@ impl App {
         self.check_once_settled();
     }
 
-    fn toggle_ignore(&mut self, name: &str) {
-        let ignoring = !self.config.is_ignored(name);
-        self.config.set_ignored(name, ignoring);
+    fn toggle_ignore(&mut self, name: &str, source: SourceKind) {
+        let ignoring = !self.config.is_ignored(name, source);
+        self.config.set_ignored(name, source, ignoring);
         if let Err(error) = self.config.save() {
             platform::notify("Globlin", &format!("Could not save the setting: {error}")).ok();
         }
         for package in &mut self.packages {
             if package.name == name {
-                package.status = if ignoring {
-                    Status::Ignored
-                } else {
-                    Status::Unknown
-                };
+                if self.config.is_ignored(name, package.source) {
+                    package.status = Status::Ignored;
+                } else if package.status == Status::Ignored {
+                    package.status = Status::Unknown;
+                }
             }
         }
         self.render();
@@ -406,43 +453,18 @@ impl App {
         });
     }
 
-    fn toggle_auto_update(&mut self) {
-        self.config.auto_update = !self.config.auto_update;
-        self.save_setting();
-    }
-
-    fn toggle_auto_approve(&mut self) {
-        self.config.auto_approve_scripts = !self.config.auto_approve_scripts;
-        self.save_setting();
-    }
-
-    fn toggle_update_on_start(&mut self) {
-        self.config.update_all_on_start = !self.config.update_all_on_start;
+    fn flip(&mut self, setting: fn(&mut Config) -> &mut bool) {
+        let value = setting(&mut self.config);
+        *value = !*value;
         self.save_setting();
     }
 
     fn toggle_silent_updates(&mut self) {
-        self.config.silent_updates = !self.config.silent_updates;
-        self.save_setting();
+        self.flip(|config| &mut config.silent_updates);
         if self.config.silent_updates {
             let targets = self.every_outdated_target();
             self.start_update(targets, Vec::new(), false);
         }
-    }
-
-    fn toggle_choco_one_prompt(&mut self) {
-        self.config.choco_one_prompt = !self.config.choco_one_prompt;
-        self.save_setting();
-    }
-
-    fn toggle_winget_one_prompt(&mut self) {
-        self.config.winget_one_prompt = !self.config.winget_one_prompt;
-        self.save_setting();
-    }
-
-    fn toggle_monochrome_icon(&mut self) {
-        self.config.monochrome_icon = !self.config.monochrome_icon;
-        self.save_setting();
     }
 
     fn save_setting(&mut self) {
@@ -506,18 +528,7 @@ impl App {
     fn advance_animation(&mut self) {
         self.frame = (self.frame + 1) % (BUSY_FRAMES * 4);
         let level = self.water_level();
-        let view = view_of(
-            &self.packages,
-            self.activity.as_ref(),
-            &self.queue,
-            &self.approvals,
-            &self.in_use,
-            self.available_release.as_ref(),
-            self.pending_restart.as_ref(),
-            self.config.auto_update,
-            self.frame,
-            self.elapsed(),
-        );
+        let view = view!(self);
         self.tray.animate(&view, level).ok();
         if let Some(window) = self.window.as_ref().filter(|window| window.visible()) {
             window.tick(&window::tick(&view));
@@ -679,7 +690,7 @@ impl App {
     }
 
     fn toggle_autostart(&mut self) {
-        let desired = !platform::autostart_enabled();
+        let desired = !self.autostart;
         if let Err(error) = platform::set_autostart(desired) {
             platform::notify(
                 "Globlin",
@@ -687,24 +698,14 @@ impl App {
             )
             .ok();
         }
+        self.autostart = platform::autostart_enabled();
         self.render();
     }
 
     fn render(&mut self) {
         let state = self.icon_state();
         let level = self.water_level();
-        let view = view_of(
-            &self.packages,
-            self.activity.as_ref(),
-            &self.queue,
-            &self.approvals,
-            &self.in_use,
-            self.available_release.as_ref(),
-            self.pending_restart.as_ref(),
-            self.config.auto_update,
-            self.frame,
-            self.elapsed(),
-        );
+        let view = view!(self);
         self.tray
             .render(&view, state, level, self.config.monochrome_icon)
             .ok();
@@ -717,18 +718,7 @@ impl App {
         let Some(window) = self.window.as_ref() else {
             return;
         };
-        let view = view_of(
-            &self.packages,
-            self.activity.as_ref(),
-            &self.queue,
-            &self.approvals,
-            &self.in_use,
-            self.available_release.as_ref(),
-            self.pending_restart.as_ref(),
-            self.config.auto_update,
-            self.frame,
-            self.elapsed(),
-        );
+        let view = view!(self);
         window.render(&window::snapshot(&view, &self.config));
     }
 
@@ -800,6 +790,7 @@ fn view_of<'a>(
     release: Option<&'a Release>,
     pending_restart: Option<&'a Version>,
     auto_update: bool,
+    autostart: bool,
     frame: u32,
     elapsed: Duration,
 ) -> View<'a> {
@@ -818,7 +809,7 @@ fn view_of<'a>(
             SelfUpdate::Managed,
         ),
         pending_restart,
-        autostart: platform::autostart_enabled(),
+        autostart,
         frame,
         elapsed,
     }

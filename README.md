@@ -247,16 +247,19 @@ The window puts updates first:
 
 ![Globlin's Settings view: Run at startup, Monochrome tray icon, Approve npm install scripts automatically, One administrator prompt for all choco updates, Update Globlin automatically and an available Globlin update under General, then one switch per source with its package count](docs/img/window-settings.png)
 
-**Settings**, behind the button at the top right, holds the rest: *Run at startup*, *Monochrome tray icon*, *Approve npm install
+**Settings**, behind the button at the top right, holds the rest in five sections (*General*, *Updates*, *Sources*, *Diagnostics*, *About*): *Run at startup*, *Monochrome tray icon*, *Approve npm install
 scripts automatically*, *Update Globlin automatically* (greyed out with the manager's name when winget
 or the installer keeps Globlin up to date) and, when a release is waiting, **Update now**. Under
 *Sources* every package manager this platform can have gets a switch and a one-line status — *13
 packages · 2 updates*, *No global packages*, *Off*. Switching one goes into `globlin.json` at once; a
 fresh check follows two seconds after the last switch, so flipping several costs one check.
 *Diagnostics* opens the last log; *About* shows the version and links to
-[Patreon](https://www.patreon.com/cw/TOR968/membership), as does *Support on Patreon* beside *Open last log* at the
-foot of the window. *Source code* under *About* and *GitHub* in the footer open the
-[repository](https://github.com/TOR968/Globlin).
+[Patreon](https://www.patreon.com/cw/TOR968/membership), as does the tray menu. *Source code* under *About* and
+*GitHub* in the tray menu open the [repository](https://github.com/TOR968/Globlin). The footer of the window
+shows only the version, the self-update link and *Open last log*.
+
+Keyboard: **Ctrl/Cmd+F** focuses the search, **Ctrl/Cmd+W** closes the window, and **Esc** leaves Settings,
+cancels an armed *Confirm* or clears the search.
 
 The tray menu stays short — the list lives in the window:
 
@@ -420,6 +423,8 @@ edits are never silently overwritten.
   "choco_one_prompt": false,
   "winget_one_prompt": false,
   "monochrome_icon": false,
+  "window_size": null,
+  "window_position": null,
   "last_self_notice": null
 }
 ```
@@ -429,8 +434,12 @@ edits are never silently overwritten.
 - **`ignore`** — listed packages still appear in the window with their version, but are never checked,
   flagged or notified about. `npm` is ignored by default because updating it on Windows means it rewrites
   its own shim mid-run; `@anthropic-ai/claude-code` because it self-updates. An explicit `[]` is respected.
+  Entries added from the window are written as `source:name` (for example `npm:prettier`) and ignore the
+  package in that source only; a bare name still ignores that name in every source.
 - **`auto_ignored`** — winget packages with an `Unknown` version that Globlin has already added to
   `ignore` on its own. A name listed here is never added again, so un-ignoring one sticks.
+- **`window_size`** — the window's last size, written when it is closed. `null` opens it at the default size.
+- **`window_position`** — where the window last was; ignored when that spot is no longer on a connected screen.
 - **`last_notified`** — bookkeeping for the "only notify on change" rule. Clear it to force the next
   check to notify again.
 - **`npm_cmd`** — an override, only needed if `npm.cmd` is somewhere unusual. Left `null`, `PATH` is

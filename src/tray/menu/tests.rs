@@ -90,6 +90,7 @@ fn top_level_ids(built: &Built) -> Vec<String> {
 #[test]
 fn fixed_menu_ids_map_to_their_actions() {
     assert_eq!(Action::from_key("quit"), Some(Action::Quit));
+    assert_eq!(Action::from_key("close-window"), Some(Action::CloseWindow));
     assert_eq!(Action::from_key("check-now"), Some(Action::CheckNow));
     assert_eq!(Action::from_key("update-all"), Some(Action::UpdateAll));
     assert_eq!(Action::from_key("autostart"), Some(Action::ToggleAutostart));
@@ -449,10 +450,22 @@ fn an_ignore_id_round_trips_including_scoped_names() {
         assert_eq!(
             Action::from_key(&ignore_id(&package)),
             Some(Action::ToggleIgnore {
-                name: name.to_string()
+                name: name.to_string(),
+                source: SourceKind::Npm,
             })
         );
     }
+}
+
+#[test]
+fn an_ignore_id_carries_the_source_it_was_built_for() {
+    assert_eq!(
+        Action::from_key("ignore:npm:prettier"),
+        Some(Action::ToggleIgnore {
+            name: "prettier".to_string(),
+            source: SourceKind::Npm,
+        })
+    );
 }
 
 #[test]

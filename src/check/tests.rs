@@ -504,8 +504,8 @@ fn a_winget_package_with_no_version_to_compare_is_ignored_on_its_own() {
 
     assert_eq!(packages[0].status, Status::Ignored);
     assert_eq!(packages[1].status, Status::Current);
-    assert!(config.is_ignored("Vendor.Tool"));
-    assert!(!config.is_ignored("Other.Tool"));
+    assert!(config.is_ignored("Vendor.Tool", SourceKind::Winget));
+    assert!(!config.is_ignored("Other.Tool", SourceKind::Winget));
 }
 
 #[test]
@@ -519,7 +519,7 @@ fn an_unknown_package_from_another_source_is_never_ignored_on_its_own() {
     assert!(!ignore_unversioned(&mut packages, &mut config));
 
     assert_eq!(packages[0].status, Status::Unknown);
-    assert!(!config.is_ignored("left-pad"));
+    assert!(!config.is_ignored("left-pad", SourceKind::Npm));
 }
 
 #[test]
@@ -527,13 +527,13 @@ fn a_winget_package_the_user_unignored_stays_unignored() {
     let mut config = Config::default();
     let mut packages = vec![winget_package("Vendor.Tool", Status::Unknown)];
     ignore_unversioned(&mut packages, &mut config);
-    config.set_ignored("Vendor.Tool", false);
+    config.set_ignored("Vendor.Tool", SourceKind::Winget, false);
     let mut rechecked = vec![winget_package("Vendor.Tool", Status::Unknown)];
 
     assert!(!ignore_unversioned(&mut rechecked, &mut config));
 
     assert_eq!(rechecked[0].status, Status::Unknown);
-    assert!(!config.is_ignored("Vendor.Tool"));
+    assert!(!config.is_ignored("Vendor.Tool", SourceKind::Winget));
 }
 
 #[test]

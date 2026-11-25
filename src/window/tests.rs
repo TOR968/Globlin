@@ -448,7 +448,7 @@ fn the_window_shell_starts_against_a_real_webview() {
     let event_loop = EventLoopBuilder::<crate::Message>::with_user_event()
         .with_any_thread(true)
         .build();
-    let window = Window::new(&event_loop, event_loop.create_proxy()).unwrap();
+    let window = Window::new(&event_loop, event_loop.create_proxy(), None, None).unwrap();
 
     assert!(!window.visible());
     window.render(&snapshot(&view(&[], None), &config()));
@@ -979,4 +979,33 @@ fn the_settings_rows_for_winget_and_choco_carry_the_same_warning_as_their_packag
         labels,
         vec![("winget", "may ask for admin"), ("choco", "asks for admin")]
     );
+}
+
+const PRIMARY: Screen = ((0, 0), (1920, 1080));
+const LEFT_OF_PRIMARY: Screen = ((-1280, 0), (1280, 1024));
+
+#[test]
+fn a_saved_position_inside_a_connected_screen_is_kept() {
+    assert!(on_a_screen((200, 150), &[PRIMARY]));
+}
+
+#[test]
+fn a_position_left_over_from_a_disconnected_monitor_is_rejected() {
+    assert!(!on_a_screen((2500, 100), &[PRIMARY]));
+}
+
+#[test]
+fn the_windows_minimised_position_is_rejected() {
+    assert!(!on_a_screen((-32000, -32000), &[PRIMARY, LEFT_OF_PRIMARY]));
+}
+
+#[test]
+fn a_screen_with_a_negative_origin_accepts_points_inside_it() {
+    assert!(on_a_screen((-1000, 200), &[PRIMARY, LEFT_OF_PRIMARY]));
+    assert!(!on_a_screen((-1000, 200), &[PRIMARY]));
+}
+
+#[test]
+fn no_connected_screens_accepts_no_position() {
+    assert!(!on_a_screen((0, 0), &[]));
 }

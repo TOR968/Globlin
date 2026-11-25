@@ -388,5 +388,15 @@ pub fn tick_script(tick: &Tick) -> String {
     format!("window.globlin.tick({body})")
 }
 
+pub type Screen = ((i32, i32), (u32, u32));
+
+pub fn on_a_screen(point: (i32, i32), screens: &[Screen]) -> bool {
+    screens.iter().any(|&((left, top), (width, height))| {
+        let (x, y) = (i64::from(point.0), i64::from(point.1));
+        let (left, top) = (i64::from(left), i64::from(top));
+        x >= left && y >= top && x < left + i64::from(width) && y < top + i64::from(height)
+    })
+}
+
 #[cfg(test)]
 mod tests;

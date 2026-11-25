@@ -15,6 +15,8 @@ use crate::queue::Queue;
 use crate::selfupdate::Release;
 use crate::Result;
 
+type PackageVerb = fn(String, SourceKind) -> Action;
+
 const BATCH_ROWS_SHOWN: usize = 7;
 const BATCH_ROWS_BEFORE_ACTIVE: usize = 2;
 const ID_UPDATE_ALL: &str = "update-all";
@@ -35,6 +37,7 @@ const ID_OPEN_PATREON: &str = "open-patreon";
 const ID_OPEN_REPO: &str = "open-repo";
 const ID_OPEN_SELF_LOG: &str = "open-self-log";
 const ID_QUIT: &str = "quit";
+const ID_CLOSE_WINDOW: &str = "close-window";
 const UPDATE_PREFIX: &str = "update:";
 const UPDATE_MANY_PREFIX: &str = "update-many:";
 const IGNORE_PREFIX: &str = "ignore:";
@@ -52,7 +55,7 @@ const FRAMES_PER_DOT: u32 = 2;
 pub enum Action {
     Update { name: String, source: SourceKind },
     UpdateMany { refs: Vec<PackageRef> },
-    ToggleIgnore { name: String },
+    ToggleIgnore { name: String, source: SourceKind },
     Remove { name: String, source: SourceKind },
     ToggleSource { kind: SourceKind },
     Approve { name: String, source: SourceKind },
@@ -76,6 +79,7 @@ pub enum Action {
     OpenRepo,
     OpenSelfLog,
     Quit,
+    CloseWindow,
 }
 
 pub struct Built {
@@ -132,22 +136,43 @@ impl Action {
             ID_OPEN_REPO => Some(Self::OpenRepo),
             ID_OPEN_SELF_LOG => Some(Self::OpenSelfLog),
             ID_QUIT => Some(Self::Quit),
-            other => Self::parse_update(other)
+            ID_CLOSE_WINDOW => Some(Self::CloseWindow),
+            other => Self::parse_package(other)
                 .or_else(|| Self::parse_update_many(other))
-                .or_else(|| Self::parse_ignore(other))
-                .or_else(|| Self::parse_remove(other))
-                .or_else(|| Self::parse_source(other))
-                .or_else(|| Self::parse_approve(other))
-                .or_else(|| Self::parse_dismiss(other))
-                .or_else(|| Self::parse_close_update(other)),
+                .or_else(|| Self::parse_source(other)),
         }
     }
 
-    fn parse_update(key: &str) -> Option<Self> {
-        let reference = package_ref(key.strip_prefix(UPDATE_PREFIX)?)?;
-        Some(Self::Update {
-            name: reference.name,
-            source: reference.source,
+    fn parse_package(key: &str) -> Option<Self> {
+        const VERBS: [(&str, PackageVerb); 6] = [
+            (UPDATE_PREFIX, |name, source| Action::Update {
+                name,
+                source,
+            }),
+            (IGNORE_PREFIX, |name, source| Action::ToggleIgnore {
+                name,
+                source,
+            }),
+            (REMOVE_PREFIX, |name, source| Action::Remove {
+                name,
+                source,
+            }),
+            (APPROVE_PREFIX, |name, source| Action::Approve {
+                name,
+                source,
+            }),
+            (DISMISS_PREFIX, |name, source| Action::Dismiss {
+                name,
+                source,
+            }),
+            (CLOSE_UPDATE_PREFIX, |name, source| Action::CloseAndUpdate {
+                name,
+                source,
+            }),
+        ];
+        VERBS.iter().find_map(|(prefix, build)| {
+            let reference = package_ref(key.strip_prefix(prefix)?)?;
+            Some(build(reference.name, reference.source))
         })
     }
 
@@ -160,48 +185,9 @@ impl Action {
         (!refs.is_empty()).then_some(Self::UpdateMany { refs })
     }
 
-    fn parse_ignore(key: &str) -> Option<Self> {
-        let reference = package_ref(key.strip_prefix(IGNORE_PREFIX)?)?;
-        Some(Self::ToggleIgnore {
-            name: reference.name,
-        })
-    }
-
-    fn parse_remove(key: &str) -> Option<Self> {
-        let reference = package_ref(key.strip_prefix(REMOVE_PREFIX)?)?;
-        Some(Self::Remove {
-            name: reference.name,
-            source: reference.source,
-        })
-    }
-
     fn parse_source(key: &str) -> Option<Self> {
         Some(Self::ToggleSource {
             kind: SourceKind::from_label(key.strip_prefix(SOURCE_PREFIX)?)?,
-        })
-    }
-
-    fn parse_approve(key: &str) -> Option<Self> {
-        let reference = package_ref(key.strip_prefix(APPROVE_PREFIX)?)?;
-        Some(Self::Approve {
-            name: reference.name,
-            source: reference.source,
-        })
-    }
-
-    fn parse_dismiss(key: &str) -> Option<Self> {
-        let reference = package_ref(key.strip_prefix(DISMISS_PREFIX)?)?;
-        Some(Self::Dismiss {
-            name: reference.name,
-            source: reference.source,
-        })
-    }
-
-    fn parse_close_update(key: &str) -> Option<Self> {
-        let reference = package_ref(key.strip_prefix(CLOSE_UPDATE_PREFIX)?)?;
-        Some(Self::CloseAndUpdate {
-            name: reference.name,
-            source: reference.source,
         })
     }
 }

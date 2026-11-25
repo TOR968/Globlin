@@ -108,24 +108,10 @@ impl SourceKind {
         self.available_on(std::env::consts::OS)
     }
 
-    pub const fn suffix(self) -> &'static str {
+    pub fn suffix(self) -> String {
         match self {
-            Self::Npm => "",
-            Self::Bun => " (bun)",
-            Self::Pnpm => " (pnpm)",
-            Self::Yarn => " (yarn)",
-            Self::Pipx => " (pipx)",
-            Self::Uv => " (uv)",
-            Self::Scoop => " (scoop)",
-            Self::Cargo => " (cargo)",
-            Self::Go => " (go)",
-            Self::Dotnet => " (dotnet)",
-            Self::PsGallery => " (psgallery)",
-            Self::Gem => " (gem)",
-            Self::Brew => " (brew)",
-            Self::Winget => " (winget)",
-            Self::Choco => " (choco)",
-            Self::Skills => " (skills)",
+            Self::Npm => String::new(),
+            kind => format!(" ({})", kind.label()),
         }
     }
 }
