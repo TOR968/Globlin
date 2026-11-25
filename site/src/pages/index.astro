@@ -154,7 +154,7 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
               <a href={download('globlin-arm64.exe')} rel="nofollow">portable ARM64</a>
             </p>
           </Platform>
-          <Platform icon="apple" name="macOS" meta="macOS 11 or later · Apple Silicon" experimental>
+          <Platform icon="apple" name="macOS" meta="macOS 11 or later · Apple Silicon">
             <ol class="platform-text">
               <li>Download the .zip, unzip it, drag Globlin.app into Applications.</li>
               <li>Open it. When macOS says it could not verify Globlin, choose Done.</li>
@@ -163,7 +163,7 @@ const pairSizes = '(max-width: 900px) calc(100vw - 48px), (max-width: 1120px) ca
             <DownloadButton slot="actions" file="globlin-macos-apple-silicon.zip" icon="apple" label="Download .zip" />
             <p slot="alt" class="platform-alt">Lives in the menu bar; in the Dock only while its window is open.</p>
           </Platform>
-          <Platform icon="linux" name="Linux" meta="glibc 2.35 or later · x64, ARM64" experimental>
+          <Platform icon="linux" name="Linux" meta="glibc 2.35 or later · x64, ARM64">
             <p class="platform-text">
               Install the package with apt or dnf, or run the AppImage, which updates itself. GNOME
               needs the AppIndicator extension to show the tray icon; packages do not update themselves.

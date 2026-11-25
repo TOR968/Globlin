@@ -257,19 +257,6 @@ code {
   right: 18px;
 }
 
-.tag {
-  display: inline-block;
-  padding: 1px 9px;
-  border-radius: 999px;
-  background: #2a2316;
-  color: var(--amber);
-  font-family: var(--sans);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  vertical-align: middle;
-}
-
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
