@@ -27,6 +27,8 @@ fn arguments(command: &Command) -> Vec<String> {
         .collect()
 }
 
+const CODES: &str = r"C:\data\winget-codes.txt";
+
 fn winget() -> Winget {
     Winget {
         command: PathBuf::from("winget"),
@@ -53,7 +55,7 @@ fn script(command: &Command) -> String {
 #[test]
 fn the_upgrade_names_the_exact_id_and_never_waits_for_an_answer() {
     assert_eq!(
-        arguments(&winget().update_command("Git.Git").unwrap()),
+        arguments(&winget().upgrade("Git.Git", false)),
         vec![
             "upgrade",
             "--id",
@@ -464,7 +466,7 @@ fn winget_exit_codes_that_are_not_a_broken_update_are_told_apart() {
 fn one_prompt_upgrades_every_id_in_a_single_elevated_shell() {
     let script = script(
         &elevating_winget()
-            .update_together(&["GitHub.cli", "Obsidian.Obsidian"])
+            .elevated_upgrade(&["GitHub.cli", "Obsidian.Obsidian"], &[], CODES)
             .unwrap(),
     );
 
@@ -488,11 +490,7 @@ fn one_prompt_upgrades_every_id_in_a_single_elevated_shell() {
 #[test]
 fn a_shared_run_hands_each_ids_exit_code_back_through_a_file_the_unelevated_shell_prints() {
     let winget = elevating_winget();
-    let script = script(
-        &winget
-            .elevated_upgrade(&["Git.Git"], r"C:\data\winget-codes.txt")
-            .unwrap(),
-    );
+    let script = script(&winget.elevated_upgrade(&["Git.Git"], &[], CODES).unwrap());
 
     assert!(
         script.contains(
@@ -519,7 +517,11 @@ fn each_id_in_a_shared_run_reads_its_own_exit_code_not_a_longer_id_sharing_its_p
 
 #[test]
 fn a_shared_run_ends_with_a_refusal_code_only_when_every_failure_gave_that_same_code() {
-    let script = script(&elevating_winget().update_together(&["Git.Git"]).unwrap());
+    let script = script(
+        &elevating_winget()
+            .elevated_upgrade(&["Git.Git"], &[], CODES)
+            .unwrap(),
+    );
 
     assert!(
         script.contains("$shared = @($codes | Select-Object -Unique);"),
@@ -535,7 +537,11 @@ fn a_shared_run_ends_with_a_refusal_code_only_when_every_failure_gave_that_same_
 
 #[test]
 fn an_elevated_run_never_carries_a_double_quote_the_inner_shell_would_strip() {
-    let script = script(&elevating_winget().update_together(&["Git.Git"]).unwrap());
+    let script = script(
+        &elevating_winget()
+            .elevated_upgrade(&["Git.Git"], &[], CODES)
+            .unwrap(),
+    );
 
     assert!(!script.contains('"'), "{script}");
 }
@@ -545,15 +551,72 @@ fn an_id_that_could_break_out_of_the_elevated_script_builds_no_command() {
     let winget = elevating_winget();
 
     assert!(winget
-        .update_together(&["Git.Git", "x'; Remove-Item C:\\; '"])
+        .elevated_upgrade(&["Git.Git", "x'; Remove-Item C:\\; '"], &[], CODES)
         .is_none());
     assert!(winget
-        .update_together(&[r"ARP\Machine\X64\{GUID}"])
+        .elevated_upgrade(&[r"ARP\Machine\X64\{GUID}"], &[], CODES)
         .is_none());
-    assert!(winget.update_together(&[]).is_none());
+    assert!(winget.elevated_upgrade(&[], &[], CODES).is_none());
 }
 
 #[test]
 fn without_powershell_there_is_no_shared_elevated_run() {
-    assert!(winget().update_together(&["Git.Git"]).is_none());
+    assert!(winget()
+        .elevated_upgrade(&["Git.Git"], &[], CODES)
+        .is_none());
+}
+
+const DETAILS: &str = r"(1/4) WordCraft [ArtCraft.WordCraft]
+Version: 0.18.1
+Publisher: Learning Machines LLC [US]
+Local Identifier: ARP\Machine\X64\{35218007-C526-4F81-AFED-5C5473D70655}
+Installer Category: msi
+Installed Scope: Machine
+Available Upgrades:
+  winget [0.19.1]
+(2/4) 7-Zip 26.06 (x64) [7zip.7zip]
+Version: 26.06
+Installer Category: exe
+Installed Scope: Machine
+(3/4) Node.js [OpenJS.NodeJS]
+Installer Category: msi
+Installed Scope: User
+(4/4) Affinity [Canva.Affinity]
+Installer Category: msix
+";
+
+#[test]
+fn only_an_msi_installed_for_every_user_is_upgraded_for_every_user() {
+    assert_eq!(machine_wide_msis(DETAILS), vec!["ArtCraft.WordCraft"]);
+    assert_eq!(
+        arguments(&winget().upgrade("ArtCraft.WordCraft", true))[8..],
+        ["--custom", "ALLUSERS=1"]
+    );
+}
+
+#[test]
+fn a_shared_run_keeps_a_machine_wide_msi_machine_wide_and_leaves_the_others_alone() {
+    let script = script(
+        &elevating_winget()
+            .elevated_upgrade(
+                &["Git.Git", "ArtCraft.WordCraft"],
+                &["ArtCraft.WordCraft".into(), "Not.InThisBatch".into()],
+                CODES,
+            )
+            .unwrap(),
+    );
+
+    assert!(
+        script.contains("$everyone = @(''ArtCraft.WordCraft'');"),
+        "{script}"
+    );
+    assert!(
+        script.contains("if ($everyone -contains $id) { $scope = ''--custom'', ''ALLUSERS=1'' };"),
+        "{script}"
+    );
+    assert!(
+        script.contains("--accept-package-agreements @scope;"),
+        "{script}"
+    );
+    assert!(!script.contains('"'), "{script}");
 }
