@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 cargo build --release          # target/release/globlin.exe
-cargo test                     # 720 tests (689 run, 31 ignored) on Windows, no network, no side effects
+cargo test                     # 722 tests (691 run, 31 ignored) on Windows, no network, no side effects
 cargo fmt --check              # CI gate
 cargo clippy --all-targets -- -D warnings   # CI gate
 ```
@@ -112,7 +112,9 @@ versions as `String`, because winget and choco emit `1.2.3.4` and `2024.01.15`, 
 and must still be displayable. The full endpoint rationale is in `docs/DEVELOPMENT.md#seven-catalogs`.
 
 **Every source updates and uninstalls; elevation is Windows' job, never Globlin's.** winget runs as the
-user (`--id <id> --exact --silent`), so only a machine-scope installer raises its own UAC prompt. choco
+user (`--id <id> --exact --silent`), so only a machine-scope installer raises its own UAC prompt; an MSI
+that `winget list --details` shows installed machine-wide is upgraded with `--custom ALLUSERS=1`
+(`Winget::machine_wide`), because a dual-scope MSI otherwise refuses with 1603. choco
 always needs an administrator, so `Choco::elevated` wraps each command in PowerShell
 `Start-Process -Verb RunAs` — one prompt per package, `$ErrorActionPreference = 'Stop'` so a declined
 prompt fails instead of exiting 0, and the name must pass `source::plain_name` because it is pasted into

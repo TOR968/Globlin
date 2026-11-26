@@ -164,6 +164,18 @@ rest, and the elevation is left to Windows' own prompt:
   `--id Git.Git` also matches `Git.Git.Beta`-style ids and winget stops to ask which one. The id is passed
   as a plain argument, never through a shell, so the `ARP\Machine\X64\{GUID}` ids winget invents for
   registry-only entries need no escaping and uninstall like any other.
+- **An MSI installed for every user is upgraded for every user.** A dual-scope MSI (WordCraft's
+  defaults to `MSIINSTALLPERUSER=1`) refuses a silent upgrade of a machine-wide copy in
+  `LaunchConditions` — MSI 1603, which winget reports as `0x8A150049` — because winget does not tell it
+  which scope the installed copy has. So before building an upgrade, `Winget::machine_wide` runs one
+  `winget list --details` (about two seconds for 340 packages, once per command, once per shared run) and
+  `machine_wide_msis` picks every id whose block carries both `Installer Category: msi` and
+  `Installed Scope: Machine`; those ids get `--custom ALLUSERS=1`, in `Winget::upgrade` and, through the
+  `$everyone` list, in the shared elevated script. For an MSI that is per-machine anyway the property is
+  what it already sets. A listing that fails, or a Windows whose winget prints those two labels in
+  another language, flags nothing and the upgrade runs exactly as before. The category is the
+  *installed* copy's: a package whose new version ships as an `exe` still receives the property, which
+  installers ignore.
 - **choco always needs an administrator**, so `Choco::elevated` wraps it in Windows PowerShell:
   `Start-Process -FilePath <choco> -ArgumentList '<verb>', '<name>', '-y', '--no-progress' -Verb RunAs
   -WindowStyle Hidden -Wait -PassThru`, one UAC prompt per package. `$ErrorActionPreference = 'Stop'` is

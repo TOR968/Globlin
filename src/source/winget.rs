@@ -65,6 +65,10 @@ const UPGRADE_FLAGS: &str =
 const DIAGNOSTICS: &str =
     "\\Packages\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\LocalState\\DiagOutputDir";
 
+const MSI: &str = "Installer Category: msi";
+const MACHINE_WIDE: &str = "Installed Scope: Machine";
+const FOR_EVERYONE: [&str; 2] = ["--custom", "ALLUSERS=1"];
+
 const CODES_FILE: &str = "winget-codes.txt";
 
 const UPDATE_NOT_APPLICABLE: u32 = 0x8A15_002B;
@@ -92,16 +96,57 @@ impl Winget {
         Ok(Self { command, shell })
     }
 
-    fn elevated_upgrade(&self, ids: &[&str], codes: &str) -> Option<Command> {
-        let ids = ids
+    fn machine_wide(&self) -> Vec<String> {
+        run_listing(hidden_command(&self.command).args([
+            "list",
+            "--details",
+            "--disable-interactivity",
+            "--accept-source-agreements",
+        ]))
+        .map(|output| machine_wide_msis(&stdout_text(&output)))
+        .unwrap_or_default()
+    }
+
+    fn upgrade(&self, id: &str, for_everyone: bool) -> Command {
+        let mut command = self.change("upgrade", id);
+        command.arg("--accept-package-agreements");
+        if for_everyone {
+            command.args(FOR_EVERYONE);
+        }
+        command
+    }
+
+    fn elevated_upgrade(
+        &self,
+        ids: &[&str],
+        machine_wide: &[String],
+        codes: &str,
+    ) -> Option<Command> {
+        if ids.is_empty() {
+            return None;
+        }
+        let listed = |ids: &[&str]| {
+            ids.iter()
+                .map(|id| plain_name(id).map(|id| format!("'{id}'")))
+                .collect::<Option<Vec<String>>>()
+                .map(|ids| ids.join(", "))
+        };
+        let everyone: Vec<&str> = ids
             .iter()
-            .map(|id| plain_name(id).map(|id| format!("'{id}'")))
-            .collect::<Option<Vec<String>>>()?
+            .copied()
+            .filter(|id| machine_wide.iter().any(|wide| wide == id))
+            .collect();
+        let ids = listed(ids)?;
+        let everyone = listed(&everyone)?;
+        let scope = FOR_EVERYONE
+            .map(|argument| format!("'{argument}'"))
             .join(", ");
         let codes = quoted(codes);
         let inner = format!(
             "$codes = @(); $null = New-Item -Force -ItemType File -Path {codes}; \
-             foreach ($id in {ids}) {{ & {} upgrade --id $id {UPGRADE_FLAGS}; \
+             $everyone = @({everyone}); \
+             foreach ($id in {ids}) {{ $scope = @(); if ($everyone -contains $id) {{ $scope = {scope} }}; \
+             & {} upgrade --id $id {UPGRADE_FLAGS} @scope; \
              Add-Content -LiteralPath {codes} -Value ($id + ' ' + $LASTEXITCODE); \
              if ($LASTEXITCODE) {{ $codes += $LASTEXITCODE }} }}; \
              $shared = @($codes | Select-Object -Unique); \
@@ -198,9 +243,8 @@ impl PackageSource for Winget {
     }
 
     fn update_command(&self, name: &str) -> Option<Command> {
-        let mut command = self.change("upgrade", name);
-        command.arg("--accept-package-agreements");
-        Some(command)
+        let for_everyone = self.machine_wide().iter().any(|id| id == name);
+        Some(self.upgrade(name, for_everyone))
     }
 
     fn update_together(&self, names: &[&str]) -> Option<Command> {
@@ -209,6 +253,7 @@ impl PackageSource for Winget {
         }
         self.elevated_upgrade(
             names,
+            &self.machine_wide(),
             &crate::platform::data_dir()
                 .join(CODES_FILE)
                 .to_string_lossy(),
@@ -324,6 +369,33 @@ fn close_script(location: &str) -> String {
          @({HOLDERS}) + @({PROCESSES}) | Stop-Process -Force",
         quoted(location),
     )
+}
+
+fn machine_wide_msis(details: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let (mut id, mut msi, mut machine) = (None, false, false);
+    for line in details.lines().map(str::trim) {
+        if let Some(next) = listed_id(line) {
+            (id, msi, machine) = (Some(next), false, false);
+            continue;
+        }
+        let already = msi && machine;
+        msi |= line == MSI;
+        machine |= line == MACHINE_WIDE;
+        if let (Some(id), true, false) = (id, msi && machine, already) {
+            found.push(id.to_string());
+        }
+    }
+    found
+}
+
+fn listed_id(line: &str) -> Option<&str> {
+    let (count, entry) = line.strip_prefix('(')?.split_once(") ")?;
+    let (index, total) = count.split_once('/')?;
+    index.parse::<u32>().ok()?;
+    total.parse::<u32>().ok()?;
+    let (_, id) = entry.strip_suffix(']')?.rsplit_once(" [")?;
+    Some(id)
 }
 
 fn installed_location(details: &str) -> Option<String> {
