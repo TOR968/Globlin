@@ -7,6 +7,12 @@ Commits](https://www.conventionalcommits.org/en/v1.0.0/), so the commit message 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.31](https://github.com/TOR968/Globlin/compare/v0.4.30...v0.4.31) - 2026-11-26
+
+### Fixed
+
+- upgrade an MSI installed for every user with ALLUSERS=1 so a dual-scope installer stops refusing it
+
 ## [0.4.30](https://github.com/TOR968/Globlin/compare/v0.4.29...v0.4.30) - 2026-11-25
 
 ### Fixed
